@@ -6,6 +6,6 @@
 .idea
 *.egg-info
 .ipynb_checkpoints
-*.html
+# *.html
 
 cluster_vs_continuum/.gitattributes
