@@ -1,2 +1,2 @@
-# cluster_vs_continuum
+# cluster vs continuum
 Finding methods for assessing clustering tendency.
