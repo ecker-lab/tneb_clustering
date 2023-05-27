@@ -1,0 +1,13 @@
+name: corc_env
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - scipy
+  - pyyaml
+  - pandas
+  - tqdm
+  - opentsne
+  - seaborn
+  - nbconvert
+  - ipykernel
