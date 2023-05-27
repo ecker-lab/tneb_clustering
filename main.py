@@ -48,7 +48,7 @@ def main():
             predictions, scores = clustering.run(train_latents, test_latents)
 
             # calculate metric
-            metric.calculate(predictions, scores, k, s)
+            metric.calculate(train_latents, test_latents, predictions, scores, k, s)
 
     # save metrics
     metric.summarize()

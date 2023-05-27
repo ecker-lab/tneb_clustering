@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.mixture import GaussianMixture
+from sklearn.cluster import KMeans
 
 
 class Clustering():
@@ -37,7 +38,8 @@ class Clustering():
         """
         if self.clustering_type == 'gmm':
             return self.run_gmm_clustering(train_latents, test_latents)
-
+        if self.clustering_type == 'kmeans':
+            return self.run_kmeans_clustering(train_latents, test_latents)
 
 
     def run_gmm_clustering(self, train_latents, test_latents):
@@ -64,4 +66,30 @@ class Clustering():
             gmm = GaussianMixture(n_components=self.n_clusters, covariance_type='diag').fit(train_latents)
             predictions[i] = gmm.predict(test_latents)
             scores[i] = gmm.score(test_latents)
+        return predictions, scores
+
+
+    def run_kmeans_clustering(self, train_latents, test_latents):
+        """ fit kmeans and predict test set
+
+        Parameters
+        ----------
+        train_latents : ndarray
+            training set of latent embeddings
+        test_latents : ndarray
+            test set of latent embeddings
+
+        Returns
+        -------
+        ndarray, ndarray
+            prediction and scores of kmeans
+        """
+        predictions = np.zeros((self.n_runs, len(test_latents)))
+        scores = np.zeros((self.n_runs))
+
+        for i in range(self.n_runs):
+            # fit kmeans & predict test set
+            kmeans = KMeans(n_clusters=self.n_clusters, random_state=42, n_init='auto').fit(train_latents)
+            predictions[i] = kmeans.predict(test_latents)
+            scores[i] = kmeans.score(test_latents)
         return predictions, scores

@@ -29,3 +29,5 @@ def save(data, filename, outdir):
     """
     with open(join(outdir, f'{filename}.pkl'), 'wb') as f:
         pickle.dump(data, f)
+    with open(join(outdir, f'{filename}.txt'), 'w') as f:
+        f.write(f'{data}')

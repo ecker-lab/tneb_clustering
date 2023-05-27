@@ -8,4 +8,5 @@
 .ipynb_checkpoints
 # *.html
 
+logs
 # notebooks/.gitattributes

@@ -1,11 +1,11 @@
-experiment_name: uniform_10_ari
+experiment_name: test
 K: 3
 generation:
   center_structure: uniform
   n_centers: 10
   n_samples: 100
   dim: 32
-  stds: [0.1, 1]
+  stds: [0.001, 1]
   save_file: True
 clustering:
   type: gmm
@@ -18,6 +18,6 @@ visualization:
   perplexity: 30
   savefig: True
 metric: 
-  type: ARI
+  type: ari
   n_best: 3
   save_file: True
