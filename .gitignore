@@ -8,4 +8,4 @@
 .ipynb_checkpoints
 # *.html
 
-cluster_vs_continuum/.gitattributes
+# notebooks/.gitattributes

@@ -1,0 +1,23 @@
+experiment_name: uniform_10_ari
+K: 3
+generation:
+  center_structure: uniform
+  n_centers: 10
+  n_samples: 100
+  dim: 32
+  stds: [0.1, 1]
+  save_file: True
+clustering:
+  type: gmm
+  n_runs: 10
+  n_clusters: 10
+visualization:
+  plot_histplot: True
+  plot_gaussplot: True
+  plot_tsne: True
+  perplexity: 30
+  savefig: True
+metric: 
+  type: ARI
+  n_best: 3
+  save_file: True
