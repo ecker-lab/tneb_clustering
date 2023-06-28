@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.metrics import adjusted_rand_score, silhouette_score
 from sklearn.neighbors import NearestNeighbors
 
@@ -12,7 +13,7 @@ class Metric():
 
         Parameters
         ----------
-        type : str
+        type : list
             type of metric, i.e. adjusted rand index (ARI)
         n_best : int
             number of how many clustering runs to consider for metric calculated
@@ -24,8 +25,8 @@ class Metric():
             standard deviations of sampled data
         outdir : str
             folder name where to save data
-        k_results : ndarry, K x n_stds
-            summary array of metric
+        k_results : dict -> str: ndarray, K x n_stds
+            summary dict of metrics
         """
         self.metric_type = type
         self.n_best = n_best
@@ -34,7 +35,9 @@ class Metric():
         self.stds = stds
         self.outdir = outdir
 
-        self.k_results = np.zeros((self.K, len(self.stds)))
+        self.k_results = {}
+        for t in self.metric_type:
+            self.k_results[t] = np.zeros((self.K, len(self.stds)))
 
 
     def calculate(self, train_latents, test_latents, predictions, scores, k, s):
@@ -53,29 +56,35 @@ class Metric():
 
         Returns
         -------
-        ndarray, n_best x n_best
-            mean metric between n_best runs of clustering
+        dict -> str: ndarray, metric: n_best x n_best
+            dict over metrics of mean metric between n_best runs of clustering
         """
-        if self.metric_type == 'ARI':
+        if 'ARI' in self.metric_type:
             results = self.calculate_ARI(predictions, scores)
-            self.k_results[k, s] = results[np.triu_indices(self.n_best, k=1)].mean()
-        if self.metric_type == 'silhouette':
+            self.k_results['ARI'][k, s] = results[np.triu_indices(self.n_best, k=1)].mean()
+        if 'silhouette' in self.metric_type:
             results = self.calculate_silhouette_score(test_latents, predictions, scores)
-            self.k_results[k, s] = results.mean()
-        if self.metric_type == 'hopkins':
+            self.k_results['silhouette'][k, s] = results.mean()
+        if 'hopkins' in self.metric_type:
             results = self.calc_hopkins_statistics(train_latents)
-            self.k_results[k, s] = results.mean()
+            self.k_results['hopkins'][k, s] = results.mean()
+        else:
+            print('[ERROR] Metric not yet implemented.')
+            exit()
 
 
     def summarize(self):
         """take mean metric per std over K and print/save
         """
-        mean_metrics = self.k_results.mean(axis=0)
         if self.save_file:
-            data = pd.DataFrame(data=np.stack((self.stds, mean_metrics)).T, columns=['std', self.metric_type])
-            save(data, self.metric_type, self.outdir)
+            for t in self.metric_type:
+                mean_metrics = self.k_results[t].mean(axis=0)
+                data = pd.DataFrame(data=np.stack((self.stds, mean_metrics)).T, columns=['std', t])
+                save(data, t, self.outdir)
         else:
-            print(mean_metrics)
+            for t in self.metric_type:
+                mean_metrics = self.k_results[t].mean(axis=0)
+                print(t, mean_metrics)
 
 
     def calculate_ARI(self, predictions, scores):

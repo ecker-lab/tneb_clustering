@@ -12,13 +12,15 @@ clustering:
   n_runs: 10
   n_clusters: 3
 visualization:
+  plot_data: True
   plot_histplot: True
   plot_gaussplot: True
   plot_tsne: True
+  plot_ivat: True
   perplexity: 30
   savefig: True
 metric: 
-  type: silhouette #['silhouette', 'hopkins', 'ARI']
+  type: ['silhouette', 'hopkins', 'ARI']
   n_best: 3
   stds: [0.01, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
   save_file: True
