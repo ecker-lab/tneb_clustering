@@ -27,7 +27,7 @@ def main():
 
     vis = Visualization(**opt['visualization'], outdir=outdir)
     gen = GenerationModel(**opt['generation'], outdir=outdir)
-    metric = Metric(**opt['metric'], K=opt['K'], stds=opt['generation']['stds'], outdir=outdir)
+    metric = Metric(**opt['metric'], K=opt['K'], outdir=outdir)
     clustering = Clustering(**opt['clustering'])
 
     # execute clustering and metric calculation for K times
@@ -35,7 +35,7 @@ def main():
         gen.generate()
 
         # cluster centers are the same for each std
-        for s, std in enumerate(opt['generation']['stds']):
+        for s, std in enumerate(opt['metric']['stds']):
             # create data
             latent_emb = gen.sample_embedding(std)
             train_latents, test_latents = gen.split_data(latent_emb)

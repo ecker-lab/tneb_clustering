@@ -5,7 +5,7 @@ from corc.utils import save
 
 
 class GenerationModel():
-    def __init__(self, center_structure, n_centers, n_samples, dim, stds, save_file, outdir) -> None:
+    def __init__(self, center_structure, n_centers, n_samples, dim, save_file, outdir, distance=None) -> None:
         """ generation of toy dataset
 
         Parameters
@@ -18,14 +18,12 @@ class GenerationModel():
             number of data points
         dim : int
             dimensionality of latent embedding
-        stds : list of float
-            standard deviations of sampled data
-        cluster_centers : ndarray, n_centers x dim
-            points sampled uniformly in [0,1]^dim
         save_file : bool
             if embeddings should be saved to pkl
         outdir : str
             folder name where to save data
+        distance : int
+            distance between cluster centers in equidistant structure
 
         labels : ndarray, n_samples x 1
             labels of gt clusters; each cluster center has a label which is shared with points sampled Normal(center, std) around it
@@ -37,10 +35,10 @@ class GenerationModel():
             number of points sampled around cluster center
         """
         self.center_structure =  center_structure
+        self.distance = distance
         self.n_centers = n_centers
         self.n_samples = n_samples
-        self.dim = dim 
-        self.stds = stds
+        self.dim = dim
         self.save_file = save_file
         self.outdir = outdir
         self.labels = []
@@ -76,8 +74,23 @@ class GenerationModel():
         ndarray, n_centers x 1
             min dists per cluster center to neighboring cluster centers
         """
-        dists = distance.cdist(self.cluster_centers, self.cluster_centers, 'cosine') + np.eye(len(self.cluster_centers))*1000
+        dists = distance.cdist(self.cluster_centers, self.cluster_centers) + np.eye(len(self.cluster_centers))*1000
         self.dists = np.min(dists, axis=0)
+
+
+    def _calculate_coordinates_triangle(self):
+        # Define the coordinates of the first point as (0, 0)
+        x1, y1 = 0, 0
+        # Calculate the coordinates of the second point
+        x2, y2 = self.distance, 0
+        # Calculate the distance between the second and third points using the Law of Cosines
+        cos_theta = self.distance ** 2 / (2 * self.distance * self.distance)
+        sin_theta = np.sqrt(1 - cos_theta ** 2)
+        # Calculate the coordinates of the third point using the calculated angles and distances
+        x3 = self.distance * cos_theta
+        y3 = self.distance * sin_theta
+
+        return np.array([[x1, y1], [x2, y2], [x3, y3]])
     
 
     def get_cluster_centers(self):
@@ -90,6 +103,13 @@ class GenerationModel():
         """
         if self.center_structure == 'uniform':
             self.cluster_centers = np.random.uniform(0,1,size=(self.n_centers, self.dim))
+        elif self.center_structure == 'equidistant_triangle':
+            assert self.n_centers == 3, f'Number of cluster centers needs to be 3 for equidistant triangle.'
+            assert self.dim == 2, f'Dimension has to be 2 for equidistant triangle.'
+            self.cluster_centers = self._calculate_coordinates_triangle()
+        else:
+            print('[ERROR] Type of placing cluster centers not valid.')
+            exit()
 
 
     def get_labels(self):
