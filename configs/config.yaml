@@ -20,7 +20,7 @@ visualization:
   perplexity: 30
   savefig: True
 metric: 
-  type: ['silhouette', 'hopkins', 'ARI']
+  type: ['silhouette', 'hopkins', 'ARI', 'CH', 'DB']
   n_best: 3
   stds: [0.01, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5]
   save_file: True

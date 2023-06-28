@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.metrics import adjusted_rand_score, silhouette_score
+from sklearn.metrics import adjusted_rand_score, silhouette_score, calinski_harabasz_score, davies_bouldin_score
 from sklearn.neighbors import NearestNeighbors
 
 from corc.utils import save
@@ -65,6 +65,12 @@ class Metric():
         if 'silhouette' in self.metric_type:
             results = self.calculate_silhouette_score(test_latents, predictions, scores)
             self.k_results['silhouette'][k, s] = results.mean()
+        if 'CH' in self.metric_type:
+            results = self.calculate_calinski_harabasz_score(test_latents, predictions, scores)
+            self.k_results['CH'][k, s] = results.mean()
+        if 'DB' in self.metric_type:
+            results = self.calculate_davies_bouldin_score(test_latents, predictions, scores)
+            self.k_results['DB'][k, s] = results.mean()
         if 'hopkins' in self.metric_type:
             results = self.calc_hopkins_statistics(train_latents)
             self.k_results['hopkins'][k, s] = results.mean()
@@ -138,6 +144,60 @@ class Metric():
         for i in range(self.n_best):
             silhouette[i] = silhouette_score(test_latents, sorted_preds[i])
         return silhouette
+
+
+    def calculate_calinski_harabasz_score(self, test_latents, predictions, scores):
+        """ calculate Calinski Harabasz score for best clusterings
+
+        Parameters
+        ----------
+        test_latents : ndarray
+            test split of data points
+        predictions : ndarray
+            of clustering algorithm
+        scores : ndarray
+            of clustering algorithm
+
+        Returns
+        -------
+        ndarray, n_best x 1
+            Calinski Harabasz score of n_best runs of clustering
+        """
+        sorted_scores = np.argsort(scores)[::-1]
+        sorted_preds = predictions[sorted_scores[:self.n_best]]
+
+        score = np.zeros((self.n_best, 1))
+
+        for i in range(self.n_best):
+            score[i] = calinski_harabasz_score(test_latents, sorted_preds[i])
+        return score
+
+
+    def calculate_davies_bouldin_score(self, test_latents, predictions, scores):
+        """ calculate Davies Bouldin score for best clusterings
+
+        Parameters
+        ----------
+        test_latents : ndarray
+            test split of data points
+        predictions : ndarray
+            of clustering algorithm
+        scores : ndarray
+            of clustering algorithm
+
+        Returns
+        -------
+        ndarray, n_best x 1
+            Davies Bouldin score of n_best runs of clustering
+        """
+        sorted_scores = np.argsort(scores)[::-1]
+        sorted_preds = predictions[sorted_scores[:self.n_best]]
+
+        score = np.zeros((self.n_best, 1))
+
+        for i in range(self.n_best):
+            score[i] = davies_bouldin_score(test_latents, sorted_preds[i])
+        return score
 
 
     def calc_hopkins_statistics(self, train_latents):
