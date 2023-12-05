@@ -53,6 +53,10 @@ def main():
     # save metrics
     metric.summarize()
 
+    # generate overview plots
+    utils.generate_overview_lineplot(outdir)
+    utils.generate_overview_visplot(outdir)
+
 
 if __name__ == '__main__':
     main()

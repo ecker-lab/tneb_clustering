@@ -108,8 +108,7 @@ class GenerationModel():
             assert self.dim == 2, f'Dimension has to be 2 for equidistant triangle.'
             self.cluster_centers = self._calculate_coordinates_triangle()
         else:
-            print('[ERROR] Type of placing cluster centers not valid.')
-            exit()
+            raise NotImplementedError('[ERROR] Type of placing cluster centers not valid.')
 
 
     def get_labels(self):

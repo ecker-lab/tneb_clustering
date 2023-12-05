@@ -39,6 +39,8 @@ class Visualization():
         self.savefig = savefig
         self.outdir = outdir
 
+        self.figsize = (5,5)
+
 
     def visualize(self, dists, std, latent_emb, labels):
         """visualize different plots
@@ -87,7 +89,7 @@ class Visualization():
 
 
     def dataplot(self, data, labels, std):
-        fig = plt.figure()
+        fig = plt.figure(figsize=self.figsize)
         df = pd.DataFrame()
         df['x'], df['y'], df['label'] = data[:,0], data[:,1], labels
         sns.scatterplot(data=df, x='x', y='y', hue='label', legend=False)
@@ -107,7 +109,7 @@ class Visualization():
             standard deviation of sampled data
         """
         dists_std_ratio = dists / std
-        fig = plt.figure()
+        fig = plt.figure(figsize=self.figsize)
         sns.histplot(data=pd.DataFrame(dists_std_ratio), legend=False, multiple='stack')
         if self.savefig:
             self.save_plot(fig, std, plotname='hist')
@@ -131,7 +133,7 @@ class Visualization():
         dist = dists_std_ratio.mean()
         x = np.linspace(0-3*std, 0+3*std, 1000)
         y = scipy.stats.norm.pdf(x, 0, std)
-        fig = plt.figure()
+        fig = plt.figure(figsize=self.figsize)
         plt.plot(x, y, color='r')
         x2 = np.linspace(dist-3*std, dist+3*std, 1000)
         y2 = scipy.stats.norm.pdf(x2, dist, std)
@@ -158,7 +160,7 @@ class Visualization():
         outdir : str
             folder name where to save plot
         """
-        fig = plt.figure()
+        fig = plt.figure(figsize=self.figsize)
         tsne = TSNE(n_components=2, perplexity=self.perplexity)
         emb = tsne.fit(latent_emb).transform(latent_emb)
         check = pd.DataFrame(emb, columns=['x', 'y'])
@@ -283,7 +285,7 @@ class Visualization():
 
         ordered_matrix = _compute_ivat_ordered_dissimilarity_matrix(latent_emb)
 
-        fig, ax = plt.subplots(figsize=(10, 10))
+        fig, ax = plt.subplots(figsize=self.figsize)
         ax.imshow(ordered_matrix, cmap='gray', vmin=0, vmax=np.max(ordered_matrix))
 
         if self.savefig:
