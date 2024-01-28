@@ -43,3 +43,15 @@ which loads parameters set in `configs/config.yaml`.
 ## Notebooks
 
 There is a folder with example notebooks for different clustering tendency assessment algorithms.
+
+## Automatic Notebook Clean-up
+
+Add this to `.git/config`:
+```bash
+[filter "clean-notebook-output"]
+    clean = "jupyter nbconvert --ClearOutputPreprocessor.enabled=True --to=notebook --stdin --stdout --log-level=ERROR"
+```
+and add a file `.gitattributes` with the following content:
+```
+**/*.ipynb filter=clean-notebook-output
+```
