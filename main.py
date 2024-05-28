@@ -32,12 +32,11 @@ def main():
 
     # execute clustering and metric calculation for K times
     for k in tqdm(range(opt['K'])):
-        gen.generate()
-
         # cluster centers are the same for each std
         for s, std in enumerate(opt['metric']['stds']):
             # create data
-            latent_emb = gen.sample_embedding(std)
+            gen.stds = std
+            latent_emb = gen.sample_embedding()
             train_latents, test_latents = gen.split_data(latent_emb)
 
             # plot once

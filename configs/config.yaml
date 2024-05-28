@@ -1,12 +1,14 @@
-experiment_name: equidistant_triangle
+experiment_name: test_new_gen
 K: 10
 generation:
-  center_structure: equidistant_triangle
+  center_structure: uniform
   distance: 1
-  n_centers: 3
-  n_samples: 100
-  dim: 2
+  n_centers: 6
+  n_samples: 1000
+  dim: 32
   save_file: True
+  std: 0.2
+  equal_sized_clusters: False
 clustering:
   type: gmm
   n_runs: 10
