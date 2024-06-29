@@ -129,7 +129,7 @@ class GMM(fj.Module, Dataset, register=False):
         )
 
 
-class Clusterlab1(Dataset):
+class Clusterlab1(Dataset, fj.Module, register=False):
     """
     A single cluster, example dataset 1 from the R package clusterlab.
     Used in "Sparse clusterability: testing for cluster structure in high
@@ -145,7 +145,7 @@ class Clusterlab1(Dataset):
         return X, y
 
 
-class Clusterlab2(Dataset):
+class Clusterlab2(Dataset, fj.Module, register=False):
     """
     Four clusters with equal variances, example dataset 2 from the R package
     clusterlab.
@@ -196,7 +196,7 @@ class Clusterlab2(Dataset):
         return Xs, ys
 
 
-class Clusterlab3(Dataset):
+class Clusterlab3(Dataset, fj.Module, register=False):
     """
     Four clusters with different variances, example dataset 3 from the R package
     clusterlab.
@@ -228,7 +228,7 @@ class Clusterlab3(Dataset):
         return xs, ys
 
 
-class Clusterlab4(Dataset):
+class Clusterlab4(Dataset, fj.Module, register=False):
     """
     Simulating four clusters with one cluster pushed to the outside, example
     dataset 4 from the R package clusterlab.
@@ -263,7 +263,7 @@ class Clusterlab4(Dataset):
         return xs, ys
 
 
-class Clusterlab6(Dataset):
+class Clusterlab6(Dataset, fj.Module, register=False):
     """
     Simulating five clusters with one central cluster, example dataset 6 from
     the R package clusterlab.
@@ -297,7 +297,7 @@ class Clusterlab6(Dataset):
         return xs, ys
 
 
-class Clusterlab8(Dataset):
+class Clusterlab8(Dataset, fj.Module, register=False):
     """
     Simulating six clusters with different variances, example dataset 8 from
     the R package clusterlab.
@@ -329,7 +329,7 @@ class Clusterlab8(Dataset):
         return xs, ys
 
 
-class Clusterlab9(Dataset):
+class Clusterlab9(Dataset, fj.Module, register=False):
     """
     Simulating six clusters with different push apart degrees, example dataset
     9 from the R package clusterlab.
@@ -361,7 +361,7 @@ class Clusterlab9(Dataset):
         return xs, ys
 
 
-class Clusterlab10(Dataset):
+class Clusterlab10(Dataset, fj.Module, register=False):
     """
     Simulating six clusters with different push apart degrees and variances,
     example dataset 10 from the R package clusterlab.
@@ -393,7 +393,7 @@ class Clusterlab10(Dataset):
         return xs, ys
 
 
-class BowTie(Dataset):
+class BowTie(Dataset, fj.Module, register=False):
     """
     A 2D dataset with two clusters in the shape of a bowtie, that thins out
     towards the ends.
@@ -436,7 +436,7 @@ def _correlated_2d_normal(key, n, rho: float):
     return x
 
 
-class ZigZag(Dataset):
+class ZigZag(Dataset, fj.Module, register=False):
     """
     A 2D dataset with seven correlated normal clusters right next to each other.
     """
@@ -469,7 +469,7 @@ class ZigZag(Dataset):
         return X, y
 
 
-class UniformCircle(fj.Module, Dataset):
+class UniformCircle(Dataset, fj.Module, register=False):
     """
     A 2D dataset with two clusters in the shape of a circle.
 
@@ -495,7 +495,7 @@ class UniformCircle(fj.Module, Dataset):
         return X, y
 
 
-class UniformSquare(fj.Module, Dataset):
+class UniformSquare(Dataset, fj.Module, register=False):
     """
     A 2D dataset with a uniform distribution in a square.
     """
