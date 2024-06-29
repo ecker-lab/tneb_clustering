@@ -65,9 +65,9 @@ class GMM(fj.Module, Dataset, register=False):
         keys = jrandom.split(key, n)
         keys = jnp.stack(keys, axis=0)
 
-        return jax.vmap(self.sample_)(keys)
+        return jax.vmap(self._sample)(keys)
 
-    def sample_(
+    def _sample(
         self,
         key: PRNGKeyArray,
     ) -> tuple[Float[Array, "dim"], Int[Array, ""]]:
