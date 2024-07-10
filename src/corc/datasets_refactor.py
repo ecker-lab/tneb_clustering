@@ -67,6 +67,7 @@ class GMM(fj.Module, Dataset, register=False):
 
         return jax.vmap(self._sample)(keys)
 
+    # sample one element
     def _sample(
         self,
         key: PRNGKeyArray,
