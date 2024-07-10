@@ -159,7 +159,8 @@ class Clusterlab2(Dataset, fj.Module, register=False):
     def sample(self, key, n):
         # the vectors of centers just point into the four cardinal directions
         # create the angles of the four cardinal directions
-        angles = jnp.linspace(0, 2 * jnp.pi, 4, endpoint=False)
+        cardinal_dir = 4
+        angles = jnp.linspace(0, 2 * jnp.pi, cardinal_dir, endpoint=False)
 
         # get the vectors from the angles
         centers = _vec2d_from_angle(angles)
