@@ -159,8 +159,8 @@ class Clusterlab2(Dataset, fj.Module, register=False):
     def sample(self, key, n):
         # the vectors of centers just point into the four cardinal directions
         # create the angles of the four cardinal directions
-        cardinal_dir = 4
-        angles = jnp.linspace(0, 2 * jnp.pi, cardinal_dir, endpoint=False)
+        n_directions = 4
+        angles = jnp.linspace(0, 2 * jnp.pi, n_directions, endpoint=False)
 
         # get the vectors from the angles
         centers = _vec2d_from_angle(angles)
@@ -311,7 +311,8 @@ class Clusterlab8(Dataset, fj.Module, register=False):
 
     def sample(self, key, n):
         # see the 'clusterlab_dataset2' for comments explaining the code
-        cs = _vec2d_from_angle(jnp.linspace(0, 2 * jnp.pi, 6, endpoint=False))
+        n_directions = 6
+        cs = _vec2d_from_angle(jnp.linspace(0, 2 * jnp.pi, n_directions, endpoint=False))
         xs = []
         ys = []
 
@@ -323,7 +324,7 @@ class Clusterlab8(Dataset, fj.Module, register=False):
                 ni += n % len(cs)
 
             xs.append(jrandom.normal(subkey, (ni, 2)) * s + c * self.radius_data)
-            ys.append(jnp.zeros(50) + i)
+            ys.append(jnp.zeros(ni) + i)
 
         xs = jnp.vstack(xs)
         ys = jnp.concatenate(ys)
@@ -343,7 +344,8 @@ class Clusterlab9(Dataset, fj.Module, register=False):
 
     def sample(self, key, n):
         # see the 'clusterlab_dataset2' for comments explaining the code
-        cs = _vec2d_from_angle(jnp.linspace(0, 2 * jnp.pi, 6, endpoint=False))
+        n_directions = 6
+        cs = _vec2d_from_angle(jnp.linspace(0, 2 * jnp.pi, n_directions, endpoint=False))
         xs = []
         ys = []
 
@@ -355,7 +357,7 @@ class Clusterlab9(Dataset, fj.Module, register=False):
                 ni += n % len(cs)
 
             xs.append(jrandom.normal(subkey, (ni, 2)) + c * self.radius_data * a)
-            ys.append(jnp.zeros(50) + i)
+            ys.append(jnp.zeros(ni) + i)
 
         xs = jnp.vstack(xs)
         ys = jnp.concatenate(ys)
@@ -375,7 +377,8 @@ class Clusterlab10(Dataset, fj.Module, register=False):
 
     def sample(self, key, n):
         # see the 'clusterlab_dataset2' for comments explaining the code
-        cs = _vec2d_from_angle(jnp.linspace(0, 2 * jnp.pi, 6, endpoint=False))
+        n_directions = 6
+        cs = _vec2d_from_angle(jnp.linspace(0, 2 * jnp.pi, n_directions, endpoint=False))
         xs = []
         ys = []
 
@@ -387,7 +390,7 @@ class Clusterlab10(Dataset, fj.Module, register=False):
                 ni += n % len(cs)
 
             xs.append(jrandom.normal(subkey, (ni, 2)) * s + c * 9 * a)
-            ys.append(jnp.zeros(50) + i)
+            ys.append(jnp.zeros(ni) + i)
 
         xs = jnp.vstack(xs)
         ys = jnp.concatenate(ys)
