@@ -413,7 +413,8 @@ class BowTie(Dataset, fj.Module, register=False):
         X = X @ jnp.array([[1, self.rho], [self.rho, 1]], dtype="float32")
 
         # abs normal with offset
-        X = jnp.abs(X) + 0.1
+        offset = 0.1
+        X = jnp.abs(X) + offset
 
         # random {-1, 1} labels
         y = jrandom.randint(key_y, (X.shape[0],), 0, 2)
