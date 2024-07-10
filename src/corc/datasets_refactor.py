@@ -373,7 +373,7 @@ class Clusterlab10(Dataset, fj.Module, register=False):
     """
 
     std_devs: tuple[float, ...] = (0.5, 1, 1.5, 1.75, 2, 2.25, 2.25)
-    radii: tuple[float, ...] = (0.5, 1, 1.5, 1.75, 1.85, 1.95, 2.05)
+    radii: tuple[float, ...] = (4.5, 9, 13.5, 15.75, 16.65, 17.55, 18.45
 
     def sample(self, key, n):
         # see the 'clusterlab_dataset2' for comments explaining the code
@@ -389,7 +389,7 @@ class Clusterlab10(Dataset, fj.Module, register=False):
             if i == 0:
                 ni += n % len(cs)
 
-            xs.append(jrandom.normal(subkey, (ni, 2)) * s + c * 9 * a)
+            xs.append(jrandom.normal(subkey, (ni, 2)) * s + c * a)
             ys.append(jnp.zeros(ni) + i)
 
         xs = jnp.vstack(xs)
