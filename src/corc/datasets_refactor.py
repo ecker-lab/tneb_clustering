@@ -41,7 +41,8 @@ class GMM(fj.Module, Dataset, register=False):
         The covariances of the components
 
     frequencies: Float[Array, "components"]
-        The relative frequencies of the components
+        The relative frequencies of the components. 
+        The frequencies should sum to 1.
     """
 
     means: Float[Array, "components dim"]
@@ -116,12 +117,15 @@ class GMM(fj.Module, Dataset, register=False):
     def equidistant_triangle(
         cls,
         stddev: float,
+        frequencies: Float[Arrray, "components"] | None = None,
     ) -> "GMM":
         angles = jnp.linspace(0, 2 * jnp.pi, 3, endpoint=False)
         means = _vec2d_from_angle(angles)
 
         covariances = cls._isotropic_covariances(3, 2) * stddev**2
-        frequencies = jnp.ones(3) / 3
+
+        if frequencies is None:
+            frequencies = jnp.ones(3) / 3
 
         return cls(
             means,
