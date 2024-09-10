@@ -149,19 +149,19 @@ def compute_neb_paths(tmm, iterations=1000):
     temps = dict()  # "procentual" values of the path (used for plotting logprob against distance)
     logprobs = dict()  # actual values at path positions
 
-    for i, j in tqdm.tqdm(itertools.product(range(n_components), repeat=2), total=n_components ** 2):
+    for i, j in tqdm.tqdm(itertools.combinations(range(n_components), r=2), total=n_components * (n_components - 1) // 2):
         # compute nudged elastic band
         path_positions, temperatures, interpolation_probs = (
             compute_interpolation(i, j, means=tmm.location,
                 covs=np.transpose(tmm.scale,(2, 0, 1)),
                 weights=tmm.mix_weights,
                 iterations=iterations))
-        paths[(i, j)] = path_positions
-        temps[(i, j)] = temperatures
-        logprobs[(i, j)] = interpolation_probs
+        paths[(i, j)] = paths[(j,i)] = path_positions
+        temps[(i, j)] = temps[(j,j)] = temperatures
+        logprobs[(i, j)] = logprobs[(j,i)] = interpolation_probs
 
         # evaluate score of elastic band (minimum value along the path)
-        adjacency[i, j] = min(interpolation_probs)
+        adjacency[i, j] = adjacency[j,i] = min(interpolation_probs)
 
         raw_adjacency = adjacency.copy()
         adjacency = compute_mst_distances(raw_adjacency)
@@ -211,3 +211,17 @@ def compute_mst_distances(adjacency):
         distances[i, i] = 0
 
     return distances
+
+def get_thresholds_and_cluster_numbers(adjacency):
+    thresholds, counts = np.unique(adjacency, return_counts=True)
+    thresholds = sorted(thresholds.tolist())
+
+    cluster_numbers = list()
+    for threshold in thresholds:
+        tmp_adj = np.array(adjacency >= threshold, dtype=int)
+        n_components, component_labels = scipy.sparse.csgraph.connected_components(tmp_adj, directed=False)
+        cluster_numbers.append((threshold, n_components))
+
+    cluster_numbers = np.array(cluster_numbers)
+
+    return thresholds, cluster_numbers, counts
