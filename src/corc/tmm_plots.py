@@ -100,8 +100,12 @@ def plot_row_with_computation(data_X, data_y, overclustering_n=15, iterations=50
 
     plot_row(data_X, data_y, tmm, paths, thresholds, cluster_numbers, counts, mst_edges)
 
-    if levels is not None:
-        plot_cluster_levels(levels, tmm, data_X, adjacency, paths)
+
+    if levels is None:
+        target_cluster_n = len(np.unique(data_y))
+        levels = [target_cluster_n-1, target_cluster_n, target_cluster_n+1]
+    plot_cluster_levels(levels, tmm, data_X, adjacency, paths)
+
 
 def plot_row(data_X, data_y, tmm, paths, thresholds, cluster_numbers, counts, mst_edges):
     fig, axes = plt.subplots(1, 4, figsize=(16, 6))
@@ -142,7 +146,9 @@ def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
     cmap = plt.get_cmap('viridis')  # choose a colormap
 
     for index, level in enumerate(levels):
+        axis = axes[index]
         if level not in cluster_numbers:
+            axis.set_title(f'no threshold leads to {level} clusters')
             print(f'{level} clusters is not achievable.')
             continue
 
@@ -157,7 +163,6 @@ def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
         else:
             normalized_component_labels = component_labels
 
-        axis = axes[index]
         axis.contourf(x, y, tmm_probs, levels=20, cmap="coolwarm", alpha=0.5)
         axis.scatter(data_X[:, 0], data_X[:, 1], s=10, label="raw data")
         axis.scatter(tmm.location[:, 0], tmm.location[:, 1], c=component_labels, cmap='viridis', marker="X",
@@ -167,7 +172,6 @@ def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
             if i==j:
                 continue
             path = paths[(i, j)]
-            # axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5)
             axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5, color=cmap(normalized_component_labels[i]))
 
         axis.set_title(f'{level} target clusters ({len(tmm.location)} total)')
