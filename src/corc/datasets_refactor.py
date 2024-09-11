@@ -6,6 +6,26 @@ import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
+# use like this:
+# datasets = {
+#     'Clusterlab1': datasets2d.Clusterlab1().sample(jrandom.PRNGKey(0), 100),
+#     'Clusterlab2': datasets2d.Clusterlab2().sample(jrandom.PRNGKey(0), 200),
+#     'Clusterlab3': datasets2d.Clusterlab3().sample(jrandom.PRNGKey(0), 200),
+#     'Clusterlab4': datasets2d.Clusterlab4().sample(jrandom.PRNGKey(0), 200),
+#     'Clusterlab6': datasets2d.Clusterlab6().sample(jrandom.PRNGKey(0), 250),
+#     'Clusterlab8': datasets2d.Clusterlab8().sample(jrandom.PRNGKey(0), 300),
+#     'Clusterlab9': datasets2d.Clusterlab9().sample(jrandom.PRNGKey(0), 300),
+#     'Clusterlab10': datasets2d.Clusterlab10().sample(jrandom.PRNGKey(0), 300),
+#     'BowTie': datasets2d.BowTie().sample(jrandom.PRNGKey(0), 256),
+#     # 'ZigZag': datasets2d.ZigZag().sample(key, 64),
+#     'UniformCircle': datasets2d.UniformCircle().sample(jrandom.PRNGKey(0), 256),
+#     'UniformSquare': datasets2d.UniformSquare().sample(jrandom.PRNGKey(0), 256),
+# }
+# data_X, data_y = datasets['Clusterlab10']
+
+# TODO: missing are: AnisoBlobs, Blobs, Circles, Clusterlab5, Clusterlab7, Moons, ZigZig
+# TODO: ZigZag is broken
+
 
 @staticmethod
 def _vec2d_from_angle(angle: Float[Array, "..."]) -> Float[Array, "..."]:
