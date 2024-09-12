@@ -3,14 +3,20 @@ import matplotlib.pyplot as plt
 import itertools
 import scipy
 import studenttmixture
+import sklearn
 
 import src.corc.jax_neb as jax_neb
 
-def plot_logprob_lines(tmm, i, j, temps, logprobs, path=None):
+''' plotting probabilities between the direct line and the nudged elastic band'''
+def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
+    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
+        locations = mixture_model.means_
+    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
+        locations = mixture_model.location
     # the direct line
     direct_x = np.linspace(0, 1, num=128)[..., None]
-    ms = (1 - direct_x) * tmm.location[i] + direct_x * tmm.location[j]
-    direct_y = tmm.score_samples(ms)
+    ms = (1 - direct_x) * locations[i] + direct_x * locations[j]
+    direct_y = mixture_model.score_samples(ms)
     plt.plot(direct_x[:, 0], direct_y, label="direct")
 
     # and the nudged elastic band
@@ -21,15 +27,20 @@ def plot_logprob_lines(tmm, i, j, temps, logprobs, path=None):
         plt.savefig(path)
 
 
-''' Plots the TMM field and the optimized paths (if available).
-stm: trained studenttmixture model
+''' Plots the TMM/GMM field and the optimized paths (if available).
+tmm: trained studenttmixture model
+gmm: trained Gaussian mixture model
 selection: selects which paths are included in the plot, by default, all paths are included.
-  other typical options: MST through selection=zip(mst.row,mst.col) and individuals via e.g. [(0,1), (3,4)] 
+  other typical options: MST through selection=zip(mst.row,mst.col) and individuals via e.g. [(0,1), (3,4)]
+  One needs to set tmm or gmm, matching the mixture_model parameter 
 '''
-def plot_field(data_X, tmm, paths=None, levels=20, selection=None, save_path=None, axis=None):
-    n_components = len(tmm.location)
-    if axis is None:
-        figure, axis = plt.subplots(1, 1)
+def plot_field(data_X, mixture_model, paths=None, levels=20, selection=None, save_path=None, axis=None):
+    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
+        locations = mixture_model.means_
+    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
+        locations = mixture_model.location
+    n_components = len(locations)
+
 
     # grid coordinates
     x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, 128)
@@ -37,22 +48,22 @@ def plot_field(data_X, tmm, paths=None, levels=20, selection=None, save_path=Non
     XY = np.stack(np.meshgrid(x, y), -1)
 
     # get scores for the grid values
-    tmm_probs = tmm.score_samples(XY.reshape(-1, 2)).reshape(128, 128)
-    # gmm_probs = gm.score_samples(XY.reshape(-1, 2)).reshape(128,128)
+    mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(128, 128)
 
-    # plot the tmm
-    axis.contourf(x, y, tmm_probs, levels=levels, cmap="coolwarm", alpha=0.5)
-    # plt.contourf(x, y, gmm_probs, levels=64, cmap="coolwarm", alpha=0.5)
+    if axis is None:
+        figure, axis = plt.subplots(1, 1)
+    # plot the mixture model field
+    axis.contourf(x, y, mm_probs, levels=levels, cmap="coolwarm", alpha=0.5)
+    # the raw data
     axis.scatter(data_X[:, 0], data_X[:, 1], s=10, label="raw data")
-
     # cluster centers and IDs
-    axis.scatter(tmm.location[:, 0], tmm.location[:, 1], color="black", marker="X",
-                label="Student's t-mixture", s=100)
-    for i, location in enumerate(tmm.location):
+    axis.scatter(locations[:, 0], locations[:, 1], color="black", marker="X",
+                label="mixture centers", s=100)
+    for i, location in enumerate(locations):
         axis.annotate(f"{i}", xy=location - 1, color="black")
 
     # print paths between centers (by default: all)
-    if selection == None and paths is not None:
+    if selection is None and paths is not None:
         selection = ((i, j) for i, j in itertools.combinations(range(n_components), r=2) if i != j)
     for i, j in selection:
         path = paths[(i, j)]
@@ -70,65 +81,73 @@ def compute_mst_edges(raw_adjacency):
     return entries
 
 
-def computations_for_plot_row(data_X, overclustering_n, iterations=500):
+def computations_for_plot_row(data_X, overclustering_n, iterations=500, mixture_model='tmm'):
     # main computation
-    tmm = studenttmixture.EMStudentMixture(
-        n_components=overclustering_n,
-        fixed_df=True,
-        df=1.0,
-        init_type="k++",
-        random_state=42
-    )
-    tmm.fit(np.array(data_X, dtype=np.float64))
+    if mixture_model == 'tmm':
+        model = studenttmixture.EMStudentMixture(
+            n_components=overclustering_n,
+            n_init=5,
+            fixed_df=True,
+            df=1.0,
+            init_type="k++",
+            random_state=42
+        )
+        model.fit(np.array(data_X, dtype=np.float64))
+    elif mixture_model == 'gmm':
+        model = sklearn.mixture.GaussianMixture(
+            n_components=overclustering_n,
+            n_init=5,
+            random_state=42,
+            init_params='kmeans++'
+        )
 
     # compute elastic band paths
-    adjacency, raw_adjacency, paths, temps, logprobs = jax_neb.compute_neb_paths(tmm, iterations=iterations)
+    adjacency, raw_adjacency, paths, temps, logprobs = jax_neb.compute_neb_paths(model, iterations=iterations)
 
     # thresholds for the cluster-number plot
-    thresholds, cluster_numbers, counts = jax_neb.get_thresholds_and_cluster_numbers(adjacency)
+    thresholds, cluster_numbers, clusterings = jax_neb.get_thresholds_and_cluster_numbers(adjacency)
 
     # extracting the smallest edges to only draw them in the heatmap
     mst_edges = compute_mst_edges(raw_adjacency)
 
-    return tmm, adjacency, paths, thresholds, cluster_numbers, counts, mst_edges
+    return model, adjacency, paths, cluster_numbers, mst_edges, clusterings
 
 
-def plot_row_with_computation(data_X, data_y, overclustering_n=15, iterations=500, levels=None):
+def plot_row_with_computation(data_X, data_y, overclustering_n=15, iterations=500, levels=None, mixture_model='tmm'):
     # main computation
-    tmm, adjacency, paths, thresholds, cluster_numbers, counts, mst_edges = (
-        computations_for_plot_row(data_X, overclustering_n, iterations=iterations))
+    mixture_model, adjacency, paths, cluster_numbers, mst_edges, clusterings = (
+        computations_for_plot_row(data_X, overclustering_n, iterations=iterations, mixture_model=mixture_model))
 
-    plot_row(data_X, data_y, tmm, paths, thresholds, cluster_numbers, counts, mst_edges)
-
+    plot_row(data_X, data_y, mixture_model, paths, cluster_numbers, mst_edges)
 
     if levels is None:
         target_cluster_n = len(np.unique(data_y))
         levels = [target_cluster_n-1, target_cluster_n, target_cluster_n+1]
-    plot_cluster_levels(levels, tmm, data_X, adjacency, paths)
+    plot_cluster_levels(levels, mixture_model, data_X, adjacency, paths)
 
 
-def plot_row(data_X, data_y, tmm, paths, thresholds, cluster_numbers, counts, mst_edges):
-    fig, axes = plt.subplots(1, 4, figsize=(16, 6))
+def plot_row(data_X, data_y, mixture_model, paths, cluster_numbers, mst_edges):
+    fig, axes = plt.subplots(1, 3, figsize=(16, 6))
 
     # ground truth
     axes[0].scatter(data_X[:, 0], data_X[:, 1], c=data_y, cmap='viridis')
     axes[0].set_title('Ground Truth')
 
     # heatmap with arrows
-    plot_field(data_X, tmm, paths=paths, selection=mst_edges, axis=axes[1])
+    plot_field(data_X, mixture_model, paths=paths, selection=mst_edges, axis=axes[1])
     axes[1].set_title('Heatmap')
 
-    # threshold counts
-    axes[2].bar(thresholds, counts)
-    axes[2].set_title('Threshold Counts')
-    axes[2].set_xlabel('Threshold')
+    # # threshold counts
+    # axes[2].bar(thresholds, counts)
+    # axes[2].set_title('Threshold Counts')
+    # axes[2].set_xlabel('Threshold')
 
     # clusters vs thresholds
-    axes[3].plot(cluster_numbers[:, 1], cluster_numbers[:, 0], marker='o')
-    axes[3].set_xlabel('Number of clusters')
-    axes[3].set_ylabel('Threshold')
-    axes[3].set_title('Clusters')
-    axes[3].grid()
+    axes[2].plot(cluster_numbers[:, 1], cluster_numbers[:, 0], marker='o')
+    axes[2].set_xlabel('Number of clusters')
+    axes[2].set_ylabel('Threshold')
+    axes[2].set_title('Clusters')
+    axes[2].grid()
 
 
 def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):

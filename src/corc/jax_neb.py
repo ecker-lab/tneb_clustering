@@ -7,14 +7,12 @@ import numpy as np
 import scipy
 import tqdm
 import itertools
+import sklearn
 
-# @_wraps(osp_stats.multivariate_t.logpdf, update_doc=False, lax_description="""
-# In the JAX version, the `allow_singular` argument is not implemented.
-# """)
+# evaluates multivariate T dist at x, return logpdf
 # from https://gist.github.com/yuneg11/5b493ab689f2c46fce50f19aec2df5b4
-def t_logpdf(x, loc, shape, df, allow_singular=None):
-  if allow_singular is not None:
-    raise NotImplementedError("allow_singular argument of multivariate_t.logpdf")
+@jax.jit
+def t_logpdf(x, loc, shape, df):
   # TODO: Properly handle df == np.inf
   # if df == np.inf:
   #   return multivariate_normal.logpdf(x, loc, shape)
@@ -30,6 +28,8 @@ def t_logpdf(x, loc, shape, df, allow_singular=None):
     else:
       if shape.ndim < 2 or shape.shape[-2:] != (n, n):
         raise ValueError("multivariate_t.logpdf got incompatible shapes")
+
+      # actual computation starts here
       u = 1/2 * (df + n)
       L = lax.linalg.cholesky(shape)
       y = lax.linalg.triangular_solve(L, x - loc, lower=True, transpose_a=True)
@@ -67,9 +67,14 @@ def tmm_jax(x, means, scales, weights):
 
 
 # the loss of the interpolation
-def loss(ms, means, covs, weights, dif_refrence):
+def loss(ms, means, covs, weights, dif_refrence, mixture_model='tmm'):
     # maximize the negative log likelihood
-    nll = -tmm_jax(ms, means, covs, weights).sum()
+    if mixture_model == 'tmm':
+        nll = -tmm_jax(ms, means, covs, weights).sum()
+    elif mixture_model == 'gmm':
+        nll = -gmm_jax(ms, means, covs, weights).sum()
+    else:
+        raise ValueError("mixture_model must be either 'tmm' or 'gmm'")
 
     # calculate the difference between the points
     dif = jnp.diff(ms, axis=0)
@@ -85,8 +90,8 @@ def loss(ms, means, covs, weights, dif_refrence):
 
 # perform gradient descent on the points
 @jax.jit
-def step(ms, means, covs, weights, dif_refrence):
-    g = jax.grad(loss)(ms, means, covs, weights, dif_refrence)
+def step(ms, means, covs, weights, dif_refrence, mixture_model='tmm'):
+    g = jax.grad(loss)(ms, means, covs, weights, dif_refrence, mixture_model=mixture_model)
     ms_new = ms - 1e-1 * g
     ms = ms.at[1:-1].set(ms_new[1:-1])
     return ms
@@ -107,7 +112,7 @@ def reinterpolate(ms):
 
 
 # given two indicies i and j find interpolation between the ith and jth means
-def compute_interpolation(i, j, means, covs, weights, iterations=4000):
+def compute_interpolation(i, j, means, covs, weights, iterations=4000, mixture_model='tmm'):
     m1, m2 = means[i], means[j]
 
     # linear interpolation between m1 and m2
@@ -123,7 +128,12 @@ def compute_interpolation(i, j, means, covs, weights, iterations=4000):
         ms = reinterpolate(ms)
 
     # compute logprobs with the given mixture model
-    ps = tmm_jax(ms, means, covs, weights)
+    if mixture_model == 'tmm':
+        ps = tmm_jax(ms, means, covs, weights)
+    elif mixture_model == 'gmm':
+        ps = gmm_jax(ms, means, covs, weights)
+    else:
+        raise ValueError("mixture_model must be either 'tmm' or 'gmm'")
     return ms, ts, ps
 
 
@@ -142,8 +152,19 @@ def compute_interpolation(i, j, means, covs, weights, iterations=4000):
 #     # take the better approximation
 #     return jnp.minimum(min_, max_)
 
-def compute_neb_paths(tmm, iterations=1000):
-    n_components = len(tmm.location)
+def compute_neb_paths(mixture_model, iterations=1000):
+    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
+        locations = mixture_model.means_
+        covs = mixture_model.covariances_
+        weights = mixture_model.weights_
+        model_type = 'gmm'
+    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
+        locations = mixture_model.location
+        covs = np.transpose(mixture_model.scale, axes=(2, 0, 1))
+        weights = mixture_model.mix_weights
+        model_type = 'tmm'
+    n_components = len(locations)
+
     adjacency = np.zeros((n_components, n_components))  # will hold the scores, i.e. the minimum value encountered on a path
     paths = dict()  # the bent path positions from one center to another
     temps = dict()  # "procentual" values of the path (used for plotting logprob against distance)
@@ -151,11 +172,13 @@ def compute_neb_paths(tmm, iterations=1000):
 
     for i, j in tqdm.tqdm(itertools.combinations(range(n_components), r=2), total=n_components * (n_components - 1) // 2):
         # compute nudged elastic band
-        path_positions, temperatures, interpolation_probs = (
-            compute_interpolation(i, j, means=tmm.location,
-                covs=np.transpose(tmm.scale,(2, 0, 1)),
-                weights=tmm.mix_weights,
-                iterations=iterations))
+        path_positions, temperatures, interpolation_probs =(
+            compute_interpolation(i, j, means=locations,
+                covs=covs,
+                weights=weights,
+                iterations=iterations,
+                mixture_model=model_type))
+        # store results
         paths[(i, j)] = paths[(j,i)] = path_positions
         temps[(i, j)] = temps[(j,j)] = temperatures
         logprobs[(i, j)] = logprobs[(j,i)] = interpolation_probs
@@ -217,11 +240,13 @@ def get_thresholds_and_cluster_numbers(adjacency):
     thresholds = sorted(thresholds.tolist())
 
     cluster_numbers = list()
+    clusterings = list()
     for threshold in thresholds:
         tmp_adj = np.array(adjacency >= threshold, dtype=int)
-        n_components, component_labels = scipy.sparse.csgraph.connected_components(tmp_adj, directed=False)
+        n_components, clusters = scipy.sparse.csgraph.connected_components(tmp_adj, directed=False)
         cluster_numbers.append((threshold, n_components))
+        clusterings.append((n_components, threshold, clusters))
 
     cluster_numbers = np.array(cluster_numbers)
 
-    return thresholds, cluster_numbers, counts
+    return thresholds, cluster_numbers, clusterings
