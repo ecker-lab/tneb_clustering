@@ -12,7 +12,7 @@ import sklearn
 # evaluates multivariate T dist at x, return logpdf
 # from https://gist.github.com/yuneg11/5b493ab689f2c46fce50f19aec2df5b4
 @jax.jit
-def t_logpdf(x, loc, shape, df):
+def t_logpdf2(x, loc, shape, df):
   # TODO: Properly handle df == np.inf
   # if df == np.inf:
   #   return multivariate_normal.logpdf(x, loc, shape)
@@ -36,6 +36,18 @@ def t_logpdf(x, loc, shape, df):
       return (-u * jnp.log(1 + 1/df * jnp.einsum('...i,...i->...', y, y))
               - n/2*jnp.log(df*np.pi) + jax.scipy.special.gammaln(u) - jax.scipy.special.gammaln(1/2 * df)
               - jnp.log(L.diagonal(axis1=-1, axis2=-2)).sum(-1))
+        
+# evaluates multivariate T dist at x, return logpdf
+# from https://gist.github.com/yuneg11/5b493ab689f2c46fce50f19aec2df5b4
+@jax.jit
+def t_logpdf(x, loc, shape, df):
+    # we trust that everything comes in the right shape
+    u = 1/2 * (df + n)
+    L = lax.linalg.cholesky(shape)
+    y = lax.linalg.triangular_solve(L, x - loc, lower=True, transpose_a=True)
+    return (-u * jnp.log(1 + 1/df * jnp.einsum('...i,...i->...', y, y))
+          - n/2*jnp.log(df*np.pi) + jax.scipy.special.gammaln(u) - jax.scipy.special.gammaln(1/2 * df)
+          - jnp.log(L.diagonal(axis1=-1, axis2=-2)).sum(-1))
 
 
 @jax.jit
@@ -89,7 +101,7 @@ def loss(ms, means, covs, weights, dif_refrence, mixture_model='tmm'):
 
 
 # perform gradient descent on the points
-@jax.jit
+# @jax.jit
 def step(ms, means, covs, weights, dif_refrence, mixture_model='tmm'):
     g = jax.grad(loss)(ms, means, covs, weights, dif_refrence, mixture_model=mixture_model)
     ms_new = ms - 1e-1 * g
@@ -124,7 +136,7 @@ def compute_interpolation(i, j, means, covs, weights, iterations=4000, mixture_m
 
     # this is where the band becomes elastic and where the work is done.
     for _ in range(iterations):
-        ms = step(ms, means, covs, weights, dif_refrence)
+        ms = step(ms, means, covs, weights, dif_refrence, mixture_model=mixture_model)
         ms = reinterpolate(ms)
 
     # compute logprobs with the given mixture model
