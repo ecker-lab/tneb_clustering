@@ -13,9 +13,9 @@ dependencies:
   - nbconvert
   - ipykernel
   - jupyter
-  - jax
-  - jaxtyping
   - Cython
   - pip:
+    - jax[cuda12]
+    - jaxtyping
     - studenttmixture
     - flarejax
