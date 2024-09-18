@@ -92,14 +92,15 @@ def computations_for_plot_row(data_X, overclustering_n, iterations=500, mixture_
             init_type="k++",
             random_state=42
         )
-        model.fit(np.array(data_X, dtype=np.float64))
     elif mixture_model == 'gmm':
         model = sklearn.mixture.GaussianMixture(
             n_components=overclustering_n,
             n_init=5,
             random_state=42,
-            init_params='kmeans++'
+            init_params='k-means++',
+            covariance_type='spherical'
         )
+    model.fit(np.array(data_X, dtype=np.float64))
 
     # compute elastic band paths
     adjacency, raw_adjacency, paths, temps, logprobs = jax_neb.compute_neb_paths(model, iterations=iterations)
