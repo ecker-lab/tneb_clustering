@@ -14,8 +14,13 @@ dependencies:
   - ipykernel
   - jupyter
   - Cython
+  - colorcet
+  - scanpy
+  - python-igraph
+  - openblas
   - pip:
     - jax[cuda12]
     - jaxtyping
     - studenttmixture
     - flarejax
+    - diptest
