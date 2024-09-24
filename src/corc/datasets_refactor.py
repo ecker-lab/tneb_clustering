@@ -6,6 +6,26 @@ import jax.numpy as jnp
 import jax.random as jrandom
 from jaxtyping import Array, Float, Int, PRNGKeyArray
 
+# use like this:
+# datasets = {
+#     'Clusterlab1': datasets2d.Clusterlab1().sample(jrandom.PRNGKey(0), 100),
+#     'Clusterlab2': datasets2d.Clusterlab2().sample(jrandom.PRNGKey(0), 200),
+#     'Clusterlab3': datasets2d.Clusterlab3().sample(jrandom.PRNGKey(0), 200),
+#     'Clusterlab4': datasets2d.Clusterlab4().sample(jrandom.PRNGKey(0), 200),
+#     'Clusterlab6': datasets2d.Clusterlab6().sample(jrandom.PRNGKey(0), 250),
+#     'Clusterlab8': datasets2d.Clusterlab8().sample(jrandom.PRNGKey(0), 300),
+#     'Clusterlab9': datasets2d.Clusterlab9().sample(jrandom.PRNGKey(0), 300),
+#     'Clusterlab10': datasets2d.Clusterlab10().sample(jrandom.PRNGKey(0), 300),
+#     'BowTie': datasets2d.BowTie().sample(jrandom.PRNGKey(0), 256),
+#     # 'ZigZag': datasets2d.ZigZag().sample(key, 64),
+#     'UniformCircle': datasets2d.UniformCircle().sample(jrandom.PRNGKey(0), 256),
+#     'UniformSquare': datasets2d.UniformSquare().sample(jrandom.PRNGKey(0), 256),
+# }
+# data_X, data_y = datasets['Clusterlab10']
+
+# TODO: missing are: AnisoBlobs, Blobs, Circles, Clusterlab5, Clusterlab7, Moons, ZigZig
+# TODO: ZigZag is broken
+
 
 @staticmethod
 def _vec2d_from_angle(angle: Float[Array, "..."]) -> Float[Array, "..."]:
@@ -117,7 +137,7 @@ class GMM(fj.Module, Dataset, register=False):
     def equidistant_triangle(
         cls,
         stddev: float,
-        frequencies: Float[Arrray, "components"] | None = None,
+        frequencies: Float[Array, "components"] | None = None,
     ) -> "GMM":
         angles = jnp.linspace(0, 2 * jnp.pi, 3, endpoint=False)
         means = _vec2d_from_angle(angles)
@@ -378,7 +398,7 @@ class Clusterlab10(Dataset, fj.Module, register=False):
     """
 
     std_devs: tuple[float, ...] = (0.5, 1, 1.5, 1.75, 2, 2.25, 2.25)
-    radii: tuple[float, ...] = (4.5, 9, 13.5, 15.75, 16.65, 17.55, 18.45
+    radii: tuple[float, ...] = (4.5, 9, 13.5, 15.75, 16.65, 17.55, 18.45)
 
     def sample(self, key, n):
         # see the 'clusterlab_dataset2' for comments explaining the code

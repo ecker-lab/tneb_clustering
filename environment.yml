@@ -2,8 +2,9 @@ name: corc_env
 channels:
   - defaults
 dependencies:
-  - python=3.9
+  - python=3.11
   - scipy
+  - numpy
   - pyyaml
   - pandas
   - tqdm
@@ -11,3 +12,10 @@ dependencies:
   - seaborn
   - nbconvert
   - ipykernel
+  - jupyter
+  - jax
+  - jaxtyping
+  - Cython
+  - pip:
+    - studenttmixture
+    - flarejax
