@@ -22,7 +22,7 @@ class Graph():
         self.graph_data = {'nodes':None, 'edges':None, 'nodes_org_space':None}
 
 
-    def create_graph(self, save=True, *args, **kwargs):
+    def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs):
         """
         Abstract method to create a graph.
 
@@ -47,32 +47,3 @@ class Graph():
             pickle.dump(self.graph_data, f)
 
         print(f"Graph saved to {self.path / f'graph{file_name}'}.")
-
-
-    def plot_graph(self, X2D=None):
-        """
-        from openTSNE import TSNE
-        tsne = TSNE(
-            perplexity=perplexity,
-            metric='euclidean',
-            n_jobs=8,
-            random_state=42,
-            verbose=False,
-        )
-        X2D = tsne.fit(self.data)
-        """
-        cluster_means = self.graph_data['nodes']
-
-        if X2D is not None:
-            cluster_means = X2D.transform(cluster_means)
-        self.graph_data['nodes'] = cluster_means
-
-        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c='black')
-
-        for (cm, neigh), weight in self.graph_data['edges'].items():
-            plt.plot(
-                [cluster_means[cm][0], cluster_means[neigh][0]],
-                [cluster_means[cm][1], cluster_means[neigh][1]],
-                alpha=weight,
-                c="black",
-            )

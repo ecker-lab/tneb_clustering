@@ -8,6 +8,7 @@ import matplotlib.pylab as plt
 import seaborn as sns
 import colorcet as cc
 from datetime import datetime
+import scipy
 
 from corc.graph_metrics.graph import Graph
 
@@ -30,7 +31,7 @@ class GWGMara(Graph):
         self.n_neighbors = n_neighbors if n_neighbors < n_components else n_components-1
 
 
-    def create_graph(self, save=True):
+    def create_graph(self, save=True, plot=True, return_graph=False):
         ''''
         1. Overcluster data using a GMM
         2. Construct a weighted undirected graph with the clusters as centers. Low weights mean, that the clusters are more disconnected. 
@@ -41,7 +42,8 @@ class GWGMara(Graph):
         gmm_fit = GaussianMixture(
             n_components=self.n_components,
             covariance_type="diag",
-            init_params='k-means++'
+            init_params='k-means++',
+            random_state=self.seed
         )
         gmm_fit = gmm_fit.fit(self.data)
         pred_labels = gmm_fit.predict(self.data)
@@ -56,19 +58,29 @@ class GWGMara(Graph):
 
         filename = f'_{self.n_components}_vae_latent_dim_{self.latent_dim}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
         
-        self._plt_graph_compare(embeddings, pred_labels, save=f'{filename}.png')
+        if plot:
+            self._plt_graph_compare(embeddings, pred_labels, save=f'{filename}.png')
 
         if save:
             self.save_graph(f'{filename}.pkl')
+
+        if return_graph:
+            return self.graph_data
+
+
+    def get_graph(self):
+        if self.graph_data["nodes"] is None:
+            self.create_graph(save=False, plot=False, return_graph=False)
+        return self.graph_data
 
 
     def _dim_reduction(self, gmm_means):    
         if self.latent_dim > 2:
             tsne = TSNE(
-                perplexity=30,
+                perplexity=len(self.data)/100,
                 metric='euclidean',#'cosine',
                 n_jobs=8,
-                random_state=42,
+                random_state=self.seed,
                 verbose=False,
             )
             embeddings = tsne.fit(self.data)
@@ -79,10 +91,14 @@ class GWGMara(Graph):
 
         return embeddings, cluster_means
 
+
     def _get_threshold(self, means, k):
         knn_all_to_all = kneighbors_graph(means, k, mode='distance', include_self=False).toarray()
         knn_all_to_all_sorted = np.sort(knn_all_to_all)
-        return knn_all_to_all_sorted.mean(axis=0)[3] # OPEN QUESTION: why 3??
+        '''
+        Why 3: I looked at the average distances between 1st, 2nd, etc neighbors and there was a jump in the change of distances between 2nd and 3rd neighbor (second point in the plot), so I set max distance threshold to be the average distance of the 3rd neighbor.
+        '''
+        return knn_all_to_all_sorted.mean(axis=0)[3]
 
 
     def _get_knn_dict(self, means, k=3, thresh=np.inf):
@@ -205,13 +221,18 @@ class GWGMara(Graph):
         )
         gmm_fit = gmm_fit.fit(self.data)
         pred_labels = gmm_fit.predict(self.data)
-        self.labels_ = pred_labels
 
-        knn_dict = self._get_knn_dict(gmm_fit.means_, k=self.n_neighbors, thresh=self._get_threshold(gmm_fit.means_, k=self.n_components-1))
+        threshold = self._get_threshold(gmm_fit.means_, k=self.n_components-1)
+        knn_dict = self._get_knn_dict(gmm_fit.means_, k=self.n_neighbors, thresh=threshold)
         dip_dict = self.get_dip_dict(gmm_fit.means_, pred_labels, knn_dict)
         edges = self._get_edges_dict(knn_dict, dip_dict)
 
         self.graph_data = {'nodes':gmm_fit.means_, 'edges':edges, 'nodes_org_space':gmm_fit.means_, 'norm':[np.array(list(edges.values())).min(), np.array(list(edges.values())).max()]}
+
+        thresholds, cluster_numbers, clusterings = self.get_thresholds_and_cluster_numbers()
+        # self.labels_ = pred_labels
+        # self.labels_, thresh = self._get_recoloring(level=1, clusterings=clusterings, pred_labels=pred_labels)
+        self.labels_ = self._get_recoloring(pred_labels=pred_labels)
 
 
     def plot_graph(self, X2D=None):
@@ -242,3 +263,54 @@ class GWGMara(Graph):
                 alpha=(1 - norm(weight)),
                 c="black",
             )
+
+
+    def get_thresholds_and_cluster_numbers(self):
+        adjacency = self._get_adjacency_matrix()
+        thresholds, counts = np.unique(adjacency, return_counts=True)
+        thresholds = sorted(thresholds.tolist())
+
+        cluster_numbers = list()
+        clusterings = list()
+        for threshold in thresholds:
+            tmp_adj = np.array(adjacency >= threshold, dtype=int)
+            n_components, clusters = scipy.sparse.csgraph.connected_components(tmp_adj, directed=False)
+            cluster_numbers.append((threshold, n_components))
+            clusterings.append((n_components, threshold, clusters))
+
+        cluster_numbers = np.array(cluster_numbers)
+
+        return thresholds, cluster_numbers, clusterings
+
+
+    def _get_recoloring(self, level, clusterings, pred_labels):
+        _, threshold, clustering = clusterings[level]
+        O2R = dict(zip(range(len(clustering)), clustering))
+        return np.array([O2R[yp] for yp in pred_labels]), threshold
+    
+    
+    def _get_recoloring(self, pred_labels):
+        adjacency = self._get_adjacency_matrix()
+        n_components, clustering = scipy.sparse.csgraph.connected_components(adjacency, directed=False)
+        O2R = dict(zip(range(len(clustering)), clustering))
+        return np.array([O2R[yp] for yp in pred_labels])
+
+
+    def _get_adjacency_matrix(self):
+        adjacency_list = self.graph_data['edges']
+        adjacency_matrix = np.zeros(shape=(self.n_components, self.n_components))
+
+        for i in range(self.n_components):
+            for j in range(self.n_components):
+                adjacency_matrix[i, j] = adjacency_matrix[j,i] = adjacency_list[(i,j)] if (i,j) in adjacency_list.keys() else 0.0
+
+        return adjacency_matrix
+    
+
+    def plot_thresholds(self, cluster_numbers):
+        # clusters vs thresholds
+        plt.plot(cluster_numbers[:, 1], cluster_numbers[:, 0], marker='o')
+        plt.xlabel('Number of clusters')
+        plt.ylabel('Threshold')
+        plt.title('Clusters')
+        plt.grid()

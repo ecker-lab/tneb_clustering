@@ -173,9 +173,9 @@ class PAGA(Graph):
         sc.tl.umap(adata)
 
         if self.clustering_method == 'leiden':
-            sc.tl.leiden(self.adata, flavor="igraph", n_iterations=2, resolution=self.resolution)
+            sc.tl.leiden(self.adata, flavor="igraph", n_iterations=2, resolution=self.resolution, random_state=self.seed)
         elif self.clustering_method == 'louvain':
-            sc.tl.louvain(self.adata, flavor="igraph", resolution=self.resolution)
+            sc.tl.louvain(self.adata, flavor="igraph", resolution=self.resolution, random_state=self.seed)
         else:
             print('Wrong clustering method. Choose "louvain" or "leiden".')
             exit()
@@ -192,3 +192,32 @@ class PAGA(Graph):
 
         edges = self._adj_matrix_to_edges_list(self.adata.uns['paga']['connectivities'].toarray())
         self.graph_data = {'nodes':pos, 'edges':edges, 'nodes_org_space':pos}
+
+
+    def plot_graph(self, X2D=None):
+        """
+        from openTSNE import TSNE
+        tsne = TSNE(
+            perplexity=perplexity,
+            metric='euclidean',
+            n_jobs=8,
+            random_state=42,
+            verbose=False,
+        )
+        X2D = tsne.fit(self.data)
+        """
+        cluster_means = self.graph_data['nodes']
+
+        if X2D is not None:
+            cluster_means = X2D.transform(cluster_means)
+        self.graph_data['nodes'] = cluster_means
+
+        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c='black')
+
+        for (cm, neigh), weight in self.graph_data['edges'].items():
+            plt.plot(
+                [cluster_means[cm][0], cluster_means[neigh][0]],
+                [cluster_means[cm][1], cluster_means[neigh][1]],
+                alpha=1.0,
+                c="black",
+            )
