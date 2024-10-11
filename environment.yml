@@ -12,6 +12,8 @@ dependencies:
   - seaborn
   - nbconvert
   - ipykernel
+  - anndata
+  - configargparse
   - jupyter
   - Cython
   - colorcet

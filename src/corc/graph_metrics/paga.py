@@ -35,13 +35,14 @@ class PAGA(Graph):
         adata.obs["category"] = self.labels
         self.adata = adata
 
-        sc.pp.neighbors(self.adata)
-        sc.tl.umap(self.adata)
+        sc.pp.neighbors(adata, random_state=self.seed)
+        sc.tl.umap(adata, random_state=self.seed)
 
         if self.clustering_method == 'leiden':
-            sc.tl.leiden(self.adata, flavor="igraph", n_iterations=2, resolution=self.resolution)
+            sc.tl.leiden(adata, flavor="igraph", n_iterations=2, resolution=self.resolution, random_state=self.seed)
         elif self.clustering_method == 'louvain':
-            sc.tl.louvain(self.adata, flavor="igraph", resolution=self.resolution)
+            sc.tl.louvain(adata, flavor="igraph", resolution=self.resolution, random_state=self.seed)
+
         else:
             print('Wrong clustering method. Choose "louvain" or "leiden".')
             exit()
