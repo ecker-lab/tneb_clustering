@@ -4,7 +4,6 @@ import diptest
 import matplotlib.pylab as plt
 import numpy as np
 import seaborn as sns
-from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import kneighbors_graph
 
 
@@ -18,10 +17,11 @@ class GWG(GWGGraph):
         data=None,
         labels=None,
         path=None,
+        n_clusters=None,
         n_components=10,
         n_neighbors=3,
-        thresh=0.01,
-        covariance='full',
+        covariance='diag',
+        clustering_method='gmm',
         seed=42,
     ):
 
@@ -36,9 +36,8 @@ class GWG(GWGGraph):
             n_components (int): Number of components for GMM clustering.
         """
 
-        super().__init__(latent_dim, data, labels, path, n_components, n_neighbors, covariance, seed)
+        super().__init__(latent_dim, data, labels, path, n_clusters, n_components, n_neighbors, covariance, clustering_method, seed)
 
-        self.thresh = thresh
 
     def create_graph(self, save=True, plot=True, return_graph=False):
         """'
@@ -48,48 +47,38 @@ class GWG(GWGGraph):
         We use the pvalue of the diptest as edge weights (line thickness) for the graph.
         3. Plots show tsne on samples and gmm cluster means.
         """
-        gmm_fit = GaussianMixture(
-            n_components=self.n_components,
-            covariance_type=self.covariance,
-            init_params="k-means++",
-            random_state=self.seed,
-        )
-        gmm_fit = gmm_fit.fit(self.data)
-        pred_labels = gmm_fit.predict(self.data)
+        center_points, pred_labels = self._cluster()
+        embeddings, cluster_means = self._dim_reduction(center_points)
 
-        embeddings, cluster_means = self._dim_reduction(gmm_fit.means_)
-
-        knn_dict = self._get_knn_dict(gmm_fit.means_, k=self.n_neighbors)
-        pvalue_dict = self._get_pvalue_dict(gmm_fit.means_, pred_labels, knn_dict)
-        edges = self._get_edges_dict(knn_dict, pvalue_dict)
+        knn_dict = self._get_knn_dict(center_points, k=self.n_neighbors)
+        pvalue_dict = self._get_pvalue_dict(center_points, pred_labels, knn_dict)
+        edges = self._get_edges_dict_initial(knn_dict, pvalue_dict, thresh=0.0)
 
         self.graph_data = {
             "nodes": cluster_means,
             "edges": edges,
-            "nodes_org_space": gmm_fit.means_,
+            "nodes_org_space": center_points,
         }
 
         filename = f'_{self.n_components}_vae_latent_dim_{self.latent_dim}_{datetime.now().strftime("%Y%m%d-%H%M%S")}'
 
         if plot:
             self._plt_graph_compare(embeddings, pred_labels, save=f"{filename}.png")
-
         if save:
             self.save_graph(f"{filename}.pkl")
-
         if return_graph:
             return self.graph_data
 
 
     def _get_knn_dict(self, means, k=3):
         knn = kneighbors_graph(means, k, mode="distance", include_self=False).toarray()
-        knn[knn < self.thresh] = 0
 
         knn_dict = {}
         for i in range(len(means)):
             neighbors = np.where(knn[i])[0]
-            knn_dict[i] = neighbors
+            knn_dict[i] = set(neighbors)
         return knn_dict
+
 
     def _get_pvalue_dict(self, means, labels, knn_dict):
         pvalue_dict = {}
@@ -106,6 +95,23 @@ class GWG(GWGGraph):
                 pvalue_list.append(pvalue)
             pvalue_dict[cm] = pvalue_list
         return pvalue_dict
+
+
+    def _get_edges_dict_initial(self, knn_dict, pvalue_dict, thresh=0.0):
+        edges = {}
+        for (cm, neighs), (_, dips) in zip(knn_dict.items(), pvalue_dict.items()):
+            for n, dip in zip(list(neighs), list(dips)):
+                if dip > thresh:
+                    edges[(cm, n)] = dip
+        return edges
+
+
+    def _get_edges_dict(self, thresh=0.0):
+        edges = {}
+        for (cm, neigh), dip in self.graph_data["edges"].items():
+            if dip > thresh:
+                    edges[(cm, neigh)] = dip
+        return edges
 
 
     def _plt_graph_compare(self, embeddings, pred_labels, save=None):
@@ -184,25 +190,47 @@ class GWG(GWGGraph):
         """
         self.data = data
 
-        gmm_fit = GaussianMixture(
-            n_components=self.n_components,
-            covariance_type=self.covariance,
-            init_params="k-means++",
-        )
-        gmm_fit = gmm_fit.fit(self.data)
-        pred_labels = gmm_fit.predict(self.data)
+        center_points, pred_labels = self._cluster()
+        knn_dict = self._get_knn_dict(center_points, k=self.n_neighbors)
+        pvalue_dict = self._get_pvalue_dict(center_points, pred_labels, knn_dict)
 
-        knn_dict = self._get_knn_dict(gmm_fit.means_, k=self.n_neighbors)
-
-        pvalue_dict = self._get_pvalue_dict(gmm_fit.means_, pred_labels, knn_dict)
-        edges = self._get_edges_dict(knn_dict, pvalue_dict)
+        edges = self._get_edges_dict_initial(knn_dict, pvalue_dict)
 
         self.graph_data = {
-            "nodes": gmm_fit.means_,
+            "nodes": center_points,
             "edges": edges,
-            "nodes_org_space": gmm_fit.means_,
+            "nodes_org_space": center_points,
         }
-        self.labels_ = self._get_recoloring(pred_labels=pred_labels)
+        self.pred_labels = pred_labels
+        if self.n_clusters is None:
+            self.labels_ = self._get_recoloring(pred_labels=pred_labels)
+
+
+    def predict(self, data):
+        threshold = self._get_threshold()
+        edges = self._get_edges_dict(thresh=threshold)
+        self.graph_data["edges"] = edges
+        self.labels_ = self._get_recoloring(pred_labels=self.pred_labels)
+        return self.labels_
+
+
+    def _get_threshold(self):
+        thresholds, cluster_numbers, clusterings = self.get_thresholds_and_cluster_numbers()
+        target_number_classes = self.n_clusters
+
+        if self.n_clusters not in cluster_numbers:
+            print(f"{target_number_classes} clusters is not achievable.")
+            try: # try smaller n_clusters instead
+                target_number_classes = max(np.argwhere(cluster_numbers[:,1]<target_number_classes))[0]
+            except ValueError:  # take lowest threshold
+                target_number_classes = cluster_numbers[0,1]
+            print(f"Working with {target_number_classes} clusters instead.")
+
+        # find matching threshold
+        threshold = thresholds[
+            np.where(cluster_numbers == target_number_classes)[0][0]
+        ]
+        return threshold
 
 
     def plot_graph(self, X2D=None):
@@ -229,6 +257,6 @@ class GWG(GWGGraph):
             plt.plot(
                 [cluster_means[cm][0], cluster_means[neigh][0]],
                 [cluster_means[cm][1], cluster_means[neigh][1]],
-                alpha=dip,
+                # alpha=dip,
                 c="black",
             )

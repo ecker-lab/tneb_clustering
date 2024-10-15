@@ -19,9 +19,11 @@ class GWGMara(GWGGraph):
         data=None,
         labels=None,
         path=None,
+        n_clusters=None,
         n_components=10,
         n_neighbors=3,
         covariance='diag',
+        clustering_method='gmm',
         seed=42,
     ):
         """
@@ -34,7 +36,7 @@ class GWGMara(GWGGraph):
             latent_dim (int): Dimension of the data.
             n_components (int): Number of components for GMM clustering.
         """
-        super().__init__(latent_dim, data, labels, path, n_components, n_neighbors, covariance, seed)
+        super().__init__(latent_dim, data, labels, path, n_clusters, n_components, n_neighbors, covariance, clustering_method, seed)
 
 
     def create_graph(self, save=True, plot=True, return_graph=False):
@@ -45,29 +47,21 @@ class GWGMara(GWGGraph):
         We use the dip statistic as edge weights (line thickness) for the graph.
         3. Plots show tsne on samples and gmm cluster means.
         """
-        gmm_fit = GaussianMixture(
-            n_components=self.n_components,
-            covariance_type="diag",  # TODO: make this a parameter
-            init_params="k-means++",
-            random_state=self.seed,
-        )
-        gmm_fit = gmm_fit.fit(self.data)
-        pred_labels = gmm_fit.predict(self.data)
-
-        embeddings, cluster_means = self._dim_reduction(gmm_fit.means_)
+        center_points, pred_labels = self._cluster()
+        embeddings, cluster_means = self._dim_reduction(center_points)
 
         knn_dict = self._get_knn_dict(
-            gmm_fit.means_,
+            center_points,
             k=self.n_neighbors,
-            thresh=self._get_threshold(gmm_fit.means_, k=self.n_components - 1),
+            thresh=self._get_threshold(center_points, k=self.n_components - 1),
         )
-        dip_dict = self._get_dip_dict(gmm_fit.means_, pred_labels, knn_dict)
+        dip_dict = self._get_dip_dict(center_points, pred_labels, knn_dict)
         edges = self._get_edges_dict(knn_dict, dip_dict)
 
         self.graph_data = {
             "nodes": cluster_means,
             "edges": edges,
-            "nodes_org_space": gmm_fit.means_,
+            "nodes_org_space": center_points,
             "norm": [
                 np.array(list(edges.values())).min(),
                 np.array(list(edges.values())).max(),
@@ -78,14 +72,10 @@ class GWGMara(GWGGraph):
 
         if plot:
             self._plt_graph_compare(embeddings, pred_labels, save=f"{filename}.png")
-
         if save:
             self.save_graph(f"{filename}.pkl")
-
-
         if return_graph:
             return self.graph_data
-
 
     def _get_threshold(self, means, k):
         knn_all_to_all = kneighbors_graph(
@@ -96,7 +86,6 @@ class GWGMara(GWGGraph):
         Why 3: I looked at the average distances between 1st, 2nd, etc neighbors and there was a jump in the change of distances between 2nd and 3rd neighbor (second point in the plot), so I set max distance threshold to be the average distance of the 3rd neighbor.
         """
         return knn_all_to_all_sorted.mean(axis=0)[3]
-
 
     def _get_knn_dict(self, means, k=3, thresh=np.inf):
         knn = kneighbors_graph(means, k, mode="distance", include_self=False).toarray()
@@ -125,6 +114,15 @@ class GWGMara(GWGGraph):
                 dip_list.append(dip)
             dip_dict[cm] = dip_list
         return dip_dict
+
+
+    def _get_edges_dict(self, knn_dict, pvalue_dict):
+        edges = {}
+
+        for (cm, neighs), (_, dips) in zip(knn_dict.items(), pvalue_dict.items()):
+            for n, dip in zip(list(neighs), list(dips)):
+                edges[(cm, n)] = dip
+        return edges
 
 
     def _plt_graph_compare(self, embeddings, pred_labels, save=None):
@@ -197,7 +195,6 @@ class GWGMara(GWGGraph):
         else:
             plt.show()
 
-
     def fit(self, data):
         """'
         1. Overcluster data using a GMM
@@ -208,32 +205,25 @@ class GWGMara(GWGGraph):
         """
         self.data = data
 
-        gmm_fit = GaussianMixture(
-            n_components=self.n_components,
-            covariance_type=self.covariance,
-            init_params="k-means++",
-        )
-        gmm_fit = gmm_fit.fit(self.data)
-        pred_labels = gmm_fit.predict(self.data)
+        center_points, pred_labels = self._cluster()
 
-        threshold = self._get_threshold(gmm_fit.means_, k=self.n_components - 1)
+        threshold = self._get_threshold(center_points, k=self.n_components - 1)
         knn_dict = self._get_knn_dict(
-            gmm_fit.means_, k=self.n_neighbors, thresh=threshold
+            center_points, k=self.n_neighbors, thresh=threshold
         )
-        dip_dict = self._get_dip_dict(gmm_fit.means_, pred_labels, knn_dict)
+        dip_dict = self._get_dip_dict(center_points, pred_labels, knn_dict)
         edges = self._get_edges_dict(knn_dict, dip_dict)
 
         self.graph_data = {
-            "nodes": gmm_fit.means_,
+            "nodes": center_points,
             "edges": edges,
-            "nodes_org_space": gmm_fit.means_,
+            "nodes_org_space": center_points,
             "norm": [
                 np.array(list(edges.values())).min(),
                 np.array(list(edges.values())).max(),
             ],
         }
         self.labels_ = self._get_recoloring(pred_labels=pred_labels)
-
 
     def plot_graph(self, X2D=None):
         """
@@ -262,6 +252,6 @@ class GWGMara(GWGGraph):
             plt.plot(
                 [cluster_means[cm][0], cluster_means[neigh][0]],
                 [cluster_means[cm][1], cluster_means[neigh][1]],
-                alpha=(1 - norm(weight)),
+                # linewidth=(1 - norm(weight)),
                 c="black",
             )

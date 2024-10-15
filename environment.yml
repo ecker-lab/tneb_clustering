@@ -1,10 +1,10 @@
 name: corc_env
 channels:
   - defaults
+  - conda-forge
 dependencies:
   - python=3.11
   - scipy
-  - numpy
   - pyyaml
   - pandas
   - tqdm
@@ -20,9 +20,16 @@ dependencies:
   - scanpy
   - python-igraph
   - openblas
+  - dask
   - pip:
     - jax[cuda12]
     - jaxtyping
     - studenttmixture
     - flarejax
     - diptest
+    - pyslingshot
+    - pybind11
+    - hnswlib
+    - pyVIA
+    - densired
+    - numpy==1.26.4

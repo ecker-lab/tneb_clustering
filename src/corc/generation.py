@@ -1,11 +1,13 @@
 import numpy as np
 from scipy.spatial import distance
+import os
+import random
 
 from corc.utils import save
 
 
 class GenerationModel():
-    def __init__(self, center_structure, n_centers, n_samples, dim, std=None, equal_sized_clusters=True, save_file=False, outdir='.', distance=None) -> None:
+    def __init__(self, center_structure, n_centers, n_samples, dim, std=None, equal_sized_clusters=True, save_file=False, outdir='.', distance=None, random_state=42) -> None:
         """ generation of toy dataset
 
         Parameters
@@ -37,6 +39,10 @@ class GenerationModel():
         dists :  ndarray, n_centers x 1
             min dists per cluster center to neighboring cluster centers
         """
+        os.environ['PYTHONHASHSEED']=str(random_state)
+        random.seed(random_state)
+        np.random.seed(random_state)
+
         self.center_structure =  center_structure
         self.distance = distance
         self.n_centers = n_centers

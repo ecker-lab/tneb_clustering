@@ -6,8 +6,8 @@ import pandas as pd
 from corc import generation
 
 
-def make_gaussians(dim, std, n_samples, equal_sized_clusters=True):
-    gen = generation.GenerationModel(center_structure='uniform', n_centers=6, n_samples=n_samples, dim=dim, std=std, equal_sized_clusters=equal_sized_clusters, save_file=False, outdir='.', distance=None)
+def make_gaussians(dim, std, n_samples, equal_sized_clusters=True, n_centers=6, random_state=42):
+    gen = generation.GenerationModel(center_structure='uniform', n_centers=n_centers, n_samples=n_samples, dim=dim, std=std, equal_sized_clusters=equal_sized_clusters, save_file=False, outdir='.', distance=None, random_state=random_state)
     return gen.sample_embedding(), gen.labels
 
 
@@ -115,6 +115,6 @@ def make_densired(dim, n_samples, std=1.0, random_state=42):
     return data[:,:-1], data[:,-1]
 
 
-def make_mnist_nd(dim):
-    df = pd.read_pickle('../mvae_mnist_nd_saved.pkl')
+def make_mnist_nd(dim, path='../mvae_mnist_nd_saved.pkl'):
+    df = pd.read_pickle(path)
     return df['data'][dim], df['labels'][dim]

@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class Graph():
+class Graph:
     def __init__(self, latent_dim, data=None, labels=None, path=None, seed=42):
         """
         Initialize the Graph class.
@@ -16,22 +16,19 @@ class Graph():
             labels (np.array): Labels.
             latent_dim (int): Dimension of the data.
         """
-
-        os.environ['PYTHONHASHSEED']=str(seed)
+        os.environ["PYTHONHASHSEED"] = str(seed)
         random.seed(seed)
         np.random.seed(seed)
-        
-        self.seed = seed
 
+        self.seed = seed
         self.data = data
         self.labels = labels
         self.latent_dim = latent_dim
         self.seed = seed
 
-        self.path = Path('figures') if path is None else path
+        self.path = Path("figures") if path is None else path
 
-        self.graph_data = {'nodes':None, 'edges':None, 'nodes_org_space':None}
-
+        self.graph_data = {"nodes": None, "edges": None, "nodes_org_space": None}
 
     def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs):
         """
@@ -40,7 +37,6 @@ class Graph():
         This method should be implemented by subclasses.
         """
         pass
-
 
     def save_graph(self, file_name):
         """
@@ -52,9 +48,11 @@ class Graph():
         import pickle
 
         if self.graph_data["nodes"] is None:
-            raise ValueError("Graph data is not created yet. Please create the graph before saving.")
-        
-        with open(self.path / f'graph{file_name}', 'wb') as f:
+            raise ValueError(
+                "Graph data is not created yet. Please create the graph before saving."
+            )
+
+        with open(self.path / f"graph{file_name}", "wb") as f:
             pickle.dump(self.graph_data, f)
 
         print(f"Graph saved to {self.path / f'graph{file_name}'}.")
@@ -67,12 +65,13 @@ class GWGGraph(Graph):
         data=None,
         labels=None,
         path=None,
+        n_clusters=None,
         n_components=10,
         n_neighbors=3,
-        covariance='full',
+        covariance="full",
+        clustering_method="gmm",
         seed=42,
     ):
-
         """
         Initialize the GWG class.
         GMM + weighted graph.
@@ -86,18 +85,49 @@ class GWGGraph(Graph):
 
         super().__init__(latent_dim, data, labels, path, seed)
 
+        self.n_clusters = n_clusters
         self.n_components = n_components
         self.n_neighbors = (
             n_neighbors if n_neighbors < n_components else n_components - 1
         )
         self.covariance = covariance
-
+        self.clustering_method = clustering_method
 
     def get_graph(self):
-        if self.graph_data["nodes"] is None:
+        if self.graph_data is None or self.graph_data["nodes"] is None:
             self.create_graph(save=False, plot=False, return_graph=False)
         return self.graph_data
 
+    def _cluster(self):
+        if self.clustering_method == "gmm":
+            from sklearn.mixture import GaussianMixture
+
+            gmm = GaussianMixture(
+                n_components=self.n_components,
+                covariance_type=self.covariance,
+                init_params="k-means++",
+                random_state=self.seed,
+            )
+            gmm.fit(self.data)
+            pred_labels = gmm.predict(self.data)
+            return gmm.means_, pred_labels
+        elif self.clustering_method == "tmm":
+            import studenttmixture
+
+            tmm = studenttmixture.EMStudentMixture(
+                n_components=self.n_components,
+                n_init=1,
+                fixed_df=False,  # True,
+                # df=1.0,
+                init_type="k++",
+                random_state=self.seed,
+            )
+            tmm.fit(self.data)
+            pred_labels = tmm.predict(self.data)
+            return tmm.location, pred_labels
+        else:
+            print("[ERROR] Clustering method not yet implemented.")
+            exit()
 
     def _dim_reduction(self, gmm_means):
         from openTSNE import TSNE
@@ -118,16 +148,6 @@ class GWGGraph(Graph):
 
         return embeddings, cluster_means
 
-
-    def _get_edges_dict(self, knn_dict, pvalue_dict):
-        edges = {}
-
-        for (cm, neighs), (_, dips) in zip(knn_dict.items(), pvalue_dict.items()):
-            for n, dip in zip(list(neighs), list(dips)):
-                edges[(cm, n)] = dip
-        return edges
-
-
     def _compute_projection(self, cluster1, cluster2, means, predictions):
         c = means[cluster1] - means[cluster2]
         unit_vector = c / np.linalg.norm(c)
@@ -143,7 +163,6 @@ class GWGGraph(Graph):
         cluster2_proj -= mean
 
         return cluster1_proj, cluster2_proj
-    
 
     def get_thresholds_and_cluster_numbers(self):
         adjacency = self._get_adjacency_matrix()
@@ -153,7 +172,7 @@ class GWGGraph(Graph):
         cluster_numbers = list()
         clusterings = list()
         for threshold in thresholds:
-            tmp_adj = np.array(adjacency >= threshold, dtype=int)
+            tmp_adj = np.array(adjacency > threshold, dtype=int)
             n_components, clusters = scipy.sparse.csgraph.connected_components(
                 tmp_adj, directed=False
             )
@@ -169,7 +188,6 @@ class GWGGraph(Graph):
         O2R = dict(zip(range(len(clustering)), clustering))
         return np.array([O2R[yp] for yp in pred_labels]), threshold
 
-
     def _get_recoloring(self, pred_labels):
         adjacency = self._get_adjacency_matrix()
         n_components, clustering = scipy.sparse.csgraph.connected_components(
@@ -179,14 +197,11 @@ class GWGGraph(Graph):
         return np.array([O2R[yp] for yp in pred_labels])
 
     def _get_adjacency_matrix(self):
-        adjacency_list = self.graph_data["edges"]
         adjacency_matrix = np.zeros(shape=(self.n_components, self.n_components))
 
-        for i in range(self.n_components):
-            for j in range(self.n_components):
-                adjacency_matrix[i, j] = adjacency_matrix[j, i] = (
-                    adjacency_list[(i, j)] if (i, j) in adjacency_list.keys() else 0.0
-                )
+        for (cm, neigh), dip in self.graph_data["edges"].items():
+            adjacency_matrix[(cm, neigh)] = dip
+            adjacency_matrix[(neigh, cm)] = dip
 
         return adjacency_matrix
 
