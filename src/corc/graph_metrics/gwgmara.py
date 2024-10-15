@@ -22,8 +22,8 @@ class GWGMara(GWGGraph):
         n_clusters=None,
         n_components=10,
         n_neighbors=3,
-        covariance='diag',
-        clustering_method='gmm',
+        covariance="diag",
+        clustering_method="gmm",
         seed=42,
     ):
         """
@@ -36,7 +36,18 @@ class GWGMara(GWGGraph):
             latent_dim (int): Dimension of the data.
             n_components (int): Number of components for GMM clustering.
         """
-        super().__init__(latent_dim, data, labels, path, n_clusters, n_components, n_neighbors, covariance, clustering_method, seed)
+        super().__init__(
+            latent_dim,
+            data,
+            labels,
+            path,
+            n_clusters,
+            n_components,
+            n_neighbors,
+            covariance,
+            clustering_method,
+            seed,
+        )
 
 
     def create_graph(self, save=True, plot=True, return_graph=False):
@@ -115,6 +126,13 @@ class GWGMara(GWGGraph):
             dip_dict[cm] = dip_list
         return dip_dict
 
+    def _get_edges_dict(self, knn_dict, pvalue_dict):
+        edges = {}
+
+        for (cm, neighs), (_, dips) in zip(knn_dict.items(), pvalue_dict.items()):
+            for n, dip in zip(list(neighs), list(dips)):
+                edges[(cm, n)] = dip
+        return edges
 
     def _get_edges_dict(self, knn_dict, pvalue_dict):
         edges = {}

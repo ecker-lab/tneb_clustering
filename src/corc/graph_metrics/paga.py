@@ -31,7 +31,9 @@ class PAGA(Graph):
             resolution (float):
             clustering_method (str): Set clustering method. Options are 'leiden' and 'louvain'.
         """
-        super().__init__(latent_dim, data, labels, path, seed)
+        super().__init__(
+            latent_dim=latent_dim, data=data, labels=labels, path=path, seed=seed
+        )
 
         self.resolution = resolution
         self.clustering_method = clustering_method
@@ -258,11 +260,20 @@ class PAGA(Graph):
         """
         cluster_means = self.graph_data["nodes"]
 
-        if X2D is not None:
-            cluster_means = X2D.transform(cluster_means)
-        self.graph_data["nodes"] = cluster_means
+        # get TSNE(centers) if needed
+        if self.latent_dim > 2:
+            if hasattr(self, "transformed_centers_"):
+                cluster_means = self.transformed_centers_
+            else:
+                if X2D is not None:
+                    cluster_means = X2D.transform(cluster_means)
+                    self.graph_data["nodes"] = cluster_means
+                    self.transformed_centers_ = cluster_means
+                else:
+                    print("transformation missing!")
 
-        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
+        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
+
 
         for (cm, neigh), weight in self.graph_data["edges"].items():
             plt.plot(

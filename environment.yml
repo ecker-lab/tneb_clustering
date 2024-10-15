@@ -21,6 +21,7 @@ dependencies:
   - python-igraph
   - openblas
   - dask
+  - optax
   - pip:
     - jax[cuda12]
     - jaxtyping

@@ -24,7 +24,6 @@ class GWG(GWGGraph):
         clustering_method='gmm',
         seed=42,
     ):
-
         """
         Initialize the GWG class.
         GMM + weighted graph.

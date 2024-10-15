@@ -1,13 +1,29 @@
 import numpy as np
 from scipy.spatial import distance
-import densired
+
+# import densired
 import pandas as pd
 
 from corc import generation
 
 
-def make_gaussians(dim, std, n_samples, equal_sized_clusters=True, n_centers=6, random_state=42):
-    gen = generation.GenerationModel(center_structure='uniform', n_centers=n_centers, n_samples=n_samples, dim=dim, std=std, equal_sized_clusters=equal_sized_clusters, save_file=False, outdir='.', distance=None, random_state=random_state)
+
+def make_gaussians(
+    dim, std, n_samples, equal_sized_clusters=True, n_centers=6, random_state=42
+):
+    gen = generation.GenerationModel(
+        center_structure="uniform",
+        n_centers=n_centers,
+        n_samples=n_samples,
+        dim=dim,
+        std=std,
+        equal_sized_clusters=equal_sized_clusters,
+        save_file=False,
+        outdir=".",
+        distance=None,
+        random_state=random_state,
+    )
+
     return gen.sample_embedding(), gen.labels
 
 
@@ -28,10 +44,19 @@ def make_2d_worms(max_clusters, noise=False, random_state=42):
         numsteps = np.random.randint(100, 301)
         var_range = [10, 80]
         c = np.random.rand(2) * 2000 - 1000
-        X, c_trail, labels, i_clu = _gen_one_worm(X, c, var_range, numsteps, 
-                                                 steepness, nump, i_clu, num_noisep, c_trail, labels, 
-                                                 noise=noise)
-        
+        X, c_trail, labels, i_clu = _gen_one_worm(
+            X,
+            c,
+            var_range,
+            numsteps,
+            steepness,
+            nump,
+            i_clu,
+            num_noisep,
+            c_trail,
+            labels,
+            noise=noise,
+        )
 
     X = np.array(X)
     minX = X.min(axis=0)
@@ -39,7 +64,20 @@ def make_2d_worms(max_clusters, noise=False, random_state=42):
 
     return X, np.array([i[0] for i in labels])
 
-def _gen_one_worm(X, c, var_range, numsteps, steepness, nump, i_clu, num_noisep, c_trail, labels, noise=False):
+
+def _gen_one_worm(
+    X,
+    c,
+    var_range,
+    numsteps,
+    steepness,
+    nump,
+    i_clu,
+    num_noisep,
+    c_trail,
+    labels,
+    noise=False,
+):
     stepl = 5
     dims = 2
     new_cs = []
@@ -89,11 +127,12 @@ def _gen_one_worm(X, c, var_range, numsteps, steepness, nump, i_clu, num_noisep,
     return X, c_trail, labels, i_clu
 
 
-def make_Paul15():
-    df = pd.read_pickle('../paul15_dataset.pkl')
-    data = np.array(df.iloc[:, :-2], dtype='float64')
-    labels_num = np.array(df['paul15_clusters_num'])
+def make_Paul15(path="../paul15_dataset.pkl"):
+    df = pd.read_pickle(path)
+    data = np.array(df.iloc[:, :-2], dtype="float64")
+    labels_num = np.array(df["paul15_clusters_num"])
     return data, labels_num
+
 
 
 def make_densired(dim, n_samples, std=1.0, random_state=42):
@@ -118,3 +157,4 @@ def make_densired(dim, n_samples, std=1.0, random_state=42):
 def make_mnist_nd(dim, path='../mvae_mnist_nd_saved.pkl'):
     df = pd.read_pickle(path)
     return df['data'][dim], df['labels'][dim]
+

@@ -30,6 +30,22 @@ class Graph:
 
         self.graph_data = {"nodes": None, "edges": None, "nodes_org_space": None}
 
+    def fit(self, data):
+        """
+        Abstract method that fits the model. To be implemented by subclasses.
+        """
+        pass
+
+    def predict(self, data, target_number_classes=0):
+        """
+        Abstract method that predicts the model. To be implemented by subclasses.
+
+        target_number_classes contains number of classes that may be predicted
+            (i.e. possibly merging existing classes to get to the right number)
+        """
+        pass
+
+
     def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs):
         """
         Abstract method to create a graph.
@@ -37,6 +53,10 @@ class Graph:
         This method should be implemented by subclasses.
         """
         pass
+
+    def apply_tsne(self, X2D, transform_paths=True, samples_per_path=50):
+        # we assume that fitting did take place
+        self.transformed_centers_ = X2D.transform(self.graph_data["nodes"])
 
     def save_graph(self, file_name):
         """
@@ -56,6 +76,93 @@ class Graph:
             pickle.dump(self.graph_data, f)
 
         print(f"Graph saved to {self.path / f'graph{file_name}'}.")
+
+    def _dim_reduction(self, cluster_centers):
+        from openTSNE import TSNE
+
+        if self.latent_dim > 2:
+            tsne = TSNE(
+                perplexity=len(self.data) / 100,
+                metric="euclidean",
+                n_jobs=8,
+                random_state=self.seed,
+                verbose=False,
+            )
+            embeddings = tsne.fit(self.data)
+            cluster_means = embeddings.transform(cluster_centers)
+        else:
+            embeddings = self.data
+            cluster_means = cluster_centers
+
+        return embeddings, cluster_means
+
+    def get_graph(self):
+        if self.graph_data is None or self.graph_data["nodes"] is None:
+            self.create_graph(save=False, plot=False, return_graph=False)
+        return self.graph_data
+
+    def plot_graph(self, transformation=None):
+        """
+        from openTSNE import TSNE
+        tsne = TSNE(
+            perplexity=perplexity,
+            metric='euclidean',
+            n_jobs=8,
+            random_state=42,
+            verbose=False,
+        )
+        transformation = tsne.fit(self.data)
+        """
+
+        self.get_graph()  # populates self.graph_data
+
+        cluster_means = np.array(self.graph_data["nodes"])
+
+        # if transformation is not None:
+        #     cluster_means = transformation.transform(cluster_means)
+
+        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
+
+        for (cm, neigh), dip in self.graph_data["edges"].items():
+            plt.plot(
+                [cluster_means[cm][0], cluster_means[neigh][0]],
+                [cluster_means[cm][1], cluster_means[neigh][1]],
+                alpha=dip,
+                c="black",
+            )
+
+    def _get_adjacency_matrix(self):
+        if hasattr(self, "adjacency_") and self.adjacency_ is not None:
+            return self.adjacency_
+        else:
+            # create adjacency from "edges"
+            adjacency_list = self.graph_data["edges"]
+            adjacency_matrix = np.zeros(shape=(self.n_components, self.n_components))
+
+            for (node_u, node_v), value in adjacency_list.items():
+                adjacency_matrix[(node_u, node_v)] = value
+
+            self.adjacency_ = adjacency_matrix
+            return adjacency_matrix
+
+    def get_thresholds_and_cluster_numbers(self):
+        adjacency = self._get_adjacency_matrix()
+        thresholds, counts = np.unique(adjacency, return_counts=True)
+        thresholds = sorted(thresholds.tolist())
+
+        cluster_numbers = list()
+        clusterings = list()
+        for threshold in thresholds:
+            tmp_adj = np.array(adjacency >= threshold, dtype=int)
+            n_components, clusters = scipy.sparse.csgraph.connected_components(
+                tmp_adj, directed=False
+            )
+            cluster_numbers.append((threshold, n_components))
+            clusterings.append((n_components, threshold, clusters))
+
+        cluster_numbers = np.array(cluster_numbers)
+
+        return thresholds, cluster_numbers, clusterings
 
 
 class GWGGraph(Graph):
