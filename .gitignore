@@ -10,7 +10,7 @@
 *.pickle
 *.npy
 *.npz
-*.pkl
 
 logs
+cache
 # notebooks/.gitattributes
