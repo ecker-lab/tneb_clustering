@@ -33,7 +33,7 @@ class Leiden:
 
 
 def get_clustering_objects(
-    params,
+    params,  # default parameters are in our_datasets.default_base
     bandwidth,
     connectivity,
 ):

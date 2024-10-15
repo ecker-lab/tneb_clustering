@@ -165,6 +165,8 @@ def compute_interpolation(
         )
         updates, opt_state = optimizer.update(grads, opt_state)
         ms = optax.apply_updates(ms, updates)
+
+        # the following line effectively resamples the line through linear interpolation. Without it, all of the 1000 points will be pushed away from the low-density regions instead of finding the best possible line between the two dense regions.
         ms = scipy.signal.savgol_filter(ms, window_length=100, polyorder=1, axis=0)
 
     # this is where the band becomes elastic and where the work is done.
