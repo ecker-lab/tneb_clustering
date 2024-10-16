@@ -4,7 +4,6 @@ import diptest
 import matplotlib.pylab as plt
 import numpy as np
 import seaborn as sns
-from sklearn.neighbors import kneighbors_graph
 
 
 from corc.graph_metrics.graph import GWGGraph
@@ -22,6 +21,7 @@ class GWG(GWGGraph):
         n_neighbors=3,
         covariance='diag',
         clustering_method='gmm',
+        filter_edges=False,
         seed=42,
     ):
         """
@@ -35,7 +35,18 @@ class GWG(GWGGraph):
             n_components (int): Number of components for GMM clustering.
         """
 
-        super().__init__(latent_dim, data, labels, path, n_clusters, n_components, n_neighbors, covariance, clustering_method, seed)
+        super().__init__(
+            latent_dim,
+            data,
+            labels,
+            path,
+            n_clusters,
+            n_components,
+            n_neighbors,
+            covariance,
+            clustering_method,
+            filter_edges,
+            seed)
 
 
     def create_graph(self, save=True, plot=True, return_graph=False):
@@ -49,9 +60,11 @@ class GWG(GWGGraph):
         center_points, pred_labels = self._cluster()
         embeddings, cluster_means = self._dim_reduction(center_points)
 
-        knn_dict = self._get_knn_dict(center_points, k=self.n_neighbors)
-        pvalue_dict = self._get_pvalue_dict(center_points, pred_labels, knn_dict)
-        edges = self._get_edges_dict_initial(knn_dict, pvalue_dict, thresh=0.0)
+        knn_dict = self._get_knn_dict(
+            center_points,
+            k=self.n_neighbors)
+        pvalue_dict = self._get_weight_dict(center_points, pred_labels, knn_dict)
+        edges = self._get_edges_dict_initial(knn_dict, pvalue_dict)
 
         self.graph_data = {
             "nodes": cluster_means,
@@ -68,18 +81,7 @@ class GWG(GWGGraph):
         if return_graph:
             return self.graph_data
 
-
-    def _get_knn_dict(self, means, k=3):
-        knn = kneighbors_graph(means, k, mode="distance", include_self=False).toarray()
-
-        knn_dict = {}
-        for i in range(len(means)):
-            neighbors = np.where(knn[i])[0]
-            knn_dict[i] = set(neighbors)
-        return knn_dict
-
-
-    def _get_pvalue_dict(self, means, labels, knn_dict):
+    def _get_weight_dict(self, means, labels, knn_dict):
         pvalue_dict = {}
         for cm, neighs in knn_dict.items():
             pvalue_list = []
@@ -94,24 +96,6 @@ class GWG(GWGGraph):
                 pvalue_list.append(pvalue)
             pvalue_dict[cm] = pvalue_list
         return pvalue_dict
-
-
-    def _get_edges_dict_initial(self, knn_dict, pvalue_dict, thresh=0.0):
-        edges = {}
-        for (cm, neighs), (_, dips) in zip(knn_dict.items(), pvalue_dict.items()):
-            for n, dip in zip(list(neighs), list(dips)):
-                if dip > thresh:
-                    edges[(cm, n)] = dip
-        return edges
-
-
-    def _get_edges_dict(self, thresh=0.0):
-        edges = {}
-        for (cm, neigh), dip in self.graph_data["edges"].items():
-            if dip > thresh:
-                    edges[(cm, neigh)] = dip
-        return edges
-
 
     def _plt_graph_compare(self, embeddings, pred_labels, save=None):
         fig, axs = plt.subplots(1, 2, figsize=(15, 5))
@@ -178,60 +162,6 @@ class GWG(GWGGraph):
         else:
             plt.show()
 
-
-    def fit(self, data):
-        """'
-        1. Overcluster data using a GMM
-        2. Construct a weighted undirected graph with the clusters as centers. Low weights mean, that the clusters are more disconnected.
-        We projected the samples of two clusters onto the line connecting the two cluster means and apply the diptest on that.
-        We use the pvalue of the diptest as edge weights (line thickness) for the graph.
-        3. Plots show tsne on samples and gmm cluster means.
-        """
-        self.data = data
-
-        center_points, pred_labels = self._cluster()
-        knn_dict = self._get_knn_dict(center_points, k=self.n_neighbors)
-        pvalue_dict = self._get_pvalue_dict(center_points, pred_labels, knn_dict)
-
-        edges = self._get_edges_dict_initial(knn_dict, pvalue_dict)
-
-        self.graph_data = {
-            "nodes": center_points,
-            "edges": edges,
-            "nodes_org_space": center_points,
-        }
-        self.pred_labels = pred_labels
-        if self.n_clusters is None:
-            self.labels_ = self._get_recoloring(pred_labels=pred_labels)
-
-
-    def predict(self, data):
-        threshold = self._get_threshold()
-        edges = self._get_edges_dict(thresh=threshold)
-        self.graph_data["edges"] = edges
-        self.labels_ = self._get_recoloring(pred_labels=self.pred_labels)
-        return self.labels_
-
-
-    def _get_threshold(self):
-        thresholds, cluster_numbers, clusterings = self.get_thresholds_and_cluster_numbers()
-        target_number_classes = self.n_clusters
-
-        if self.n_clusters not in cluster_numbers:
-            print(f"{target_number_classes} clusters is not achievable.")
-            try: # try smaller n_clusters instead
-                target_number_classes = max(np.argwhere(cluster_numbers[:,1]<target_number_classes))[0]
-            except ValueError:  # take lowest threshold
-                target_number_classes = cluster_numbers[0,1]
-            print(f"Working with {target_number_classes} clusters instead.")
-
-        # find matching threshold
-        threshold = thresholds[
-            np.where(cluster_numbers == target_number_classes)[0][0]
-        ]
-        return threshold
-
-
     def plot_graph(self, X2D=None):
         """
         from openTSNE import TSNE
@@ -252,10 +182,10 @@ class GWG(GWGGraph):
 
         plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
 
-        for (cm, neigh), dip in self.graph_data["edges"].items():
+        for (cm, neigh), weight in self.graph_data["edges"].items():
             plt.plot(
                 [cluster_means[cm][0], cluster_means[neigh][0]],
                 [cluster_means[cm][1], cluster_means[neigh][1]],
-                # alpha=dip,
+                # alpha=weight,
                 c="black",
             )
