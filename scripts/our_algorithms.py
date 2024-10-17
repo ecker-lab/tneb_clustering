@@ -1,10 +1,11 @@
 from sklearn import cluster, mixture
 import studenttmixture
-from src.corc.graph_metrics import paga, gwg, gwgmara, neb
+from corc.graph_metrics import paga, gwg, gwgmara, neb, stavia
 from scipy.sparse import csr_matrix
 import scanpy
 import anndata
 import numpy as np
+from sklearn.neighbors import kneighbors_graph
 
 
 class Leiden:
@@ -33,10 +34,20 @@ class Leiden:
 
 
 def get_clustering_objects(
-    params,  # default parameters are in our_datasets.default_base
-    bandwidth,
-    connectivity,
+    params,  # default parameters are returned together with the datasets
+    X,
+    selector=None,
 ):
+    # estimate bandwidth for mean shift
+    bandwidth = cluster.estimate_bandwidth(X, quantile=params["quantile"])
+
+    # connectivity matrix for structured Ward
+    connectivity = kneighbors_graph(
+        X, n_neighbors=params["n_neighbors"], include_self=False
+    )
+    # make connectivity symmetric  (factor of 0.5 since we are averaging)
+    connectivity = 0.5 * (connectivity + connectivity.T)
+
     # ============
     # Create cluster objects
     # ============
@@ -124,25 +135,41 @@ def get_clustering_objects(
         n_init=5,
         optimization_iterations=50,
     )
+    stavia_algo = stavia.Stavia(
+        latent_dim=params["dim"],
+        n_neighbors=20,
+        resolution=0.15,
+        seed=params["random_state"],
+    )
 
-    clustering_algorithms = (
+    clustering_algorithms = [
         ("MiniBatch\nKMeans", two_means),
         ("Agglomerative\nClustering", average_linkage),
+        ("BIRCH", birch),
         ("HDBSCAN", hdbscan),
-        ("Gaussian\nMixture", gmm),
-        ("t-Student\nMixture", tmm),
-        ("Leiden", leiden),
-        ("PAGA", mpaga),
-        ("GWG-dip", mgwgmara),
-        ("GWG-pvalue", mgwg),
-        ("Affinity\nPropagation", affinity_propagation),
-        ("MeanShift", ms),
-        ("Spectral\nClustering", spectral),
-        ("Ward", ward),
         ("DBSCAN", dbscan),
         ("OPTICS", optics),
-        ("BIRCH", birch),
-        ("TMM-NEB", tmm_neb),
+        ("Gaussian\nMixture", gmm),
+        ("t-Student\nMixture", tmm),
+        ("Affinity\nPropagation", affinity_propagation),
+        ("Spectral\nClustering", spectral),
+        ("MeanShift", ms),
+        ("Ward", ward),
+        ("Leiden", leiden),
+        ("PAGA", mpaga),
+        ("Stavia", stavia_algo),
+        ("GWG-dip", mgwgmara),
+        ("GWG-pvalue", mgwg),
         ("GMM-NEB", gmm_neb),
-    )
-    return clustering_algorithms
+        ("TMM-NEB", tmm_neb),
+    ]
+    if selector is not None:
+        selected_algorithms = [
+            (name, algo)  # return the full set of parameters
+            for name, algo in clustering_algorithms  # global variable
+            if name in selector
+        ]
+    else:
+        selected_algorithms = clustering_algorithms
+
+    return selected_algorithms

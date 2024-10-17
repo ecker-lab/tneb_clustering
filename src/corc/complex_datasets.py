@@ -7,7 +7,6 @@ import pandas as pd
 from corc import generation
 
 
-
 def make_gaussians(
     dim, std, n_samples, equal_sized_clusters=True, n_centers=6, random_state=42
 ):
@@ -134,7 +133,6 @@ def make_Paul15(path="../paul15_dataset.pkl"):
     return data, labels_num
 
 
-
 def make_densired(dim, n_samples, std=1.0, random_state=42):
     skeleton = densired.datagen.densityDataGen(
         dim=dim,
@@ -145,16 +143,22 @@ def make_densired(dim, n_samples, std=1.0, random_state=42):
         step_spread=0.3,
         # ratio_noise=0.1,
         ratio_con=0.01,
-        dens_factors=True, # list of factors, where factor = round((np.random.rand() * 1.5) + 0.5, 2)
+        dens_factors=True,  # list of factors, where factor = round((np.random.rand() * 1.5) + 0.5, 2)
         # dens_factors=False, # list of [1]s
         # dens_factors=[std]*6, # set std per cluster
-        seed=random_state
+        seed=random_state,
     )
     data = skeleton.generate_data(data_num=n_samples)
-    return data[:,:-1], data[:,-1]
+    return data[:, :-1], data[:, -1]
 
 
-def make_mnist_nd(dim, path='../mvae_mnist_nd_saved.pkl'):
+def load_densired(dim, path="../funky_shapes.npz"):
+    with open(path, "rb") as f:
+        data = np.load(f)
+        # "files" within a npz-file cannot be named with numbers only, thus the f-string
+        return data[f"d{dim}"][:, :-1], data[f"d{dim}"][:, -1]
+
+
+def make_mnist_nd(dim, path="../mvae_mnist_nd_saved.pkl"):
     df = pd.read_pickle(path)
-    return df['data'][dim], df['labels'][dim]
-
+    return df["data"][dim], df["labels"][dim]

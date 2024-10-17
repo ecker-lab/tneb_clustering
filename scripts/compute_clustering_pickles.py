@@ -2,7 +2,6 @@ import time
 import warnings
 import numpy as np
 from sklearn import cluster
-from sklearn.neighbors import kneighbors_graph
 from sklearn.preprocessing import StandardScaler
 import our_datasets
 import our_algorithms
@@ -10,25 +9,29 @@ from openTSNE import TSNE
 import re
 import pickle
 import os
+import sys
 
 """
 This file performs the clustering computation and TSNE conversion of all selected datasets and clustering algorithms. The results will be stored in the cache/*.pickle files.
 Those files can then be used by the "partner" script "figure1_2d_datasets.py" to create the plots.
 Note that for NEB also TSNE embeddings of the paths between all pairs of nodes are generated, even though this takes a lot of time.
+
+one can call the script with the list of datasets that should be used.
 """
 
 
 def main():
     # get the datasets and default parameters for them
-    default_base = our_datasets.default_base
-    datasets = our_datasets.datasets
+    my_datasets = our_datasets.our_datasets()
+    default_base = my_datasets.default_base
+    dataset_selector = (
+        sys.argv[1:] if len(sys.argv[1:]) > 0 else our_datasets.dataset_selector
+    )
+    datasets = my_datasets.select_datasets(dataset_selector)
 
     print(f"Datasets: {[algo_params['name'] for _, algo_params in datasets]}")
 
-    for i_dataset, (dataset, algo_params) in enumerate(datasets):
-        # update parameters with dataset-specific values
-        params = default_base.copy()
-        params.update(algo_params)
+    for i_dataset, (dataset, params) in enumerate(datasets):
 
         print(f"Dataset: {i_dataset+1} of {len(datasets)}: {params['name']}")
 
@@ -63,7 +66,7 @@ def main():
                 print("computing TSNE", end="")
                 X2D = tsne.fit(X)
                 print(
-                    f"finished TSNE fit for {algo_params['name']} in {time.time()-starttime:.2f} seconds"
+                    f"finished TSNE fit for {params['name']} in {time.time()-starttime:.2f} seconds"
                 )
             else:
                 X2D = None
@@ -76,19 +79,7 @@ def main():
             with open(dataset_filename, "wb") as f:
                 pickle.dump(dataset_info, f)
 
-        # estimate bandwidth for mean shift
-        bandwidth = cluster.estimate_bandwidth(X, quantile=params["quantile"])
-
-        # connectivity matrix for structured Ward
-        connectivity = kneighbors_graph(
-            X, n_neighbors=params["n_neighbors"], include_self=False
-        )
-        # make connectivity symmetric  (factor of 0.5 since we are averaging)
-        connectivity = 0.5 * (connectivity + connectivity.T)
-
-        clustering_algorithms = our_algorithms.get_clustering_objects(
-            params, bandwidth, connectivity
-        )
+        clustering_algorithms = our_algorithms.get_clustering_objects(params, X)
 
         print(f"Algorithms: {[name for name,_ in clustering_algorithms]}")
 

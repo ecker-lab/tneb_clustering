@@ -56,7 +56,8 @@ class Graph:
 
     def apply_tsne(self, X2D, transform_paths=True, samples_per_path=50):
         # we assume that fitting did take place
-        self.transformed_centers_ = X2D.transform(self.graph_data["nodes"])
+        if self.graph_data["nodes"] is not None:
+            self.transformed_centers_ = X2D.transform(self.graph_data["nodes"])
 
     def save_graph(self, file_name):
         """

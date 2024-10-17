@@ -60,7 +60,7 @@ class Stavia(Graph):
             np.array(self.via.connected_comp_labels, dtype="int"),
         )
 
-    def _get_recoloring(self, pred_labels, clustering):
+    def _get_recoloring(self, pred_labels, clustering): # MR: this should already be available from the graph class
         O2R = dict(zip(range(len(clustering)), clustering))
         return np.array([O2R[yp] for yp in pred_labels])
 

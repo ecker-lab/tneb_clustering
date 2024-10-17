@@ -9,7 +9,7 @@
 # *.html
 *.pickle
 *.npy
-*.npz
+playground.ipynb
 
 logs
 cache

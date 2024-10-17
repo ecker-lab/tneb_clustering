@@ -47,7 +47,7 @@ class NEB(Graph):
             self.mixture_model = studenttmixture.EMStudentMixture(
                 n_components=n_components,
                 n_init=n_init,
-                fixed_df=True,
+                fixed_df=False,
                 df=1.0,  # the minimum value, for df=infty we get gmm
                 init_type="k++",
                 random_state=seed,
@@ -74,6 +74,12 @@ class NEB(Graph):
         if isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
             self.centers_ = self.mixture_model.means_
         elif isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
+            for _ in range(20):
+                if self.mixture_model.df_ is None:
+                    # we have not converged
+                    print("retrying tmm fit with more iterations")
+                    self.mixture_model.max_iter = 10000
+                    self.mixture_model.fit(data)
             self.centers_ = self.mixture_model.location
 
         # compute NEB paths. This is a very time-consuming step
@@ -219,9 +225,6 @@ class NEB(Graph):
                 cluster_means = transformation.transform(cluster_means)
                 print("transformed means")
 
-        print(
-            f"plot_graph: min {min(cluster_means[:,0])}, max {max(cluster_means[:,1])}"
-        )
         # plot cluster means
         plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
 
