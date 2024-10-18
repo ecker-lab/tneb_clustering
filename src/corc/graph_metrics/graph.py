@@ -4,6 +4,7 @@ import scipy
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.neighbors import kneighbors_graph
 
 
 class Graph:
@@ -178,6 +179,7 @@ class GWGGraph(Graph):
         n_neighbors=3,
         covariance="full",
         clustering_method="gmm",
+        filter_edges=True,
         seed=42,
     ):
         """
@@ -200,11 +202,7 @@ class GWGGraph(Graph):
         )
         self.covariance = covariance
         self.clustering_method = clustering_method
-
-    def get_graph(self):
-        if self.graph_data is None or self.graph_data["nodes"] is None:
-            self.create_graph(save=False, plot=False, return_graph=False)
-        return self.graph_data
+        self.filter_edges = filter_edges
 
     def _cluster(self):
         if self.clustering_method == "gmm":
@@ -272,44 +270,23 @@ class GWGGraph(Graph):
 
         return cluster1_proj, cluster2_proj
 
-    def get_thresholds_and_cluster_numbers(self):
-        adjacency = self._get_adjacency_matrix()
-        thresholds, counts = np.unique(adjacency, return_counts=True)
-        thresholds = sorted(thresholds.tolist())
-
-        cluster_numbers = list()
-        clusterings = list()
-        for threshold in thresholds:
-            tmp_adj = np.array(adjacency > threshold, dtype=int)
-            n_components, clusters = scipy.sparse.csgraph.connected_components(
-                tmp_adj, directed=False
-            )
-            cluster_numbers.append((threshold, n_components))
-            clusterings.append((n_components, threshold, clusters))
-
-        cluster_numbers = np.array(cluster_numbers)
-
-        return thresholds, cluster_numbers, clusterings
-
     def _get_recoloring(self, level, clusterings, pred_labels):
-        _, threshold, clustering = clusterings[level]
-        O2R = dict(zip(range(len(clustering)), clustering))
-        return np.array([O2R[yp] for yp in pred_labels]), threshold
+        _, threshold, component_labels = clusterings[level]
+        return component_labels[pred_labels], threshold
 
     def _get_recoloring(self, pred_labels):
         adjacency = self._get_adjacency_matrix()
-        n_components, clustering = scipy.sparse.csgraph.connected_components(
+        n_components, component_labels = scipy.sparse.csgraph.connected_components(
             adjacency, directed=False
         )
-        O2R = dict(zip(range(len(clustering)), clustering))
-        return np.array([O2R[yp] for yp in pred_labels])
+        return component_labels[pred_labels]
 
     def _get_adjacency_matrix(self):
         adjacency_matrix = np.zeros(shape=(self.n_components, self.n_components))
 
-        for (cm, neigh), dip in self.graph_data["edges"].items():
-            adjacency_matrix[(cm, neigh)] = dip
-            adjacency_matrix[(neigh, cm)] = dip
+        for (cm, neigh), weight in self.graph_data["edges"].items():
+            adjacency_matrix[(cm, neigh)] = weight
+            adjacency_matrix[(neigh, cm)] = weight
 
         return adjacency_matrix
 
@@ -320,3 +297,100 @@ class GWGGraph(Graph):
         plt.ylabel("Threshold")
         plt.title("Clusters")
         plt.grid()
+
+    def _get_edges_dict_initial(self, knn_dict, weights_dict):
+        edges = {}
+        for (cm, neighs), (_, weights) in zip(knn_dict.items(), weights_dict.items()):
+            for n, weight in zip(list(neighs), list(weights)):
+                edges[(cm, n)] = weight
+        return edges
+
+    def _get_edges_dict(self, thresh):
+        edges = {}
+        for (cm, neigh), weight in self.graph_data["edges"].items():
+            if weight >= thresh:
+                    edges[(cm, neigh)] = weight
+        return edges
+
+    def _get_knn_dict(self, means, k=3, thresh=np.inf):
+        knn = kneighbors_graph(means, k, mode="distance", include_self=False).toarray()
+        knn[knn > thresh] = 0
+
+        knn_dict = {}
+        for i in range(len(means)):
+            neighbors = np.where(knn[i])[0]
+            knn_dict[i] = set(neighbors)
+        return knn_dict
+
+    def predict(self, data, target_number_clusters=None):
+        if target_number_clusters is not None:
+            self.n_clusters = target_number_clusters
+        threshold = self._get_threshold()
+        edges = self._get_edges_dict(thresh=threshold)
+        self.graph_data["edges"] = edges
+        self.labels_ = self._get_recoloring(pred_labels=self.pred_labels)
+        return self.labels_
+
+
+    def _get_threshold(self):
+        thresholds, cluster_numbers, clusterings = self.get_thresholds_and_cluster_numbers()
+        target_number_classes = self.n_clusters
+
+        if target_number_classes not in cluster_numbers[:,1]:
+            print(f"{target_number_classes} clusters is not achievable.")
+            try: # try smaller n_clusters instead
+                target_number_classes = max(np.argwhere(cluster_numbers[:,1]<target_number_classes))[0]
+            except ValueError:  # take lowest threshold
+                target_number_classes = cluster_numbers[0,1]
+            print(f"Working with {target_number_classes} clusters instead.")
+        else:
+            print(f"Working with {target_number_classes} clusters.")
+
+        # find matching threshold
+        threshold = thresholds[
+            np.where(cluster_numbers == target_number_classes)[0][0]
+        ]
+        return threshold
+
+    def _get_threshold_filter_edges(self, means, k):
+        knn_all_to_all = kneighbors_graph(
+            means, k, mode="distance", include_self=False
+        ).toarray()
+        knn_all_to_all_sorted = np.sort(knn_all_to_all)
+        """
+        Why 3: I looked at the average distances between 1st, 2nd, etc neighbors and there was a jump in the change of distances between 2nd and 3rd neighbor (second point in the plot), so I set max distance threshold to be the average distance of the 3rd neighbor.
+        """
+        return knn_all_to_all_sorted.mean(axis=0)[3]
+
+    def fit(self, data):
+        """'
+        1. Overcluster data using a GMM
+        2. Construct a weighted undirected graph with the clusters as centers. Low weights mean, that the clusters are more disconnected.
+        We projected the samples of two clusters onto the line connecting the two cluster means and apply the diptest on that.
+        We use the pvalue of the diptest as edge weights (line thickness) for the graph.
+        3. Plots show tsne on samples and gmm cluster means.
+        """
+        self.data = data
+
+        center_points, pred_labels = self._cluster()
+
+        # threshold to remove spurious edges
+        threshold = self._get_threshold_filter_edges(center_points, k=self.n_components - 1) if self.filter_edges else np.inf
+        knn_dict = self._get_knn_dict(
+            center_points, k=self.n_neighbors, thresh=threshold
+        )
+        weight_dict = self._get_weight_dict(center_points, pred_labels, knn_dict)
+        edges = self._get_edges_dict_initial(knn_dict, weight_dict)
+
+        self.graph_data = {
+            "nodes": center_points,
+            "edges": edges,
+            "nodes_org_space": center_points,
+            "norm": [
+                np.array(list(edges.values())).min(),
+                np.array(list(edges.values())).max(),
+            ],
+        }
+        self.pred_labels = pred_labels
+        if self.n_clusters is None:
+            self.labels_ = self._get_recoloring(pred_labels=pred_labels)

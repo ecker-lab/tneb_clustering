@@ -5,8 +5,6 @@ import matplotlib as mpl
 import matplotlib.pylab as plt
 import numpy as np
 import seaborn as sns
-from sklearn.mixture import GaussianMixture
-from sklearn.neighbors import kneighbors_graph
 
 
 from corc.graph_metrics.graph import GWGGraph
@@ -24,6 +22,7 @@ class GWGMara(GWGGraph):
         n_neighbors=3,
         covariance="diag",
         clustering_method="gmm",
+        filter_edges=True,
         seed=42,
     ):
         """
@@ -46,6 +45,7 @@ class GWGMara(GWGGraph):
             n_neighbors,
             covariance,
             clustering_method,
+            filter_edges,
             seed,
         )
 
@@ -64,10 +64,10 @@ class GWGMara(GWGGraph):
         knn_dict = self._get_knn_dict(
             center_points,
             k=self.n_neighbors,
-            thresh=self._get_threshold(center_points, k=self.n_components - 1),
+            thresh=self._get_threshold_filter_edges(center_points, k=self.n_components - 1),
         )
-        dip_dict = self._get_dip_dict(center_points, pred_labels, knn_dict)
-        edges = self._get_edges_dict(knn_dict, dip_dict)
+        dip_dict = self._get_weight_dict(center_points, pred_labels, knn_dict)
+        edges = self._get_edges_dict_initial(knn_dict, dip_dict, thresh=np.inf)
 
         self.graph_data = {
             "nodes": cluster_means,
@@ -88,27 +88,7 @@ class GWGMara(GWGGraph):
         if return_graph:
             return self.graph_data
 
-    def _get_threshold(self, means, k):
-        knn_all_to_all = kneighbors_graph(
-            means, k, mode="distance", include_self=False
-        ).toarray()
-        knn_all_to_all_sorted = np.sort(knn_all_to_all)
-        """
-        Why 3: I looked at the average distances between 1st, 2nd, etc neighbors and there was a jump in the change of distances between 2nd and 3rd neighbor (second point in the plot), so I set max distance threshold to be the average distance of the 3rd neighbor.
-        """
-        return knn_all_to_all_sorted.mean(axis=0)[3]
-
-    def _get_knn_dict(self, means, k=3, thresh=np.inf):
-        knn = kneighbors_graph(means, k, mode="distance", include_self=False).toarray()
-        knn[knn > thresh] = 0
-
-        knn_dict = {}
-        for i in range(len(means)):
-            neighbors = np.where(knn[i])[0]
-            knn_dict[i] = set(neighbors)
-        return knn_dict
-
-    def _get_dip_dict(self, means, labels, knn_dict):
+    def _get_weight_dict(self, means, labels, knn_dict):
         dip_dict = {}
         for cm, neighs in knn_dict.items():
             dip_list = []
@@ -117,31 +97,13 @@ class GWGMara(GWGGraph):
                     cm, n, means, labels
                 )
 
-                dip = (
+                dip = (1 - # take the inverse of the dip statistic to have low values if the clusters are bimodal and high values if unimodal
                     diptest.dipstat(np.concatenate([cluster1_proj, cluster2_proj]))
-                    * 2
-                    # the *2 in here scales the output such that the maximum value is 1
+                    * 2 # the *2 in here scales the output such that the maximum value is 1
                 )
                 dip_list.append(dip)
             dip_dict[cm] = dip_list
         return dip_dict
-
-    def _get_edges_dict(self, knn_dict, pvalue_dict):
-        edges = {}
-
-        for (cm, neighs), (_, dips) in zip(knn_dict.items(), pvalue_dict.items()):
-            for n, dip in zip(list(neighs), list(dips)):
-                edges[(cm, n)] = dip
-        return edges
-
-    def _get_edges_dict(self, knn_dict, pvalue_dict):
-        edges = {}
-
-        for (cm, neighs), (_, dips) in zip(knn_dict.items(), pvalue_dict.items()):
-            for n, dip in zip(list(neighs), list(dips)):
-                edges[(cm, n)] = dip
-        return edges
-
 
     def _plt_graph_compare(self, embeddings, pred_labels, save=None):
         fig, axs = plt.subplots(1, 2, figsize=(15, 5))
@@ -212,36 +174,6 @@ class GWGMara(GWGGraph):
             print(f"WARNING: saving figure to file {path}")
         else:
             plt.show()
-
-    def fit(self, data):
-        """'
-        1. Overcluster data using a GMM
-        2. Construct a weighted undirected graph with the clusters as centers. Low weights mean, that the clusters are more disconnected.
-        We projected the samples of two clusters onto the line connecting the two cluster means and apply the diptest on that.
-        We use the pvalue of the diptest as edge weights (line thickness) for the graph.
-        3. Plots show tsne on samples and gmm cluster means.
-        """
-        self.data = data
-
-        center_points, pred_labels = self._cluster()
-
-        threshold = self._get_threshold(center_points, k=self.n_components - 1)
-        knn_dict = self._get_knn_dict(
-            center_points, k=self.n_neighbors, thresh=threshold
-        )
-        dip_dict = self._get_dip_dict(center_points, pred_labels, knn_dict)
-        edges = self._get_edges_dict(knn_dict, dip_dict)
-
-        self.graph_data = {
-            "nodes": center_points,
-            "edges": edges,
-            "nodes_org_space": center_points,
-            "norm": [
-                np.array(list(edges.values())).min(),
-                np.array(list(edges.values())).max(),
-            ],
-        }
-        self.labels_ = self._get_recoloring(pred_labels=pred_labels)
 
     def plot_graph(self, X2D=None):
         """
