@@ -154,7 +154,7 @@ class Graph:
         cluster_numbers = list()
         clusterings = list()
         for threshold in thresholds:
-            tmp_adj = np.array(adjacency > threshold, dtype=int)
+            tmp_adj = np.array(adjacency >= threshold, dtype=int)
             n_components, clusters = scipy.sparse.csgraph.connected_components(
                 tmp_adj, directed=False
             )
@@ -307,7 +307,7 @@ class GWGGraph(Graph):
     def _get_edges_dict(self, thresh):
         edges = {}
         for (cm, neigh), weight in self.graph_data["edges"].items():
-            if weight > thresh:
+            if weight >= thresh:
                     edges[(cm, neigh)] = weight
         return edges
 
@@ -351,7 +351,7 @@ class GWGGraph(Graph):
         ]
         return threshold
 
-    def _filter_edges(self, means, k):
+    def _get_threshold_filter_edges(self, means, k):
         knn_all_to_all = kneighbors_graph(
             means, k, mode="distance", include_self=False
         ).toarray()
@@ -374,7 +374,7 @@ class GWGGraph(Graph):
         center_points, pred_labels = self._cluster()
 
         # threshold to remove spurious edges
-        threshold = self._filter_edges(center_points, k=self.n_components - 1) if self.filter_edges else np.inf
+        threshold = self._get_threshold_filter_edges(center_points, k=self.n_components - 1) if self.filter_edges else np.inf
         knn_dict = self._get_knn_dict(
             center_points, k=self.n_neighbors, thresh=threshold
         )

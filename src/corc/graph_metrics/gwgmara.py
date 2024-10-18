@@ -64,7 +64,7 @@ class GWGMara(GWGGraph):
         knn_dict = self._get_knn_dict(
             center_points,
             k=self.n_neighbors,
-            thresh=self._filter_edges(center_points, k=self.n_components - 1),
+            thresh=self._get_threshold_filter_edges(center_points, k=self.n_components - 1),
         )
         dip_dict = self._get_weight_dict(center_points, pred_labels, knn_dict)
         edges = self._get_edges_dict_initial(knn_dict, dip_dict, thresh=np.inf)
