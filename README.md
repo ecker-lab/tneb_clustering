@@ -7,10 +7,7 @@ Go into folder
 ```
 cd cluster_vs_continuum
 ```
-To pull the submodules run 
-```
-git submodule update --init --recursive
-```
+
 Create the environment from the environment.yaml file:
 ```
 conda env create -f environment.yml
@@ -57,10 +54,4 @@ Add this to `.git/config`:
 and add a file `.gitattributes` with the following content:
 ```
 **/*.ipynb filter=clean-notebook-output
-```
-## Remove submodule later
-```
-git submodule deinit -f path/to/submodule
-git rm -f path/to/submodule
-rm -rf .git/modules/path/to/submodule
 ```

@@ -1,3 +1,0 @@
-[submodule "mnist-nd"]
-	path = mnist-nd
-	url = https://github.com/pollytur/mnist-nd
