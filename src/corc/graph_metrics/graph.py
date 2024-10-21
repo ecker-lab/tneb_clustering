@@ -330,27 +330,6 @@ class GWGGraph(Graph):
         self.graph_data["edges"] = edges
         self.labels_ = self._get_recoloring(pred_labels=self.pred_labels)
         return self.labels_
-    
-    
-    def _get_threshold(self):
-        thresholds, cluster_numbers, clusterings = self.get_thresholds_and_cluster_numbers()
-        target_number_classes = self.n_clusters
-
-        if target_number_classes not in cluster_numbers[:,1]:
-            print(f"{int(target_number_classes)} clusters is not achievable.")
-            try: # try smaller n_clusters instead
-                idx = max(np.argwhere(cluster_numbers[:, 1] < target_number_classes))[0]
-                target_number_classes = int(cluster_numbers[idx, 1])
-            except ValueError:  # take lowest threshold
-                idx = 0
-            print(f"Working with {int(cluster_numbers[0, 1])} clusters instead.")
-        else:
-            idx = np.argwhere(cluster_numbers[:, 1] == target_number_classes)[0][0]
-            print(f"Working with {int(target_number_classes)} clusters.")
-
-        # find matching threshold
-        threshold = thresholds[idx]
-        return threshold
 
 
     def _get_threshold(self):
@@ -370,6 +349,7 @@ class GWGGraph(Graph):
         # find matching threshold
         threshold = thresholds[idx]
         return threshold
+
 
     def _get_threshold_filter_edges(self, means, k):
         knn_all_to_all = kneighbors_graph(
