@@ -337,19 +337,19 @@ class GWGGraph(Graph):
         target_number_classes = self.n_clusters
 
         if target_number_classes not in cluster_numbers[:,1]:
-            print(f"{target_number_classes} clusters is not achievable.")
+            print(f"{int(target_number_classes)} clusters is not achievable.")
             try: # try smaller n_clusters instead
-                target_number_classes = max(np.argwhere(cluster_numbers[:,1]<target_number_classes))[0]
+                idx = max(np.argwhere(cluster_numbers[:,1]<target_number_classes))[0]
+                target_number_classes = cluster_numbers[idx,1]
             except ValueError:  # take lowest threshold
-                target_number_classes = cluster_numbers[0,1]
-            print(f"Working with {target_number_classes} clusters instead.")
+                idx = cluster_numbers[0,1]
+            print(f"Working with {int(target_number_classes)} clusters instead.")
         else:
-            print(f"Working with {target_number_classes} clusters.")
+            idx = np.argwhere(cluster_numbers[:,1]==target_number_classes)
+            print(f"Working with {int(target_number_classes)} clusters.")
 
         # find matching threshold
-        threshold = thresholds[
-            np.where(cluster_numbers == target_number_classes)[0][0]
-        ]
+        threshold = thresholds[idx]
         return threshold
 
     def _get_threshold_filter_edges(self, means, k):
