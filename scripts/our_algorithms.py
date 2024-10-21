@@ -110,8 +110,9 @@ def get_clustering_objects(
     )
     mgwgmara = gwgmara.GWGMara(
         latent_dim=params["dim"],
-        n_components=params["n_components"],
-        n_neighbors=params["n_neighbors"],
+        n_components=params["gwg_n_components"],
+        n_neighbors=params["gwg_n_neighbors"],
+        covariance=params["gwg_covariance"]
         seed=params["random_state"],
     )
     mpaga = paga.PAGA(
