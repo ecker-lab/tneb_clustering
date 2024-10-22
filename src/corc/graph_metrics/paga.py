@@ -20,6 +20,7 @@ class PAGA(Graph):
         resolution=0.1,
         clustering_method="leiden",
         seed=42,
+        use_rep='X',
     ):
         """
         Initialize the PAGA class.
@@ -37,6 +38,7 @@ class PAGA(Graph):
 
         self.resolution = resolution
         self.clustering_method = clustering_method
+        self.use_rep = use_rep
 
     def create_graph(self, save=True):
 
@@ -45,7 +47,7 @@ class PAGA(Graph):
         adata.obs["category"] = self.labels
         self.adata = adata
 
-        sc.pp.neighbors(adata, random_state=self.seed)
+        sc.pp.neighbors(adata, random_state=self.seed, use_rep=self.use_rep)
         sc.tl.umap(adata, random_state=self.seed)
 
         if self.clustering_method == "leiden":
@@ -209,7 +211,7 @@ class PAGA(Graph):
 
         self.adata = adata
 
-        sc.pp.neighbors(self.adata)
+        sc.pp.neighbors(self.adata, use_rep=self.use_rep)
         sc.tl.umap(adata)
 
         if self.clustering_method == "leiden":
