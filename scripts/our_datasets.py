@@ -3,46 +3,50 @@ from sklearn import cluster, datasets
 from sklearn.neighbors import kneighbors_graph
 from corc import complex_datasets
 
+
+DENSIRED_PATH = "datasets/densired.npz"
+MNIST_PATH = "datasets/mvae_mnist_nd_saved.pkl"
+
+# ============
+# select which datasets to return
+# ============
+DATASET_SELECTOR = [
+    "noisy_circles",
+    "noisy_moons",
+    "varied",
+    "aniso",
+    "blobs",
+    "worms",
+    "bowtie",
+    "zigzag",
+    "zigzig",
+    "uniform_circle",
+    "clusterlab10",
+    ###########################
+    ##### fig 2 datasets ######
+    ###########################
+    "blobs1_8",
+    "blobs1_16",
+    "blobs1_32",
+    "blobs1_64",
+    "blobs2_8",
+    "blobs2_16",
+    "blobs2_32",
+    "blobs2_64",
+    "densired8",
+    "densired16",
+    "densired32",
+    "densired64",
+    "mnist8",
+    "mnist16",
+    "mnist32",
+    "mnist64",
+]
+
+
 class our_datasets:
 
     def __init__(self, n_samples=1000, seed=30, ) -> None:
-          # ============
-        # select which datasets to return
-        # ============
-        self.dataset_selector = [
-            "noisy_circles",
-            "noisy_moons",
-            "varied",
-            "aniso",
-            "blobs",
-            "worms",
-            "bowtie",
-            "zigzag",
-            "zigzig",
-            "uniform_circle",
-            "clusterlab10",
-            ###########################
-            ##### fig 2 datasets ######
-            ###########################
-            "blobs1_8",
-            "blobs1_16",
-            "blobs1_32",
-            "blobs1_64",
-            "blobs2_8",
-            "blobs2_16",
-            "blobs2_32",
-            "blobs2_64",
-            "densired8",
-            "densired16",
-            "densired32",
-            "densired64",
-            "mnist8",
-            "mnist16",
-            "mnist32",
-            "mnist64",
-            # "paul15",
-        ]
-
         # ============
         # Set up cluster parameters
         # ============
@@ -92,9 +96,6 @@ class our_datasets:
         varied = datasets.make_blobs(
             n_samples=n_samples, cluster_std=[1.0, 2.5, 0.5], random_state=random_state
         )
-
-        # worms
-        # worms = complex_datasets.make_2d_worms(6)
 
         # bowtie = datasets2d.bowtie_dataset(n=n_samples)
         # zigzag = datasets2d.zigzag_dataset(n=n_samples)
@@ -151,28 +152,17 @@ class our_datasets:
             equal_sized_clusters=False,
         )
 
-        # Worms with 6 clusters in 8D, 16D, 32D, 64D
-
         # funky shapes with 6 clusters in 8D, 16D, 32D, 64D
-        funky_shapes_path = "funky_shapes.npz"
-        densired0 = complex_datasets.load_densired(dim=dims[0], path=funky_shapes_path)
-        densired1 = complex_datasets.load_densired(dim=dims[1], path=funky_shapes_path)
-        densired2 = complex_datasets.load_densired(dim=dims[2], path=funky_shapes_path)
-        densired3 = complex_datasets.load_densired(dim=dims[3], path=funky_shapes_path)
-        # densired0 = complex_datasets.make_densired(dim=dims[0], n_samples=n_samples, std=std*np.sqrt(dims[0]))
-        # densired1 = complex_datasets.make_densired(dim=dims[1], n_samples=n_samples, std=std*np.sqrt(dims[1]))
-        # densired2 = complex_datasets.make_densired(dim=dims[2], n_samples=n_samples, std=std*np.sqrt(dims[2]))
-        # densired3 = complex_datasets.make_densired(dim=dims[3], n_samples=n_samples, std=std*np.sqrt(dims[3]))
+        densired0 = complex_datasets.load_densired(dim=dims[0], path=DENSIRED_PATH)
+        densired1 = complex_datasets.load_densired(dim=dims[1], path=DENSIRED_PATH)
+        densired2 = complex_datasets.load_densired(dim=dims[2], path=DENSIRED_PATH)
+        densired3 = complex_datasets.load_densired(dim=dims[3], path=DENSIRED_PATH)
 
         # MNIST-Nd
-        mnist_path = "mvae_mnist_nd_saved.pkl"
-        mnist0 = complex_datasets.make_mnist_nd(dim=dims[0], path=mnist_path)
-        mnist1 = complex_datasets.make_mnist_nd(dim=dims[1], path=mnist_path)
-        mnist2 = complex_datasets.make_mnist_nd(dim=dims[2], path=mnist_path)
-        mnist3 = complex_datasets.make_mnist_nd(dim=dims[3], path=mnist_path)
-
-        # transcriptomic dataset (one mentioned in PAGA paper)
-        # paul15 = make_Paul15()
+        mnist0 = complex_datasets.make_mnist_nd(dim=dims[0], path=MNIST_PATH)
+        mnist1 = complex_datasets.make_mnist_nd(dim=dims[1], path=MNIST_PATH)
+        mnist2 = complex_datasets.make_mnist_nd(dim=dims[2], path=MNIST_PATH)
+        mnist3 = complex_datasets.make_mnist_nd(dim=dims[3], path=MNIST_PATH)
 
         ############
         # store dataset together with default parameters
@@ -262,6 +252,7 @@ class our_datasets:
                 no_structure,
                 {
                     "name": "no_structure",
+                    "n_clusters": 1,
                     "resolution": 0.1,
                     "resolution_leiden": 0.01,
                 },
@@ -269,6 +260,7 @@ class our_datasets:
             # (
             #     worms,
             #     {
+            #         "n_clusters": 4,
             #         "resolution": 0.01,
             #         "resolution_leiden": 0.01,
             #     },
@@ -276,6 +268,7 @@ class our_datasets:
             # (
             #     bowtie,
             #     {
+            #         "n_clusters": 2,
             #         "resolution":0.1,
             #         "resolution_leiden":0.1,
             #     }
@@ -290,6 +283,7 @@ class our_datasets:
             # (
             #     zigzig,
             #     {
+            #         "n_clusters": 5,
             #         "resolution":0.01,
             #         "resolution_leiden":0.01,
             #     }
@@ -297,6 +291,7 @@ class our_datasets:
             # (
             #     uniform_circle,
             #     {
+            #         "n_clusters": 1,
             #         "resolution":0.1,
             #         "resolution_leiden":0.1,
             #     }
@@ -304,6 +299,7 @@ class our_datasets:
             # (
             #     clusterlab10,
             #     {
+            #         "n_clusters": 6,
             #         "resolution":1.0,
             #         "resolution_leiden":0.01,
             #     }
@@ -551,7 +547,6 @@ class our_datasets:
                     "preference": -6_000,
                 }
             ),
-            # (paul15, {"dim": 1000, "n_clusters": 12, "n_components": 20}),
         ]
 
 

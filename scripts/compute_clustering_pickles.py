@@ -25,9 +25,12 @@ def main():
     my_datasets = our_datasets.our_datasets()
     default_base = my_datasets.default_base
     dataset_selector = (
-        sys.argv[1:] if len(sys.argv[1:]) > 0 else our_datasets.dataset_selector
+        sys.argv[1:] if len(sys.argv[1:]) > 0 else our_datasets.DATASET_SELECTOR
     )
     datasets = my_datasets.select_datasets(dataset_selector)
+
+    path = 'cache'
+    os.makedirs(path, exist_ok=True)
 
     print(f"Datasets: {[algo_params['name'] for _, algo_params in datasets]}")
 
@@ -37,7 +40,7 @@ def main():
 
         # try to load the dataset from disk
         dataset_name = re.sub(" ", "_", params["name"])
-        dataset_filename = f"cache/{dataset_name}.pickle"
+        dataset_filename = f"{path}/{dataset_name}.pickle"
         if os.path.exists(dataset_filename):
             with open(dataset_filename, "rb") as f:
                 dataset_info = pickle.load(f)
@@ -86,7 +89,7 @@ def main():
         for name, algorithm in clustering_algorithms:
             # check whether this was already computed
             alg_name = re.sub("\n", "", name)
-            filename = f"cache/{dataset_name}_{alg_name}.pickle"
+            filename = f"{path}/{dataset_name}_{alg_name}.pickle"
             if os.path.exists(filename):
                 print(f"{filename} already exists. Skipping.")
                 continue
@@ -131,7 +134,7 @@ def main():
 
             # saving algorithm object (containing everything we computed)
             alg_name = re.sub("\n", "", name)
-            filename = f"cache/{dataset_name}_{alg_name}.pickle"
+            filename = f"{path}/{dataset_name}_{alg_name}.pickle"
             print(f"saving to {filename}")
             with open(filename, "wb") as f:
                 pickle.dump(algorithm, f)

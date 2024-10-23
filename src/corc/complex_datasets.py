@@ -126,7 +126,7 @@ def _gen_one_worm(
     return X, c_trail, labels, i_clu
 
 
-def make_Paul15(path="../paul15_dataset.pkl"):
+def make_Paul15(path="../datasets/paul15_dataset.pkl"):
     df = pd.read_pickle(path)
     data = np.array(df.iloc[:, :-2], dtype="float64")
     labels_num = np.array(df["paul15_clusters_num"])
@@ -152,13 +152,13 @@ def make_densired(dim, n_samples, std=1.0, random_state=42):
     return data[:, :-1], data[:, -1]
 
 
-def load_densired(dim, path="../funky_shapes.npz"):
+def load_densired(dim, path="../datasets/densired.npz"):
     with open(path, "rb") as f:
         data = np.load(f)
         # "files" within a npz-file cannot be named with numbers only, thus the f-string
         return data[f"d{dim}"][:, :-1], data[f"d{dim}"][:, -1]
 
 
-def make_mnist_nd(dim, path="../mvae_mnist_nd_saved.pkl"):
+def make_mnist_nd(dim, path="../datasets/mvae_mnist_nd_saved.pkl"):
     df = pd.read_pickle(path)
     return df["data"][dim], df["labels"][dim]

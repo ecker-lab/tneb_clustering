@@ -1,6 +1,6 @@
 import pickle
 
-# import our_datasets
+import our_datasets
 # import our_algorithms
 import re
 import numpy as np
@@ -11,40 +11,6 @@ import os
 import sys
 
 import corc.utils
-
-datasets = [
-    # "noisy_circles",
-    # "noisy_moons",
-    # "varied",
-    # "aniso",
-    # "blobs",
-    # "worms", # not implemented
-    # "bowtie",# not implemented
-    # "zigzag",# not implemented
-    # "zigzig",# not implemented
-    # "uniform_circle",# not implemented
-    # "clusterlab10",# not implemented
-    ###########################
-    ##### fig 2 datasets ######
-    ###########################
-    "blobs1_8",
-    "blobs1_16",
-    "blobs1_32",
-    "blobs1_64",
-    "blobs2_8",
-    "blobs2_16",
-    "blobs2_32",
-    "blobs2_64",
-    "densired8",
-    "densired16",
-    "densired32",
-    "densired64",
-    "mnist8",
-    "mnist16",
-    "mnist32",
-    "mnist64",
-    # "paul15",
-]
 
 algorithms = [
     "MiniBatch\nKMeans",
@@ -94,8 +60,13 @@ def get_color_scheme(y_pred, y):
     colors = np.append(colors, ["#000000"])
     return colors
 
+cache_path = 'cache'
+figure_path = 'figures'
+os.makedirs(cache_path, exist_ok=True)
+os.makedirs(figure_path, exist_ok=True)
 
-plt.figure(figsize=(len(algorithms) * 2 + 3, len(datasets) * 2))
+
+plt.figure(figsize=(len(algorithms) * 2 + 3, len(our_datasets.DATASET_SELECTOR) * 2))
 plt.subplots_adjust(
     left=0.02, right=0.98, bottom=0.001, top=0.95, wspace=0.05, hspace=0.01
 )
@@ -103,15 +74,15 @@ plot_num = 1
 
 # check for missing files before starting the computation
 missing_files = []
-for dataset_orig_name in datasets:
+for dataset_orig_name in our_datasets.DATASET_SELECTOR:
     dataset_name = re.sub(" ", "_", dataset_orig_name)
-    dataset_filename = f"cache/{dataset_name}.pickle"
+    dataset_filename = f"{cache_path}/{dataset_name}.pickle"
     if not os.path.exists(dataset_filename):
         missing_files.append(dataset_filename)
 
     for algorithm_name in algorithms:
         alg_name = re.sub("\n", "", algorithm_name)
-        alg_filename = f"cache/{dataset_name}_{alg_name}.pickle"
+        alg_filename = f"{cache_path}/{dataset_name}_{alg_name}.pickle"
         if not os.path.exists(alg_filename):
             missing_files.append(alg_filename)
 
@@ -125,10 +96,10 @@ if missing_files:
 
 
 # now start the computation
-for i_dataset, dataset_orig_name in enumerate(tqdm.tqdm(datasets)):
+for i_dataset, dataset_orig_name in enumerate(tqdm.tqdm(our_datasets.DATASET_SELECTOR)):
     # load dataset
     dataset_name = re.sub(" ", "_", dataset_orig_name)
-    dataset_filename = f"cache/{dataset_name}.pickle"
+    dataset_filename = f"{cache_path}/{dataset_name}.pickle"
     with open(dataset_filename, "rb") as f:
         dataset_info = pickle.load(f)
 
@@ -142,7 +113,7 @@ for i_dataset, dataset_orig_name in enumerate(tqdm.tqdm(datasets)):
     points = X2D if X2D is not None else X
 
     # first column ist GT
-    ax = plt.subplot(len(datasets), len(algorithms) + 1, plot_num)
+    ax = plt.subplot(len(our_datasets.DATASET_SELECTOR), len(algorithms) + 1, plot_num)
     if i_dataset == 0:
         plt.title("Ground Truth", size=18)
     colors = get_color_scheme(y, y)
@@ -156,7 +127,7 @@ for i_dataset, dataset_orig_name in enumerate(tqdm.tqdm(datasets)):
     for i_algorithm, algorithm_name in enumerate(algorithms):
         # load algorithm object
         alg_name = re.sub("\n", "", algorithm_name)
-        alg_filename = f"cache/{dataset_name}_{alg_name}.pickle"
+        alg_filename = f"{cache_path}/{dataset_name}_{alg_name}.pickle"
         # print(alg_filename)
 
         # skip if the file is not there
@@ -176,7 +147,7 @@ for i_dataset, dataset_orig_name in enumerate(tqdm.tqdm(datasets)):
                 y_pred = algorithm.predict(X)
 
         # create plotting area
-        plt.subplot(len(datasets), len(algorithms) + 1, plot_num)
+        plt.subplot(len(our_datasets.DATASET_SELECTOR), len(algorithms) + 1, plot_num)
         if i_dataset == 0:
             plt.title(algorithm_name, size=18)
 
@@ -196,12 +167,12 @@ for i_dataset, dataset_orig_name in enumerate(tqdm.tqdm(datasets)):
         y_pred_permuted = corc.utils.reorder_colors(y_pred, y)
         plt.scatter(points[:, 0], points[:, 1], s=10, color=colors[y_pred_permuted])
 
-        if algorithm_name in ["GWG-dip", "GWG-pvalue", "PAGA", "TMM-NEB", "GMM-NEB"]:
+        if algorithm_name in ["GWG-dip", "GWG-pvalue", "PAGA", "Stavia", "TMM-NEB", "GMM-NEB"]:
             algorithm.plot_graph(X2D=X2D)
 
         plt.xticks(())
         plt.yticks(())
         plot_num += 1
 
-plt.savefig(f"figures/fig1.pdf", bbox_inches="tight")
-plt.savefig("figures/fig1.png", bbox_inches="tight", dpi=100)
+plt.savefig(f"{figure_path}/fig1.pdf", bbox_inches="tight")
+plt.savefig(f"{figure_path}/fig1.png", bbox_inches="tight", dpi=100)

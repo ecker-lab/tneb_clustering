@@ -112,7 +112,7 @@ def get_clustering_objects(
         latent_dim=params["dim"],
         n_components=params["gwg_n_components"],
         n_neighbors=params["gwg_n_neighbors"],
-        covariance=params["gwg_covariance"]
+        covariance=params["gwg_covariance"],
         seed=params["random_state"],
     )
     mpaga = paga.PAGA(
