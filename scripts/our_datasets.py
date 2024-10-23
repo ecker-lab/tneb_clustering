@@ -65,6 +65,7 @@ class our_datasets:
             "resolution": 1.0,
             "resolution_leiden": 1.0,
             "random_state": 42,
+            "use_rep":'X',
         }
 
         # ============
@@ -313,11 +314,13 @@ class our_datasets:
                     "name": "blobs1_8",
                     "dim": dims[0],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "diag"
+                    "gwg_covariance": "diag",
+                    "resolution":1.0,
+                    "resolution_leiden":1.0,
+                    "quantile" : 0.04,
+                    "preference": -200,
                 },
             ),
             (
@@ -326,11 +329,13 @@ class our_datasets:
                     "name": "blobs1_16",
                     "dim": dims[1],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "spherical"
+                    "gwg_covariance": "spherical",
+                    "resolution":1.0,
+                    "resolution_leiden":1.0,
+                    "quantile" : 0.045,
+                    "preference": -500, 
                 },
             ),
             (
@@ -339,11 +344,13 @@ class our_datasets:
                     "name": "blobs1_32",
                     "dim": dims[2],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "diag"
+                    "gwg_covariance": "diag",
+                    "resolution":1.0,
+                    "resolution_leiden":1.0,
+                    "quantile" : 0.033,
+                    "preference": -700, 
                 },
             ),
             (
@@ -352,11 +359,13 @@ class our_datasets:
                     "name": "blobs1_64",
                     "dim": dims[3],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "diag"
+                    "gwg_covariance": "diag",
+                    "resolution":1.0,
+                    "resolution_leiden":1.0,
+                    "quantile" : 0.031,
+                    "preference": -1300, 
                 },
             ),
             (
@@ -365,11 +374,13 @@ class our_datasets:
                     "name": "blobs2_8",
                     "dim": dims[0],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "diag"
+                    "gwg_covariance": "diag",
+                    "resolution": 0.6,
+                    "resolution_leiden": 0.6,
+                    "quantile" : 0.07,
+                    "preference": -200, 
                 },
             ),
             (
@@ -378,11 +389,13 @@ class our_datasets:
                     "name": "blobs2_16",
                     "dim": dims[1],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "spherical"
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.7,
+                    "resolution_leiden": 0.7,
+                    "quantile" : 0.052, # I did not managed to get the exact same number of clusters, its the closes one above
+                    "preference": -500, 
                 },
             ),
             (
@@ -391,11 +404,13 @@ class our_datasets:
                     "name": "blobs2_32",
                     "dim": dims[2],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 50,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "diag"
+                    "gwg_covariance": "diag",
+                    "resolution": 0.85,
+                    "resolution_leiden": 0.85,
+                    "quantile" : 0.06,
+                     "preference": -900, 
                 },
             ),
             (
@@ -404,11 +419,13 @@ class our_datasets:
                     "name": "blobs2_64",
                     "dim": dims[3],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 50,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "spherical"
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.93,
+                    "resolution_leiden": 0.93,
+                    "quantile" : 0.045,
+                    "preference": -900, 
                 },
             ),
             (
@@ -417,11 +434,13 @@ class our_datasets:
                     "name": "densired8",
                     "dim": dims[0],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 50,
                     "gwg_n_neighbors": 5,
-                    "gwg_covariance": "spherical"
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.2,
+                    "resolution_leiden": 0.2,
+                    "quantile" : 0.03,
+                    "preference": -2000,
                 },
             ),
             (
@@ -430,11 +449,13 @@ class our_datasets:
                     "name": "densired16",
                     "dim": dims[1],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 50,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "spherical"
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.2,
+                    "resolution_leiden": 0.2,
+                    "quantile" : 0.04,
+                     "preference": -7000, 
                 },
             ),
             (
@@ -443,11 +464,13 @@ class our_datasets:
                     "name": "densired32",
                     "dim": dims[2],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 50,
                     "gwg_n_neighbors": 3,
-                    "gwg_covariance": "spherical"
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.1,
+                    "resolution_leiden": 0.1,
+                    "quantile" : 0.035,
+                    "preference": -7000, 
                 },
             ),
             (
@@ -456,11 +479,13 @@ class our_datasets:
                     "name": "densired64",
                     "dim": dims[3],
                     "n_clusters": 6,
-                    "resolution": 1.0,
-                    "resolution_leiden": 1.0,
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 5,
-                    "gwg_covariance": "full"
+                    "gwg_covariance": "full",
+                    "resolution": 0.1,
+                    "resolution_leiden": 0.1,
+                    "quantile" : 0.052,
+                    "preference": -14_000,
                 },
             ),
             (
@@ -472,7 +497,11 @@ class our_datasets:
                     "n_components": 20,
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 5,
-                    "gwg_covariance": "full"
+                    "gwg_covariance": "full",
+                    "resolution": 0.6,
+                    "resolution_leiden": 0.6,
+                    "quantile" : 0.023,
+                    "preference": -1500, # -2000 would work as well, 
                 }
             ),
             (
@@ -484,7 +513,11 @@ class our_datasets:
                     "n_components": 20,
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 3,
-                    "gwg_covariance": "full"
+                    "gwg_covariance": "full",
+                    "resolution": 0.7,
+                    "resolution_leiden": 0.7,
+                    "quantile" : 0.02,
+                    "preference": -3500,
                 }
             ),
             (
@@ -496,7 +529,11 @@ class our_datasets:
                     "n_components": 20,
                     "gwg_n_components": 20,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "full"
+                    "gwg_covariance": "full",
+                    "resolution": 0.4,
+                    "resolution_leiden": 0.4,
+                    "quantile" : 0.041,
+                    "preference": -5300, 
                 }),
             (
                 mnist3, 
@@ -507,7 +544,11 @@ class our_datasets:
                     "n_components": 20,
                     "gwg_n_components": 15,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "full"
+                    "gwg_covariance": "full",
+                    "resolution": 0.49,
+                    "resolution_leiden": 0.49,
+                    "quantile" : 0.13,
+                    "preference": -6_000,
                 }
             ),
             # (paul15, {"dim": 1000, "n_clusters": 12, "n_components": 20}),
