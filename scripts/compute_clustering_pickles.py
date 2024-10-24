@@ -13,7 +13,7 @@ import sys
 
 """
 This file performs the clustering computation and TSNE conversion of all selected datasets and clustering algorithms. The results will be stored in the cache/*.pickle files.
-Those files can then be used by the "partner" script "figure1_2d_datasets.py" to create the plots.
+Those files can then be used by the "partner" script "create_clustering_figure.py" to create the plots.
 Note that for NEB also TSNE embeddings of the paths between all pairs of nodes are generated, even though this takes a lot of time.
 
 one can call the script with the list of datasets that should be used.
