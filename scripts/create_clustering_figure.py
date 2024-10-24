@@ -11,6 +11,10 @@ import sys
 
 import corc.utils
 
+"""
+Example call: python scripts/create_clustering_figure.py --algorithms  "MiniBatch\nKMeans, Agglomerative\nClustering" --datasets "blobs1_8, mnist64"
+"""
+
 def main():
     p = configargparse.ArgumentParser()
     p.add('-c', '--config', required=False, is_config_file=True,
