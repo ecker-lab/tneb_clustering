@@ -8,6 +8,29 @@ import numpy as np
 from sklearn.neighbors import kneighbors_graph
 
 
+ALGORITHM_SELECTOR = [
+    "MiniBatch\nKMeans",
+    "Agglomerative\nClustering",
+    "HDBSCAN",
+    "Gaussian\nMixture",
+    "t-Student\nMixture",
+    "DBSCAN",
+    "BIRCH",
+    "OPTICS",
+    "Spectral\nClustering",
+    "Affinity\nPropagation",
+    "MeanShift",
+    "Leiden",
+    "PAGA",
+    "Ward",
+    "Stavia",
+    "GWG-dip",
+    "GWG-pvalue",
+    "TMM-NEB",
+    "GMM-NEB",
+]
+
+
 class Leiden:
     def __init__(self, resolution=1.0, seed=42):
         self.resolution = resolution
@@ -164,13 +187,14 @@ def get_clustering_objects(
         ("GMM-NEB", gmm_neb),
         ("TMM-NEB", tmm_neb),
     ]
-    if selector is not None:
-        selected_algorithms = [
-            (name, algo)  # return the full set of parameters
-            for name, algo in clustering_algorithms  # global variable
-            if name in selector
-        ]
-    else:
-        selected_algorithms = clustering_algorithms
+
+    if selector is None:
+        selector = ALGORITHM_SELECTOR
+
+    selected_algorithms = [
+        (name, algo)  # return the full set of parameters
+        for name, algo in clustering_algorithms  # global variable
+        if name in selector
+    ]
 
     return selected_algorithms
