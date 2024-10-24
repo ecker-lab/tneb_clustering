@@ -129,12 +129,13 @@ def main():
 
             # drawing the background for NEB in the 2D case
             if dim == 2 and algorithm_name in ["TMM-NEB", "GMM-NEB"]:
-                linspace_x = np.linspace(X[:, 0].min() - 0.1, X[:, 0].max() + 0.1, 128)
-                linspace_y = np.linspace(X[:, 1].min() - 0.1, X[:, 1].max() + 0.1, 128)
+                image_resolution = 128
+                linspace_x = np.linspace(X[:, 0].min() - 0.1, X[:, 0].max() + 0.1, image_resolution)
+                linspace_y = np.linspace(X[:, 1].min() - 0.1, X[:, 1].max() + 0.1, image_resolution)
                 XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
                 tmm_probs = algorithm.mixture_model.score_samples(
                     XY.reshape(-1, 2)
-                ).reshape(128, 128)
+                ).reshape(image_resolution, image_resolution)
                 plt.contourf(
                     linspace_x, linspace_y, tmm_probs, levels=20, cmap="coolwarm", alpha=0.5
                 )
