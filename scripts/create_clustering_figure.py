@@ -15,34 +15,67 @@ import corc.utils
 Example call: python scripts/create_clustering_figure.py --algorithms  "MiniBatch\nKMeans, Agglomerative\nClustering" --datasets "blobs1_8, mnist64"
 """
 
+
 def main():
     p = configargparse.ArgumentParser()
-    p.add('-c', '--config', required=False, is_config_file=True,
-                help='Path to config file.')
+    p.add(
+        "-c",
+        "--config",
+        required=False,
+        is_config_file=True,
+        help="Path to config file.",
+    )
     # general
-    p.add_argument('--cache_path', type=str, default='cache',
-                help='Path to the compressed cached datasets and clustering results.')
-    p.add_argument('--figure_path', type=str, default='figures',
-                help='Path were resulting figures are saved.')
-    p.add_argument('--figure_name', type=str, default='figure1',
-                help='Name of the figure.')
-    p.add_argument('--algorithms', type=str, default=our_algorithms.ALGORITHM_SELECTOR,
-                help='List of algorithms to include in figure. Default is our_algorithms.ALGORITHM_SELECTOR.')
-    p.add_argument('--datasets', type=str, default=our_datasets.DATASET_SELECTOR,
-                help='List of datasets to include in figure. Default is our_datasets.DATASET_SELECTOR.')
+    p.add_argument(
+        "--cache_path",
+        type=str,
+        default="cache",
+        help="Path to the compressed cached datasets and clustering results.",
+    )
+    p.add_argument(
+        "--figure_path",
+        type=str,
+        default="figures",
+        help="Path were resulting figures are saved.",
+    )
+    p.add_argument(
+        "--figure_name", type=str, default="my_figure", help="Name of the figure."
+    )
+    p.add_argument(
+        "-a",
+        "--algorithms",
+        type=str,
+        default=our_algorithms.ALGORITHM_SELECTOR,
+        help="List of algorithms to include in figure. Default is our_algorithms.ALGORITHM_SELECTOR.",
+    )
+    p.add_argument(
+        "-d",
+        "--datasets",
+        type=str,
+        default=our_datasets.DATASET_SELECTOR,
+        help="List of datasets to include in figure. Default is our_datasets.DATASET_SELECTOR.",
+    )
 
     opt = p.parse_args()
 
-    print(f'{opt.algorithms}')
+    print(f"{opt.algorithms}")
 
     if isinstance(opt.algorithms, str):
-        opt.algorithms = opt.algorithms.replace(" ","").split(',')
+        opt.algorithms = opt.algorithms.replace(" ", "").split(",")
     if isinstance(opt.datasets, str):
-        opt.datasets = opt.datasets.replace(" ","").split(',')
+        if opt.datasets.lower() == "2d":
+            opt.datasets = our_datasets.DATASETS2D
+            if opt.figure_name == "my_figure":  # the default
+                opt.figure_name = "figure1"
+        elif opt.datasets.lower() == "complex":
+            opt.datasets = our_datasets.COMPLEX_DATASETS
+            if opt.figure_name == "my_figure":  # the default
+                opt.figure_name = "figure2"
+        else:  # otherwise, handle it as a list of datasets
+            opt.datasets = opt.datasets.replace(" ", "").split(",")
 
     os.makedirs(opt.cache_path, exist_ok=True)
     os.makedirs(opt.figure_path, exist_ok=True)
-
 
     plt.figure(figsize=(len(opt.algorithms) * 2 + 3, len(opt.datasets) * 2))
     plt.subplots_adjust(
@@ -58,7 +91,7 @@ def main():
             missing_files.append(dataset_filename)
 
         for algorithm_name in opt.algorithms:
-            algorithm_name = algorithm_name.replace("\\n","\n").replace("\n","")
+            algorithm_name = algorithm_name.replace("\\n", "\n").replace("\n", "")
             alg_filename = f"{opt.cache_path}/{dataset_name}_{algorithm_name}.pickle"
             if not os.path.exists(alg_filename):
                 missing_files.append(alg_filename)
@@ -68,9 +101,8 @@ def main():
         for file in missing_files:
             print(file)
         response = input("Continue anyway? (Y/n): ")
-        if response.lower() != "y":
+        if response != "" and response.lower() != "y":
             sys.exit(1)
-
 
     # now start the computation
     for i_dataset, dataset_name in enumerate(tqdm.tqdm(opt.datasets)):
@@ -102,7 +134,7 @@ def main():
         # plotting the other algorithms
         for i_algorithm, algorithm_name in enumerate(opt.algorithms):
             # load algorithm object
-            alg_name = algorithm_name.replace("\\n","\n").replace("\n","")
+            alg_name = algorithm_name.replace("\\n", "\n").replace("\n", "")
             alg_filename = f"{opt.cache_path}/{dataset_name}_{alg_name}.pickle"
             # print(alg_filename)
 
@@ -118,33 +150,53 @@ def main():
                 y_pred = algorithm.labels_.astype(int)
             else:
                 if hasattr(algorithm, "predict_with_target"):
-                    y_pred = algorithm.predict_with_target(X, len(np.unique(y))).astype(int)
+                    y_pred = algorithm.predict_with_target(X, len(np.unique(y))).astype(
+                        int
+                    )
                 else:
                     y_pred = algorithm.predict(X)
 
             # create plotting area
             plt.subplot(len(opt.datasets), len(opt.algorithms) + 1, plot_num)
             if i_dataset == 0:
-                plt.title(algorithm_name.replace("\\n","\n").replace("\n"," "), size=18)
+                plt.title(
+                    algorithm_name.replace("\\n", "\n").replace("\n", " "), size=18
+                )
 
             # drawing the background for NEB in the 2D case
             if dim == 2 and algorithm_name in ["TMM-NEB", "GMM-NEB"]:
                 image_resolution = 128
-                linspace_x = np.linspace(X[:, 0].min() - 0.1, X[:, 0].max() + 0.1, image_resolution)
-                linspace_y = np.linspace(X[:, 1].min() - 0.1, X[:, 1].max() + 0.1, image_resolution)
+                linspace_x = np.linspace(
+                    X[:, 0].min() - 0.1, X[:, 0].max() + 0.1, image_resolution
+                )
+                linspace_y = np.linspace(
+                    X[:, 1].min() - 0.1, X[:, 1].max() + 0.1, image_resolution
+                )
                 XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
                 tmm_probs = algorithm.mixture_model.score_samples(
                     XY.reshape(-1, 2)
                 ).reshape(image_resolution, image_resolution)
                 plt.contourf(
-                    linspace_x, linspace_y, tmm_probs, levels=20, cmap="coolwarm", alpha=0.5
+                    linspace_x,
+                    linspace_y,
+                    tmm_probs,
+                    levels=20,
+                    cmap="coolwarm",
+                    alpha=0.5,
                 )
 
             colors = get_color_scheme(y_pred, y)
             y_pred_permuted = corc.utils.reorder_colors(y_pred, y)
             plt.scatter(points[:, 0], points[:, 1], s=10, color=colors[y_pred_permuted])
 
-            if algorithm_name in ["GWG-dip", "GWG-pvalue", "PAGA", "Stavia", "TMM-NEB", "GMM-NEB"]:
+            if algorithm_name in [
+                "GWG-dip",
+                "GWG-pvalue",
+                "PAGA",
+                "Stavia",
+                "TMM-NEB",
+                "GMM-NEB",
+            ]:
                 algorithm.plot_graph(X2D=X2D)
 
             plt.xticks(())
@@ -152,7 +204,9 @@ def main():
             plot_num += 1
 
     plt.savefig(f"{opt.figure_path}/{opt.figure_name}.pdf", bbox_inches="tight")
-    plt.savefig(f"{opt.figure_path}/{opt.figure_name}.png", bbox_inches="tight", dpi=100)
+    plt.savefig(
+        f"{opt.figure_path}/{opt.figure_name}.png", bbox_inches="tight", dpi=100
+    )
 
 
 def get_color_scheme(y_pred, y):

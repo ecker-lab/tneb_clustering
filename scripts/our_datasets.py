@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn import cluster, datasets
 from sklearn.neighbors import kneighbors_graph
-from corc import complex_datasets
+from corc import complex_datasets, datasets2d
 
 
 DENSIRED_PATH = "datasets/densired.npz"
@@ -16,12 +16,12 @@ DATASET_SELECTOR = [
     "varied",
     "aniso",
     "blobs",
-    "worms",
-    "bowtie",
-    "zigzag",
-    "zigzig",
-    "uniform_circle",
-    "clusterlab10",
+    # "worms", # missing completely
+    # "bowtie", # missing gwg-parameters
+    # "zigzag", # missing gwg-parameters
+    # "zigzig", # missing gwg-parameters
+    # "uniform_circle", # missing gwg-parameters
+    # "clusterlab10", # missing gwg-parameters
     ###########################
     ##### fig 2 datasets ######
     ###########################
@@ -43,10 +43,41 @@ DATASET_SELECTOR = [
     "mnist64",
 ]
 
+DATASETS2D = [
+    "noisy_circles",
+    "noisy_moons",
+    "varied",
+    "aniso",
+    "blobs",
+]
+
+COMPLEX_DATASETS = [
+    "blobs1_8",
+    "blobs1_16",
+    "blobs1_32",
+    "blobs1_64",
+    "blobs2_8",
+    "blobs2_16",
+    "blobs2_32",
+    "blobs2_64",
+    "densired8",
+    "densired16",
+    "densired32",
+    "densired64",
+    "mnist8",
+    "mnist16",
+    "mnist32",
+    "mnist64",
+]
+
 
 class our_datasets:
 
-    def __init__(self, n_samples=1000, seed=30, ) -> None:
+    def __init__(
+        self,
+        n_samples=1000,
+        seed=30,
+    ) -> None:
         # ============
         # Set up cluster parameters
         # ============
@@ -69,7 +100,7 @@ class our_datasets:
             "resolution": 1.0,
             "resolution_leiden": 1.0,
             "random_state": 42,
-            "use_rep":'X',
+            "use_rep": "X",
         }
 
         # ============
@@ -80,7 +111,9 @@ class our_datasets:
         noisy_circles = datasets.make_circles(
             n_samples=n_samples, factor=0.5, noise=0.05, random_state=seed
         )
-        noisy_moons = datasets.make_moons(n_samples=n_samples, noise=0.05, random_state=seed)
+        noisy_moons = datasets.make_moons(
+            n_samples=n_samples, noise=0.05, random_state=seed
+        )
         blobs = datasets.make_blobs(n_samples=n_samples, random_state=seed)
         rng = np.random.RandomState(seed)
         no_structure = rng.rand(n_samples, 2), None
@@ -97,13 +130,12 @@ class our_datasets:
             n_samples=n_samples, cluster_std=[1.0, 2.5, 0.5], random_state=random_state
         )
 
-        # bowtie = datasets2d.bowtie_dataset(n=n_samples)
-        # zigzag = datasets2d.zigzag_dataset(n=n_samples)
-        # zigzig = datasets2d.zigzig_dataset(n=n_samples)
-        # uniform_circle = datasets2d.uniform_circle(n=n_samples)
+        bowtie = datasets2d.bowtie_dataset(n=n_samples)
+        zigzag = datasets2d.zigzag_dataset(n=n_samples)
+        zigzig = datasets2d.zigzig_dataset(n=n_samples)
+        uniform_circle = datasets2d.uniform_circle(n=n_samples)
 
-        # clusterlab10 = datasets2d.clusterlab_dataset10()
-
+        clusterlab10 = datasets2d.clusterlab_dataset10()
 
         # ============
         # Generate high-dimensional datasets.
@@ -182,8 +214,7 @@ class our_datasets:
                     "resolution_leiden": 0.01,
                     "gwg_n_components": 15,
                     "gwg_n_neighbors": 3,
-                    "gwg_covariance": "diag"
-                    
+                    "gwg_covariance": "diag",
                 },
             ),
             (
@@ -199,7 +230,7 @@ class our_datasets:
                     "resolution_leiden": 0.01,
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "diag"
+                    "gwg_covariance": "diag",
                 },
             ),
             (
@@ -215,7 +246,7 @@ class our_datasets:
                     "resolution_leiden": 0.1,
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
-                    "gwg_covariance": "full"
+                    "gwg_covariance": "full",
                 },
             ),
             (
@@ -231,7 +262,7 @@ class our_datasets:
                     "resolution_leiden": 0.1,
                     "gwg_n_components": 5,
                     "gwg_n_neighbors": 5,
-                    "gwg_covariance": "full"
+                    "gwg_covariance": "full",
                 },
             ),
             (
@@ -245,7 +276,7 @@ class our_datasets:
                     "resolution_leiden": 0.1,
                     "gwg_n_components": 5,
                     "gwg_n_neighbors": 3,
-                    "gwg_covariance": "spherical"
+                    "gwg_covariance": "spherical",
                 },
             ),
             (
@@ -265,45 +296,50 @@ class our_datasets:
             #         "resolution_leiden": 0.01,
             #     },
             # ),
-            # (
-            #     bowtie,
-            #     {
-            #         "n_clusters": 2,
-            #         "resolution":0.1,
-            #         "resolution_leiden":0.1,
-            #     }
-            # ),
-            # (
-            #     zigzag,
-            #     {
-            #         "resolution":0.01,
-            #         "resolution_leiden":0.01,
-            #     }
-            # ),
-            # (
-            #     zigzig,
-            #     {
-            #         "n_clusters": 5,
-            #         "resolution":0.01,
-            #         "resolution_leiden":0.01,
-            #     }
-            # ),
-            # (
-            #     uniform_circle,
-            #     {
-            #         "n_clusters": 1,
-            #         "resolution":0.1,
-            #         "resolution_leiden":0.1,
-            #     }
-            # ),
-            # (
-            #     clusterlab10,
-            #     {
-            #         "n_clusters": 6,
-            #         "resolution":1.0,
-            #         "resolution_leiden":0.01,
-            #     }
-            # ),
+            (
+                bowtie,
+                {
+                    "name": "bowtie",
+                    "n_clusters": 2,
+                    "resolution": 0.1,
+                    "resolution_leiden": 0.1,
+                },
+            ),
+            (
+                zigzag,
+                {
+                    "name": "zigzag",
+                    "resolution": 0.01,
+                    "resolution_leiden": 0.01,
+                },
+            ),
+            (
+                zigzig,
+                {
+                    "name": "zigzig",
+                    "n_clusters": 5,
+                    "resolution": 0.01,
+                    "resolution_leiden": 0.01,
+                },
+            ),
+            (
+                uniform_circle,
+                {
+                    "name": "uniform_circle",
+                    "n_clusters": 1,
+                    "resolution": 0.1,
+                    "resolution_leiden": 0.1,
+                },
+            ),
+            (
+                clusterlab10,
+                {
+                    "name": "clusterlab10",
+                    "n_clusters": 6,
+                    "resolution": 1.0,
+                    "resolution_leiden": 0.01,
+                },
+            ),
             (
                 blobs1_0,
                 {
@@ -313,9 +349,9 @@ class our_datasets:
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "diag",
-                    "resolution":1.0,
-                    "resolution_leiden":1.0,
-                    "quantile" : 0.04,
+                    "resolution": 1.0,
+                    "resolution_leiden": 1.0,
+                    "quantile": 0.04,
                     "preference": -200,
                 },
             ),
@@ -328,10 +364,10 @@ class our_datasets:
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "spherical",
-                    "resolution":1.0,
-                    "resolution_leiden":1.0,
-                    "quantile" : 0.045,
-                    "preference": -500, 
+                    "resolution": 1.0,
+                    "resolution_leiden": 1.0,
+                    "quantile": 0.045,
+                    "preference": -500,
                 },
             ),
             (
@@ -343,10 +379,10 @@ class our_datasets:
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "diag",
-                    "resolution":1.0,
-                    "resolution_leiden":1.0,
-                    "quantile" : 0.033,
-                    "preference": -700, 
+                    "resolution": 1.0,
+                    "resolution_leiden": 1.0,
+                    "quantile": 0.033,
+                    "preference": -700,
                 },
             ),
             (
@@ -358,10 +394,10 @@ class our_datasets:
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "diag",
-                    "resolution":1.0,
-                    "resolution_leiden":1.0,
-                    "quantile" : 0.031,
-                    "preference": -1300, 
+                    "resolution": 1.0,
+                    "resolution_leiden": 1.0,
+                    "quantile": 0.031,
+                    "preference": -1300,
                 },
             ),
             (
@@ -375,8 +411,8 @@ class our_datasets:
                     "gwg_covariance": "diag",
                     "resolution": 0.6,
                     "resolution_leiden": 0.6,
-                    "quantile" : 0.07,
-                    "preference": -200, 
+                    "quantile": 0.07,
+                    "preference": -200,
                 },
             ),
             (
@@ -390,8 +426,8 @@ class our_datasets:
                     "gwg_covariance": "spherical",
                     "resolution": 0.7,
                     "resolution_leiden": 0.7,
-                    "quantile" : 0.052, # I did not managed to get the exact same number of clusters, its the closes one above
-                    "preference": -500, 
+                    "quantile": 0.052,  # I did not managed to get the exact same number of clusters, its the closes one above
+                    "preference": -500,
                 },
             ),
             (
@@ -405,8 +441,8 @@ class our_datasets:
                     "gwg_covariance": "diag",
                     "resolution": 0.85,
                     "resolution_leiden": 0.85,
-                    "quantile" : 0.06,
-                     "preference": -900, 
+                    "quantile": 0.06,
+                    "preference": -900,
                 },
             ),
             (
@@ -420,8 +456,8 @@ class our_datasets:
                     "gwg_covariance": "spherical",
                     "resolution": 0.93,
                     "resolution_leiden": 0.93,
-                    "quantile" : 0.045,
-                    "preference": -900, 
+                    "quantile": 0.045,
+                    "preference": -900,
                 },
             ),
             (
@@ -435,7 +471,7 @@ class our_datasets:
                     "gwg_covariance": "spherical",
                     "resolution": 0.2,
                     "resolution_leiden": 0.2,
-                    "quantile" : 0.03,
+                    "quantile": 0.03,
                     "preference": -2000,
                 },
             ),
@@ -450,8 +486,8 @@ class our_datasets:
                     "gwg_covariance": "spherical",
                     "resolution": 0.2,
                     "resolution_leiden": 0.2,
-                    "quantile" : 0.04,
-                     "preference": -7000, 
+                    "quantile": 0.04,
+                    "preference": -7000,
                 },
             ),
             (
@@ -465,8 +501,8 @@ class our_datasets:
                     "gwg_covariance": "spherical",
                     "resolution": 0.1,
                     "resolution_leiden": 0.1,
-                    "quantile" : 0.035,
-                    "preference": -7000, 
+                    "quantile": 0.035,
+                    "preference": -7000,
                 },
             ),
             (
@@ -480,12 +516,12 @@ class our_datasets:
                     "gwg_covariance": "full",
                     "resolution": 0.1,
                     "resolution_leiden": 0.1,
-                    "quantile" : 0.052,
+                    "quantile": 0.052,
                     "preference": -14_000,
                 },
             ),
             (
-                mnist0, 
+                mnist0,
                 {
                     "name": "mnist8",
                     "dim": dims[0],
@@ -496,12 +532,12 @@ class our_datasets:
                     "gwg_covariance": "full",
                     "resolution": 0.6,
                     "resolution_leiden": 0.6,
-                    "quantile" : 0.023,
-                    "preference": -1500, # -2000 would work as well, 
-                }
+                    "quantile": 0.023,
+                    "preference": -1500,  # -2000 would work as well,
+                },
             ),
             (
-                mnist1, 
+                mnist1,
                 {
                     "name": "mnist16",
                     "dim": dims[1],
@@ -512,12 +548,12 @@ class our_datasets:
                     "gwg_covariance": "full",
                     "resolution": 0.7,
                     "resolution_leiden": 0.7,
-                    "quantile" : 0.02,
+                    "quantile": 0.02,
                     "preference": -3500,
-                }
+                },
             ),
             (
-                mnist2, 
+                mnist2,
                 {
                     "name": "mnist32",
                     "dim": dims[2],
@@ -528,11 +564,12 @@ class our_datasets:
                     "gwg_covariance": "full",
                     "resolution": 0.4,
                     "resolution_leiden": 0.4,
-                    "quantile" : 0.041,
-                    "preference": -5300, 
-                }),
+                    "quantile": 0.041,
+                    "preference": -5300,
+                },
+            ),
             (
-                mnist3, 
+                mnist3,
                 {
                     "name": "mnist64",
                     "dim": dims[3],
@@ -543,21 +580,21 @@ class our_datasets:
                     "gwg_covariance": "full",
                     "resolution": 0.49,
                     "resolution_leiden": 0.49,
-                    "quantile" : 0.13,
+                    "quantile": 0.13,
                     "preference": -6_000,
-                }
+                },
             ),
         ]
-
-
-
 
     def get_datasets(self):
         return self.select_datasets(self.dataset_selector)
 
     def select_datasets(self, dataset_selector):
         datasets = [
-            (dataset, {**self.default_base, **params}) # return the full set of parameters
+            (
+                dataset,
+                {**self.default_base, **params},
+            )  # return the full set of parameters
             for dataset, params in self.dataset_store  # global variable
             if params["name"] in dataset_selector
         ]
