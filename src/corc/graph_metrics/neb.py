@@ -48,7 +48,7 @@ class NEB(Graph):
                 n_components=n_components,
                 n_init=n_init,
                 fixed_df=False,
-                df=1.0,  # the minimum value, for df=infty we get gmm
+                # df=1.0,  # the minimum value, for df=infty we get gmm
                 init_type="k++",
                 random_state=seed,
             )

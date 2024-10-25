@@ -60,13 +60,15 @@ class Stavia(Graph):
             np.array(self.via.connected_comp_labels, dtype="int"),
         )
 
-    def _get_recoloring(self, pred_labels, clustering): # MR: this should already be available from the graph class
+    def _get_recoloring(
+        self, pred_labels, clustering
+    ):  # MR: this should already be available from the graph class
         O2R = dict(zip(range(len(clustering)), clustering))
         return np.array([O2R[yp] for yp in pred_labels])
 
     def plot_graph(
         self,
-        embedding=None,
+        X2D=None,
         idx: Optional[list] = None,
         draw_all_curves: bool = True,
         arrow_width_scale_factor: float = 15.0,
@@ -78,7 +80,7 @@ class Stavia(Graph):
 
         projects the graph based coarse trajectory onto a umap/tsne embedding
 
-        :param embedding: 2d array [n_samples x 2] with x and y coordinates of all n_samples. Umap, tsne, pca OR use the via computed embedding self.via.embedding
+        :param X2D: (earlier: embedding) 2d array [n_samples x 2] with x and y coordinates of all n_samples. Umap, tsne, pca OR use the via computed embedding self.via.embedding
         :param idx: default: None. Or List. if you had previously computed a umap/tsne (embedding) only on a subset of the total n_samples (subsampled as per idx), then the via objects and results will be indexed according to idx too
         :param draw_all_curves: if the clustergraph has too many edges to project in a visually interpretable way, set this to False to get a simplified view of the graph pathways
         :param arrow_width_scale_factor:
@@ -86,7 +88,7 @@ class Stavia(Graph):
         :param highlight_terminal_states: whether or not to highlight/distinguish the clusters which are detected as the terminal states by via
         :param use_maxout_edgelist:
         """
-
+        embedding = X2D
         if embedding is None:
             embedding = self.data
             if embedding is None:
