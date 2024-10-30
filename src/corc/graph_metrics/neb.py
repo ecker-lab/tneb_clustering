@@ -68,6 +68,7 @@ class NEB(Graph):
         self.iterations = optimization_iterations
 
     def fit(self, data):
+        self.data = data
         self.mixture_model.fit(data)
 
         # extract centers for TMM/GMM
@@ -224,6 +225,28 @@ class NEB(Graph):
             if transformation is not None and cluster_means.shape[-1] > 2:
                 cluster_means = transformation.transform(cluster_means)
                 print("transformed means")
+
+        # drawing the background for NEB in the 2D case
+        if self.latent_dim == 2:
+            image_resolution = 128
+            linspace_x = np.linspace(
+                self.data[:, 0].min() - 0.1, self.data[:, 0].max() + 0.1, image_resolution
+            )
+            linspace_y = np.linspace(
+                self.data[:, 1].min() - 0.1, self.data[:, 1].max() + 0.1, image_resolution
+            )
+            XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
+            tmm_probs = self.mixture_model.score_samples(
+                XY.reshape(-1, 2)
+            ).reshape(image_resolution, image_resolution)
+            plt.contourf(
+                linspace_x,
+                linspace_y,
+                tmm_probs,
+                levels=20,
+                cmap="coolwarm",
+                alpha=0.5,
+            )
 
         # plot cluster means
         plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
