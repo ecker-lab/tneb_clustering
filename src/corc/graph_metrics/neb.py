@@ -246,6 +246,7 @@ class NEB(Graph):
                 levels=20,
                 cmap="coolwarm",
                 alpha=0.5,
+                zorder=-10,
             )
 
         # plot cluster means
