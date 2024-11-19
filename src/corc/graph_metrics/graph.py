@@ -46,7 +46,6 @@ class Graph:
         """
         pass
 
-
     def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs):
         """
         Abstract method to create a graph.
@@ -103,7 +102,7 @@ class Graph:
             self.create_graph(save=False, plot=False, return_graph=False)
         return self.graph_data
 
-    def plot_graph(self, transformation=None):
+    def plot_graph(self, transformation=None, n_clusters=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(
@@ -152,21 +151,37 @@ class Graph:
         thresholds, counts = np.unique(adjacency, return_counts=True)
         thresholds = sorted(thresholds.tolist())
 
-        cluster_numbers = list()
-        clusterings = list()
+        threshold_dict = dict()
+        clustering_dict = dict()
+        # record the number of clusters achievable with each threshold
         for threshold in thresholds:
             tmp_adj = np.array(adjacency >= threshold, dtype=int)
             n_components, clusters = scipy.sparse.csgraph.connected_components(
                 tmp_adj, directed=False
             )
-            cluster_numbers.append((threshold, n_components))
-            clusterings.append((n_components, threshold, clusters))
+            # by only updating the threshold (and merging strategy) when necessary, we choose the smallest threshold that leads to this number of clusters.
+            if n_components not in threshold_dict.keys():
+                threshold_dict[n_components] = threshold
+                # also store the merging strategy for that
+                clustering_dict[n_components] = clusters
 
-        cluster_numbers = np.array(cluster_numbers)
+        return threshold_dict, clustering_dict
 
-        # cluster_numbers is the amount of clusters achieved with each threshold.
-        # clusterings contains the actual assignment of clusters
-        return thresholds, cluster_numbers, clusterings
+    def get_best_cluster_number(self, threshold_dict, target_number_classes):
+        if target_number_classes in threshold_dict.keys():
+            return target_number_classes
+        else:
+            print(f"{int(target_number_classes)} clusters is not achievable.")
+            # try smaller n_clusters instead (and if there is none, use the smallest n_clusters)
+            smallest_n_clusters = min(set(threshold_dict.keys()))
+            num_classes = max(
+                [key for key in threshold_dict.keys() if key < target_number_classes]
+                + [
+                    smallest_n_clusters
+                ]  # this makes sure that we always return something
+            )
+            print(f"Working with {num_classes} clusters instead.")
+            return num_classes
 
 
 class GWGGraph(Graph):
@@ -292,9 +307,11 @@ class GWGGraph(Graph):
 
         return adjacency_matrix
 
-    def plot_thresholds(self, cluster_numbers):
+    def plot_thresholds(self):
+        threshold_dict, _ = self.get_thresholds_and_cluster_numbers
+
         # clusters vs thresholds
-        plt.plot(cluster_numbers[:, 1], cluster_numbers[:, 0], marker="o")
+        plt.plot(list(threshold_dict.keys()), list(threshold_dict.values()), marker="o")
         plt.xlabel("Number of clusters")
         plt.ylabel("Threshold")
         plt.title("Clusters")
@@ -311,7 +328,7 @@ class GWGGraph(Graph):
         edges = {}
         for (cm, neigh), weight in self.graph_data["edges"].items():
             if weight >= thresh:
-                    edges[(cm, neigh)] = weight
+                edges[(cm, neigh)] = weight
         return edges
 
     def _get_knn_dict(self, means, k=3, thresh=np.inf):
@@ -333,25 +350,15 @@ class GWGGraph(Graph):
         self.labels_ = self._get_recoloring(pred_labels=self.pred_labels)
         return self.labels_
 
-
     def _get_threshold(self):
-        thresholds, cluster_numbers, clusterings = self.get_thresholds_and_cluster_numbers()
+        threshold_dict, cluster_dict = self.get_thresholds_and_cluster_numbers()
         target_number_classes = self.n_clusters
 
-        if target_number_classes not in cluster_numbers[:, 1]:
-            print(f"{int(target_number_classes)} clusters is not achievable.")
-            try: # try smaller n_clusters instead
-                idx = max(np.argwhere(cluster_numbers[:, 1] < target_number_classes))[0]
-            except ValueError:  # take lowest threshold
-                idx = 0
-        else:
-            idx = np.argwhere(cluster_numbers[:, 1] == target_number_classes)[0][0]
-        print(f"Working with {int(cluster_numbers[idx, 1])} clusters.")
-
-        # find matching threshold
-        threshold = thresholds[idx]
-        return threshold
-
+        # check whether the target number is achievable and select next-best alternative instead
+        best_num_classes = self.get_best_cluster_number(
+            threshold_dict, target_number_classes
+        )
+        return threshold_dict[best_num_classes]
 
     def _get_threshold_filter_edges(self, means, k):
         knn_all_to_all = kneighbors_graph(
@@ -376,7 +383,11 @@ class GWGGraph(Graph):
         center_points, pred_labels = self._cluster()
 
         # threshold to remove spurious edges
-        threshold = self._get_threshold_filter_edges(center_points, k=self.n_components - 1) if self.filter_edges else np.inf
+        threshold = (
+            self._get_threshold_filter_edges(center_points, k=self.n_components - 1)
+            if self.filter_edges
+            else np.inf
+        )
         knn_dict = self._get_knn_dict(
             center_points, k=self.n_neighbors, thresh=threshold
         )

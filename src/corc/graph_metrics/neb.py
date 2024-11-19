@@ -29,6 +29,7 @@ class NEB(Graph):
         optimization_iterations=1000, # for NEB
         max_iter_on_retries=10000, # for TMM fitting, 10x the default
         dataset_name=None,
+        n_clusters=None,
     ):
         """
         Initialize the NEB (nudged elastic band) class.
@@ -97,8 +98,9 @@ class NEB(Graph):
             original_num_components = self.mixture_model.n_components
             self.mixture_model = self.filter_mixture_model(self.mixture_model)
             self.centers_ = self.mixture_model.location
-            print(f"After filtering {original_num_components} components, we are left with {self.mixture_model.n_components} components")
-
+            print(
+                f"After filtering {original_num_components} components, we are left with {self.mixture_model.n_components} components"
+            )
 
         # compute NEB paths. This is a very time-consuming step
         (
@@ -112,11 +114,15 @@ class NEB(Graph):
         )
 
         # check quality of generated paths
-        equidistance_factor, all_factors = corc.graph_metrics.tmm_gmm_neb.evaluate_equidistance(self.paths_)
-        if equidistance_factor>10:
-            print(f"WARNING: the path is not equidistant! longest segment {equidistance_factor} times too long")
+        equidistance_factor, all_factors = (
+            corc.graph_metrics.tmm_gmm_neb.evaluate_equidistance(self.paths_)
+        )
+        if equidistance_factor > 10:
+            print(
+                f"WARNING: the path is not equidistant! longest segment {equidistance_factor} times too long"
+            )
             for edge in all_factors.keys():
-                if all_factors[edge]>10:
+                if all_factors[edge] > 10:
                     print(f"{edge} has factor {all_factors[edge]}")
 
         # normalize adjacency
@@ -128,37 +134,90 @@ class NEB(Graph):
             self.fit(data)
         return self.mixture_model.predict(data)
 
+    # def get_merging_strategy(self, target_number_classes):
+    #     if target_number_classes >= self.mixture_model.n_components:
+    #         raise "too many classes"
+
+    #     # merging classes if necessary
+    #     thresholds_dict, clustering_dict = self.get_thresholds_and_cluster_numbers()
+
+    #     num_classes = self._get_best_cluster_number(
+    #         thresholds_dict, target_number_classes
+    #     )
+    #     threshold = thresholds_dict[num_classes]
+
+    #     # find cluster pairs that need to be merged. We assume a "distance" matrix, so smaller is better
+    #     adjacency = self._get_adjacency_matrix()
+    #     tmp_adj = np.array(adjacency >= threshold, dtype=int)
+    #     _, component_labels = scipy.sparse.csgraph.connected_components(
+    #         tmp_adj, directed=False
+    #     )
+
+    #     # all pairs of clusters that will be joined
+    #     pairs_to_be_merged = [(i, j) for i, j in zip(*np.nonzero(tmp_adj)) if i < j]
+
+    #     return component_labels, pairs_to_be_merged
+
+    # def get_merged_pairs(self, target_num_classes):
+    #     merged_classes = list()
+
+    #     thresholds_dict, clustering_dict = self.get_thresholds_and_cluster_numbers()
+    #     num_classes = self.get_best_cluster_number(thresholds_dict, target_num_classes)
+    #     merging_strategy = clustering_dict[num_classes]
+
+    #     # extract all pairs of merged classes
+    #     for id in np.unique(merging_strategy):
+    #         # get indices that make a certain class
+    #         indices = [i for i, x in enumerate(merging_strategy) if x == id]
+    #         # get all pairs of these indices
+    #         merged_classes += list(itertools.combinations(indices, 2))
+
+    #     return merged_classes
+
+    def compute_mst_edges(self, raw_adjacency):
+        mst = -scipy.sparse.csgraph.minimum_spanning_tree(-raw_adjacency)
+        rows, cols = mst.nonzero()
+        entries = list(zip(rows, cols))
+        return entries
+
+    def get_merged_pairs(self, target_num_classes, only_mst_edges=True):
+        thresholds_dict, clustering_dict = self.get_thresholds_and_cluster_numbers()
+        num_classes = self.get_best_cluster_number(thresholds_dict, target_num_classes)
+        threshold = thresholds_dict[num_classes]
+        merging_strategy = clustering_dict[num_classes]
+
+        pairs = [
+            (i, j)
+            for i, j in itertools.combinations(range(len(merging_strategy)), 2)
+            if merging_strategy[i] == merging_strategy[j]
+        ]
+
+        if only_mst_edges:
+            # only those that are also part of the MST
+            mst_edges = self.compute_mst_edges(self.raw_adjacency_)
+            pairs = [pair for pair in pairs if pair in mst_edges]
+
+        return pairs
+
     def predict_with_target(self, data, target_number_classes):
         predictions = self.predict(data)
+        self.target_num_classes = target_number_classes
 
-        # merging classes if necessary
+        # check whether prediction classes need to be merged
         if target_number_classes < self.n_components:
             raw_predictions = predictions
-            thresholds, cluster_numbers, clusterings = (
+
+            # extract merging strategy
+            threshold_dict, merging_strategy_dict = (
                 self.get_thresholds_and_cluster_numbers()
             )
-
-            # check whether it is possible to reach target_number_clusters and choose next-smaller value if necessary
-            if target_number_classes not in cluster_numbers:
-                print(f"{target_number_classes} clusters is not achievable.")
-                target_number_classes = max(
-                    num for num in cluster_numbers if num < target_number_classes
-                )
-                print(f"Working with {target_number_classes} clusters instead.")
-
-            # find matching threshold
-            threshold = thresholds[
-                np.where(cluster_numbers == target_number_classes)[0][0]
-            ]
-
-            # find cluster pairs that need to be merged. We assume a "distance" matrix, so smaller is better
-            adjacency = self._get_adjacency_matrix()
-            tmp_adj = np.array(adjacency >= threshold, dtype=int)
-            _, component_labels = scipy.sparse.csgraph.connected_components(
-                tmp_adj, directed=False
+            num_classes = self.get_best_cluster_number(
+                threshold_dict, target_number_classes
             )
+            merging_strategy = merging_strategy_dict[num_classes]
+
             # actually merge the predictions
-            predictions = component_labels[raw_predictions]
+            predictions = merging_strategy[raw_predictions]
 
         return predictions
 
@@ -177,7 +236,7 @@ class NEB(Graph):
         # edges are expected in the form of a dictionary, so we have to convert out np array
         edges = {
             (i, j): self.adjacency_[i, j]
-            for i, j in itertools.combinations(range(self.n_components), 2)
+            for i, j in itertools.combinations(range(self.adjacency_.shape[0]), 2)
         }
 
         # normalized edges
@@ -186,7 +245,7 @@ class NEB(Graph):
 
         normalized_edges = {
             (i, j): norm_adjacency[i, j]
-            for i, j in itertools.combinations(range(self.n_components), 2)
+            for i, j in itertools.combinations(range(self.adjacency_.shape[0]), 2)
         }
 
         self.graph_data = {
@@ -197,7 +256,7 @@ class NEB(Graph):
         }
 
         if plot:
-            raise NotImplementedError
+            self.plot_graph()
         #     self._plt_graph_compare(embeddings, self.labels_, save=f"{filename}.png")
 
         if save:
@@ -205,12 +264,6 @@ class NEB(Graph):
 
         if return_graph:
             return self.graph_data
-
-    def compute_mst_edges(self, raw_adjacency):
-        mst = -scipy.sparse.csgraph.minimum_spanning_tree(-raw_adjacency)
-        rows, cols = mst.nonzero()
-        entries = list(zip(rows, cols))
-        return entries
 
     def apply_tsne(self, X2D, transform_paths=True, samples_per_path=50):
         # we assume that fitting did take place
@@ -237,7 +290,10 @@ class NEB(Graph):
                 self.transformed_paths_[(i, j)] = X2D.transform(path)
                 self.transformed_paths_[(j, i)] = self.transformed_paths_[(i, j)]
 
-    def plot_graph(self, X2D=None):
+    def plot_graph(self, X2D=None, pairs=None, n_clusters=None):
+        """
+        Note: automatic "pairs" computation only works if self.labels or self.n_clusters is set.
+        """
         transformation = X2D
         self.get_graph()  # populates self.graph_data
         # print("got the graph")
@@ -279,10 +335,23 @@ class NEB(Graph):
 
         cmap = plt.get_cmap("viridis")  # choose a colormap
 
-        if hasattr(self, "pairs_"):
-            pairs = self.pairs_
-        else:
-            pairs = self.compute_mst_edges(self.raw_adjacency_)
+        if pairs is None:
+            if n_clusters is not None:
+                target_num_clusters = n_clusters
+            elif self.labels is not None:
+                target_num_clusters = len(np.unique(self.labels))
+            elif hasattr(self, "n_clusters"):
+                target_num_clusters = self.n_clusters
+            else:
+                target_num_clusters = len(
+                    cluster_means
+                )  # no clusters are merged, so no edges are drawn
+
+            # by default we do not draw lines for all pairs of nodes that are merged (because some may not have converged)
+            # but instead for the shortest edges that form the MST.
+            pairs = self.get_merged_pairs(
+                target_num_classes=target_num_clusters, only_mst_edges=True
+            )
 
         if hasattr(self, "transformed_paths_"):
             paths_store = self.transformed_paths_
@@ -324,7 +393,11 @@ class NEB(Graph):
         mixture_model.n_components = np.count_nonzero(elongation_filter)
         mixture_model.mix_weights_ = mixture_model.mix_weights_[elongation_filter]
         mixture_model.df_ = mixture_model.df_[elongation_filter]
-        mixture_model.scale_inv_cholesky_ = mixture_model.scale_inv_cholesky_[:, :, elongation_filter]
-        mixture_model.scale_cholesky = mixture_model.scale_cholesky_[:, :, elongation_filter]
+        mixture_model.scale_inv_cholesky_ = mixture_model.scale_inv_cholesky_[
+            :, :, elongation_filter
+        ]
+        mixture_model.scale_cholesky = mixture_model.scale_cholesky_[
+            :, :, elongation_filter
+        ]
 
         return mixture_model

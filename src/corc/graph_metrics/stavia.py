@@ -69,6 +69,7 @@ class Stavia(Graph):
     def plot_graph(
         self,
         X2D=None,
+        n_clusters=None,  # not used here
         idx: Optional[list] = None,
         draw_all_curves: bool = True,
         arrow_width_scale_factor: float = 15.0,

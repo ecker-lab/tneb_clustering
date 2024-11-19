@@ -242,6 +242,7 @@ def compute_neb_paths(mixture_model, iterations=1000):
 
     return adjacency, raw_adjacency, paths, temps, logprobs
 
+
 def compute_mst_distances(adjacency):
     """
     Takes a distance matrix from NEB, computes an MST, and outputs a corrected distance
@@ -279,9 +280,7 @@ def compute_mst_distances(adjacency):
                     distances[predecessors[node]][other_node],
                 )  # the latter is already computed and the first has a value
                 # assign to both directions
-                distances[node][other_node] = max(
-                    direct_dist, indirect_dist
-                )
+                distances[node][other_node] = max(direct_dist, indirect_dist)
                 distances[other_node][node] = distances[node][other_node]
 
         marked[node] = 1
@@ -292,24 +291,6 @@ def compute_mst_distances(adjacency):
 
     return distances
 
-
-# def get_thresholds_and_cluster_numbers(adjacency):
-#     thresholds, counts = np.unique(adjacency, return_counts=True)
-#     thresholds = sorted(thresholds.tolist())
-#
-#     cluster_numbers = list()
-#     clusterings = list()
-#     for threshold in thresholds:
-#         tmp_adj = np.array(adjacency >= threshold, dtype=int)
-#         n_components, clusters = scipy.sparse.csgraph.connected_components(
-#             tmp_adj, directed=False
-#         )
-#         cluster_numbers.append((threshold, n_components))
-#         clusterings.append((n_components, threshold, clusters))
-#
-#     cluster_numbers = np.array(cluster_numbers)
-#
-#     return thresholds, cluster_numbers, clusterings
 
 def evaluate_equidistance(paths):
     """
@@ -337,7 +318,7 @@ def evaluate_equidistance(paths):
         distances = np.linalg.norm(np.diff(path, axis=0), axis=1)
         longest_segment = max(distances)
         total_length = np.sum(distances)
-        equidistant_length = total_length/len(distances)
+        equidistant_length = total_length / len(distances)
         if longest_segment > longest_equidistant_length:
             factor = longest_segment / longest_equidistant_length
             all_factors[path_index] = factor

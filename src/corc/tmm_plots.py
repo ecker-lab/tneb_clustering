@@ -131,14 +131,14 @@ def computations_for_plot_row(
     )
 
     # thresholds for the cluster-number plot
-    thresholds, cluster_numbers, clusterings = (
-        tmm_gmm_neb.get_thresholds_and_cluster_numbers(adjacency)
+    thresholds_dict, clusterings_dict = tmm_gmm_neb.get_thresholds_and_cluster_numbers(
+        adjacency
     )
 
     # extracting the smallest edges to only draw them in the heatmap
     mst_edges = compute_mst_edges(raw_adjacency)
 
-    return model, adjacency, paths, cluster_numbers, mst_edges, clusterings
+    return model, adjacency, paths, thresholds_dict, mst_edges, clusterings_dict
 
 
 def plot_row_with_computation(
@@ -173,9 +173,9 @@ def plot_row_with_computation(
 
 
 def plot_row(
-        data_X,
-        data_y,
-        tmm_model,
+    data_X,
+    data_y,
+    tmm_model,
 ):
     """
     Creates a plot consisting of
@@ -191,7 +191,13 @@ def plot_row(
 
     # heatmap with arrows
     mst_edges = tmm_model.compute_mst_edges(tmm_model.raw_adjacency_)
-    plot_field(data_X, tmm_model.mixture_model, paths=tmm_model.paths_, selection=mst_edges, axis=axes[1])
+    plot_field(
+        data_X,
+        tmm_model.mixture_model,
+        paths=tmm_model.paths_,
+        selection=mst_edges,
+        axis=axes[1],
+    )
     axes[1].set_title("Heatmap")
 
     # # threshold counts
@@ -200,14 +206,19 @@ def plot_row(
     # axes[2].set_xlabel('Threshold')
 
     # clusters vs thresholds
-    thresholds, cluster_numbers_per_threshold, clusterings = tmm_model.get_thresholds_and_cluster_numbers()
-    axes[2].plot(cluster_numbers_per_threshold[:, 1], cluster_numbers_per_threshold[:, 0], marker="o")
-    axes[2].axvline(x=len(np.unique(data_y)), color='r')
+    thresholds, cluster_numbers_per_threshold, clusterings = (
+        tmm_model.get_thresholds_and_cluster_numbers()
+    )
+    axes[2].plot(
+        cluster_numbers_per_threshold[:, 1],
+        cluster_numbers_per_threshold[:, 0],
+        marker="o",
+    )
+    axes[2].axvline(x=len(np.unique(data_y)), color="r")
     axes[2].set_xlabel("Number of clusters")
     axes[2].set_ylabel("Threshold")
     axes[2].set_title("Clusters")
     axes[2].grid()
-
 
 
 def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
@@ -218,25 +229,26 @@ def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
     n_plots = len(levels)
 
     fig, axes = plt.subplots(1, n_plots, figsize=(n_plots * 4, 6))
-    thresholds, cluster_numbers, counts = tmm_model.get_thresholds_and_cluster_numbers()
+    threshold_dict, clusterings_dict = tmm_model.get_thresholds_and_cluster_numbers()
 
     # grid coordinates
     x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, GRID_RESOLUTION)
     y = np.linspace(data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, GRID_RESOLUTION)
     XY = np.stack(np.meshgrid(x, y), -1)
-    tmm_probs = tmm_model.mixture_model.score_samples(XY.reshape(-1, 2)).reshape(GRID_RESOLUTION, GRID_RESOLUTION)
+    tmm_probs = tmm_model.mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
+        GRID_RESOLUTION, GRID_RESOLUTION
+    )
 
     cmap = plt.get_cmap("viridis")  # choose a colormap
 
     for index, level in enumerate(levels):
         axis = axes[index]
-        if level not in cluster_numbers:
+        if level not in threshold_dict.keys():
             axis.set_title(f"no threshold leads to {level} clusters")
             print(f"{level} clusters is not achievable.")
             continue
 
-        level_index = np.where(cluster_numbers == level)[0][0]
-        threshold = thresholds[level_index]
+        threshold = threshold_dict[level]
         # all pairs that are merged (i.e. are below threshold)
         tmp_adj = np.array(tmm_model.adjacency_ >= threshold, dtype=int)
         pairs = np.transpose(np.nonzero(tmp_adj))
@@ -272,7 +284,9 @@ def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
                 color=cmap(normalized_component_labels[i]),
             )
 
-        axis.set_title(f"{level} target clusters ({len(tmm_model.mixture_model.location)} total)")
+        axis.set_title(
+            f"{level} target clusters ({len(tmm_model.mixture_model.location)} total)"
+        )
 
     if save_path is not None:
         plt.savefig(save_path)

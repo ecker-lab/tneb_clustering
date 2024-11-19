@@ -19,8 +19,8 @@ class GWG(GWGGraph):
         n_clusters=None,
         n_components=10,
         n_neighbors=3,
-        covariance='diag',
-        clustering_method='gmm',
+        covariance="diag",
+        clustering_method="gmm",
         filter_edges=False,
         seed=42,
     ):
@@ -46,8 +46,8 @@ class GWG(GWGGraph):
             covariance,
             clustering_method,
             filter_edges,
-            seed)
-
+            seed,
+        )
 
     def create_graph(self, save=True, plot=True, return_graph=False):
         """'
@@ -60,9 +60,7 @@ class GWG(GWGGraph):
         center_points, pred_labels = self._cluster()
         embeddings, cluster_means = self._dim_reduction(center_points)
 
-        knn_dict = self._get_knn_dict(
-            center_points,
-            k=self.n_neighbors)
+        knn_dict = self._get_knn_dict(center_points, k=self.n_neighbors)
         pvalue_dict = self._get_weight_dict(center_points, pred_labels, knn_dict)
         edges = self._get_edges_dict_initial(knn_dict, pvalue_dict)
 
@@ -162,7 +160,7 @@ class GWG(GWGGraph):
         else:
             plt.show()
 
-    def plot_graph(self, X2D=None):
+    def plot_graph(self, X2D=None, n_clusters=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(

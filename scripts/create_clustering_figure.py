@@ -174,7 +174,7 @@ def main():
                 "TMM-NEB",
                 "GMM-NEB",
             ]:
-                algorithm.plot_graph(X2D=X2D)
+                algorithm.plot_graph(X2D=X2D, n_clusters=len(np.unique(y)))
 
             plt.xticks(())
             plt.yticks(())

@@ -20,7 +20,7 @@ class PAGA(Graph):
         resolution=0.1,
         clustering_method="leiden",
         seed=42,
-        use_rep='X',
+        use_rep="X",
     ):
         """
         Initialize the PAGA class.
@@ -248,7 +248,7 @@ class PAGA(Graph):
         )
         self.graph_data = {"nodes": pos, "edges": edges, "nodes_org_space": pos}
 
-    def plot_graph(self, X2D=None):
+    def plot_graph(self, X2D=None, n_clusters=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(
@@ -275,7 +275,6 @@ class PAGA(Graph):
                     print("transformation missing!")
 
         plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
-
 
         for (cm, neigh), weight in self.graph_data["edges"].items():
             plt.plot(

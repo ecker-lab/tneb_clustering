@@ -146,18 +146,20 @@ def get_clustering_objects(
     tmm_neb = neb.NEB(
         latent_dim=params["dim"],
         n_components=params["n_components"],
+        n_clusters=params["n_clusters"],
         seed=params["random_state"],
         mixture_model_type="tmm",
         n_init=20, # they are run one after the other and not as in the GMM case all at once
-        optimization_iterations=50,
+        optimization_iterations=300,
     )
     gmm_neb = neb.NEB(
         latent_dim=params["dim"],
         n_components=params["n_components"],
+        n_clusters=params["n_clusters"],
         seed=params["random_state"],
         mixture_model_type="gmm",
         n_init=5,
-        optimization_iterations=50,
+        optimization_iterations=300,
     )
     stavia_algo = stavia.Stavia(
         latent_dim=params["dim"],
