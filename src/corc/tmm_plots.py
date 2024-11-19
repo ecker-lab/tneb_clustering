@@ -5,8 +5,10 @@ import scipy
 import studenttmixture
 import sklearn
 
-import corc.graph_metrics.tmm_gmm_neb as jax_neb
+import corc.graph_metrics.neb
+from corc.graph_metrics import tmm_gmm_neb
 
+GRID_RESOLUTION = 128 # the resolution for the "heatmap" computation for TMM plotting
 
 def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
     """plotting probabilities between the direct line and the nudged elastic band"""
@@ -51,12 +53,12 @@ def plot_field(
     n_components = len(locations)
 
     # grid coordinates
-    x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, 128)
-    y = np.linspace(data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, 128)
+    x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, GRID_RESOLUTION)
+    y = np.linspace(data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, GRID_RESOLUTION)
     XY = np.stack(np.meshgrid(x, y), -1)
 
     # get scores for the grid values
-    mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(128, 128)
+    mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(GRID_RESOLUTION, GRID_RESOLUTION)
 
     if axis is None:
         figure, axis = plt.subplots(1, 1)
@@ -124,13 +126,13 @@ def computations_for_plot_row(
     model.fit(np.array(data_X, dtype=np.float64))
 
     # compute elastic band paths
-    adjacency, raw_adjacency, paths, temps, logprobs = jax_neb.compute_neb_paths(
+    adjacency, raw_adjacency, paths, temps, logprobs = tmm_gmm_neb.compute_neb_paths(
         model, iterations=iterations
     )
 
     # thresholds for the cluster-number plot
     thresholds, cluster_numbers, clusterings = (
-        jax_neb.get_thresholds_and_cluster_numbers(adjacency)
+        tmm_gmm_neb.get_thresholds_and_cluster_numbers(adjacency)
     )
 
     # extracting the smallest edges to only draw them in the heatmap
@@ -148,21 +150,39 @@ def plot_row_with_computation(
     mixture_model="tmm",
 ):
     # main computation
-    mixture_model, adjacency, paths, cluster_numbers, mst_edges, clusterings = (
-        computations_for_plot_row(
-            data_X, overclustering_n, iterations=iterations, mixture_model=mixture_model
-        )
+    tmm_model = corc.graph_metrics.neb.NEB(
+        latent_dim=data_X.shape[1],
+        data=data_X,
+        labels=data_y,
+        optimization_iterations=iterations,
+        mixture_model_type=mixture_model,
     )
+    # this is the time-consuming step
+    tmm_model.fit(data=data_X)
 
-    plot_row(data_X, data_y, mixture_model, paths, cluster_numbers, mst_edges)
+    plot_row(
+        data_X=data_X,
+        data_y=data_y,
+        tmm_model=tmm_model,
+    )
 
     if levels is None:
         target_cluster_n = len(np.unique(data_y))
         levels = [target_cluster_n - 1, target_cluster_n, target_cluster_n + 1]
-    plot_cluster_levels(levels, mixture_model, data_X, adjacency, paths)
+    plot_cluster_levels(levels, tmm_model, data_X)
 
 
-def plot_row(data_X, data_y, mixture_model, paths, cluster_numbers, mst_edges):
+def plot_row(
+        data_X,
+        data_y,
+        tmm_model,
+):
+    """
+    Creates a plot consisting of
+    1) the GT clustering,
+    2) the TMM clustering including the heatmap and all MST edges - no joining of clusters
+    3) threshold values against number of clusters
+    """
     fig, axes = plt.subplots(1, 3, figsize=(16, 6))
 
     # ground truth
@@ -170,7 +190,8 @@ def plot_row(data_X, data_y, mixture_model, paths, cluster_numbers, mst_edges):
     axes[0].set_title("Ground Truth")
 
     # heatmap with arrows
-    plot_field(data_X, mixture_model, paths=paths, selection=mst_edges, axis=axes[1])
+    mst_edges = tmm_model.compute_mst_edges(tmm_model.raw_adjacency_)
+    plot_field(data_X, tmm_model.mixture_model, paths=tmm_model.paths_, selection=mst_edges, axis=axes[1])
     axes[1].set_title("Heatmap")
 
     # # threshold counts
@@ -179,26 +200,31 @@ def plot_row(data_X, data_y, mixture_model, paths, cluster_numbers, mst_edges):
     # axes[2].set_xlabel('Threshold')
 
     # clusters vs thresholds
-    axes[2].plot(cluster_numbers[:, 1], cluster_numbers[:, 0], marker="o")
+    thresholds, cluster_numbers_per_threshold, clusterings = tmm_model.get_thresholds_and_cluster_numbers()
+    axes[2].plot(cluster_numbers_per_threshold[:, 1], cluster_numbers_per_threshold[:, 0], marker="o")
+    axes[2].axvline(x=len(np.unique(data_y)), color='r')
     axes[2].set_xlabel("Number of clusters")
     axes[2].set_ylabel("Threshold")
     axes[2].set_title("Clusters")
     axes[2].grid()
 
 
-def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
+
+def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
+    """
+    creates a 1-line plot of the tmm clustering such but with different target_number_cluster, so with different merging strategies.
+    levels: a list of integers of how many clusters should be in each plot, its length determines the size of the plot.
+    """
     n_plots = len(levels)
 
     fig, axes = plt.subplots(1, n_plots, figsize=(n_plots * 4, 6))
-    thresholds, cluster_numbers, counts = jax_neb.get_thresholds_and_cluster_numbers(
-        adjacency
-    )
+    thresholds, cluster_numbers, counts = tmm_model.get_thresholds_and_cluster_numbers()
 
     # grid coordinates
-    x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, 128)
-    y = np.linspace(data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, 128)
+    x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, GRID_RESOLUTION)
+    y = np.linspace(data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, GRID_RESOLUTION)
     XY = np.stack(np.meshgrid(x, y), -1)
-    tmm_probs = tmm.score_samples(XY.reshape(-1, 2)).reshape(128, 128)
+    tmm_probs = tmm_model.mixture_model.score_samples(XY.reshape(-1, 2)).reshape(GRID_RESOLUTION, GRID_RESOLUTION)
 
     cmap = plt.get_cmap("viridis")  # choose a colormap
 
@@ -212,7 +238,7 @@ def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
         level_index = np.where(cluster_numbers == level)[0][0]
         threshold = thresholds[level_index]
         # all pairs that are merged (i.e. are below threshold)
-        tmp_adj = np.array(adjacency >= threshold, dtype=int)
+        tmp_adj = np.array(tmm_model.adjacency_ >= threshold, dtype=int)
         pairs = np.transpose(np.nonzero(tmp_adj))
         _, component_labels = scipy.sparse.csgraph.connected_components(
             tmp_adj, directed=False
@@ -225,8 +251,8 @@ def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
         axis.contourf(x, y, tmm_probs, levels=20, cmap="coolwarm", alpha=0.5)
         axis.scatter(data_X[:, 0], data_X[:, 1], s=10, label="raw data")
         axis.scatter(
-            tmm.location[:, 0],
-            tmm.location[:, 1],
+            tmm_model.mixture_model.location[:, 0],
+            tmm_model.mixture_model.location[:, 1],
             c=component_labels,
             cmap="viridis",
             marker="X",
@@ -237,7 +263,7 @@ def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
         for i, j in pairs:
             if i == j:
                 continue
-            path = paths[(i, j)]
+            path = tmm_model.paths_[(i, j)]
             axis.plot(
                 path[:, 0],
                 path[:, 1],
@@ -246,7 +272,7 @@ def plot_cluster_levels(levels, tmm, data_X, adjacency, paths, save_path=None):
                 color=cmap(normalized_component_labels[i]),
             )
 
-        axis.set_title(f"{level} target clusters ({len(tmm.location)} total)")
+        axis.set_title(f"{level} target clusters ({len(tmm_model.mixture_model.location)} total)")
 
     if save_path is not None:
         plt.savefig(save_path)

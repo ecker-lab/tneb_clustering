@@ -148,7 +148,7 @@ def get_clustering_objects(
         n_components=params["n_components"],
         seed=params["random_state"],
         mixture_model_type="tmm",
-        n_init=1,
+        n_init=20, # they are run one after the other and not as in the GMM case all at once
         optimization_iterations=50,
     )
     gmm_neb = neb.NEB(

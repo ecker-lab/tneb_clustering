@@ -167,7 +167,8 @@ def compute_interpolation(
         ms = optax.apply_updates(ms, updates)
 
         # the following line effectively resamples the line through linear interpolation. Without it, all of the 1000 points will be pushed away from the low-density regions instead of finding the best possible line between the two dense regions.
-        ms = scipy.signal.savgol_filter(ms, window_length=100, polyorder=1, axis=0)
+        # TODO: this does not work!!!
+        ms = scipy.signal.savgol_filter(ms, window_length=100, polyorder=5, axis=0)
 
     # this is where the band becomes elastic and where the work is done.
     # for _ in range(iterations):
@@ -236,18 +237,16 @@ def compute_neb_paths(mixture_model, iterations=1000):
         # evaluate score of elastic band (minimum value along the path)
         adjacency[i, j] = adjacency[j, i] = min(interpolation_probs)
 
-        raw_adjacency = adjacency.copy()
-        adjacency = compute_mst_distances(raw_adjacency)
+    raw_adjacency = adjacency.copy()
+    adjacency = compute_mst_distances(raw_adjacency)
 
     return adjacency, raw_adjacency, paths, temps, logprobs
 
-
-""" Takes a distance matrix from NEB, computes an MST, and outputs a corrected distance 
-especially useful in cases where NEB did not fully converge for all paths. This is already used in compute_neb_paths
-"""
-
-
 def compute_mst_distances(adjacency):
+    """
+    Takes a distance matrix from NEB, computes an MST, and outputs a corrected distance
+    especially useful in cases where NEB did not fully converge for all paths. This is already used in compute_neb_paths
+    """
     mst = -scipy.sparse.csgraph.minimum_spanning_tree(-adjacency)
     num_nodes = adjacency.shape[0]
 
@@ -280,9 +279,10 @@ def compute_mst_distances(adjacency):
                     distances[predecessors[node]][other_node],
                 )  # the latter is already computed and the first has a value
                 # assign to both directions
-                distances[node][other_node] = distances[other_node][node] = max(
+                distances[node][other_node] = max(
                     direct_dist, indirect_dist
                 )
+                distances[other_node][node] = distances[node][other_node]
 
         marked[node] = 1
 
@@ -310,3 +310,37 @@ def compute_mst_distances(adjacency):
 #     cluster_numbers = np.array(cluster_numbers)
 #
 #     return thresholds, cluster_numbers, clusterings
+
+def evaluate_equidistance(paths):
+    """
+    looks at distances between points in paths.
+    First computes the longest path and the corresponding granularity (path_length/num_points).
+    Then compares all path-segments and computes the worst factor (segment/granularity) in each path.
+    returns the worst overall factor and a dictionary with factors for all paths where a segment is longer than the granularity.
+    """
+    worst_factor = 1
+
+    # first compute the "general granularity" (to ignore inconsistencies below that)
+    longest_equidistant_length = 0
+    for path_index in paths:
+        path = paths[path_index]
+        distances = np.linalg.norm(np.diff(path, axis=0), axis=1)
+        total_length = np.sum(distances)
+        equidistant_length = total_length / len(distances)
+        if equidistant_length > longest_equidistant_length:
+            longest_equidistant_length = equidistant_length
+
+    # go through all paths and check whether their segments are equidistant
+    all_factors = dict()
+    for path_index in paths:
+        path = paths[path_index]
+        distances = np.linalg.norm(np.diff(path, axis=0), axis=1)
+        longest_segment = max(distances)
+        total_length = np.sum(distances)
+        equidistant_length = total_length/len(distances)
+        if longest_segment > longest_equidistant_length:
+            factor = longest_segment / longest_equidistant_length
+            all_factors[path_index] = factor
+            if factor > worst_factor:
+                worst_factor = factor
+    return worst_factor, all_factors

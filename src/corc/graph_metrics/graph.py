@@ -164,6 +164,8 @@ class Graph:
 
         cluster_numbers = np.array(cluster_numbers)
 
+        # cluster_numbers is the amount of clusters achieved with each threshold.
+        # clusterings contains the actual assignment of clusters
         return thresholds, cluster_numbers, clusterings
 
 

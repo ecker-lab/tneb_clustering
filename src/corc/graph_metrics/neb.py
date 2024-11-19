@@ -16,7 +16,7 @@ import corc.graph_metrics.tmm_gmm_neb
 class NEB(Graph):
     def __init__(
         self,
-        latent_dim,
+        latent_dim=2,
         data=None,
         labels=None,
         path=None,
@@ -26,7 +26,8 @@ class NEB(Graph):
         seed=42,
         mixture_model_type="tmm",
         n_init=5,
-        optimization_iterations=1000,
+        optimization_iterations=1000, # for NEB
+        max_iter_on_retries=10000, # for TMM fitting, 10x the default
         dataset_name=None,
     ):
         """
@@ -41,12 +42,16 @@ class NEB(Graph):
             n_init (int): Number of repetitions during GMM/TMM fitting.
             mixture_model_type (str): GMM or TMM
         """
+        # make sure that latent_dim does match the data if provided
+        if data is not None:
+            latent_dim = data.shape[-1]
+
         super().__init__(latent_dim, data, labels, path, seed)
 
         if mixture_model_type == "tmm":
             self.mixture_model = studenttmixture.EMStudentMixture(
                 n_components=n_components,
-                n_init=n_init,
+                n_init=1, # note that in the fit function we give it more tries.
                 fixed_df=False,
                 # df=1.0,  # the minimum value, for df=infty we get gmm
                 init_type="k++",
@@ -66,22 +71,34 @@ class NEB(Graph):
         )
         self.thresh = thresh
         self.iterations = optimization_iterations
+        self.n_init = n_init
+        self.max_iter_on_retries = max_iter_on_retries
 
-    def fit(self, data):
-        self.data = data
+
+    def fit(self, data, max_elongation=100):
+        # data: data to be fitted on.
+        # max_elongation: for TMM ignore all components that are highly elongated.
+        # max_elongation gives an upper bound on biggest_eigenvalue/smallest_eigenvalue
         self.mixture_model.fit(data)
 
         # extract centers for TMM/GMM
         if isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
             self.centers_ = self.mixture_model.means_
         elif isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
-            for _ in range(20):
+            # retry fitting if it failed before - happens regularly for high-dim datasets
+            for _ in range(self.n_init):
                 if self.mixture_model.df_ is None:
                     # we have not converged
                     print("retrying tmm fit with more iterations")
-                    self.mixture_model.max_iter = 10000
+                    self.mixture_model.max_iter = self.max_iter_on_retries
                     self.mixture_model.fit(data)
+
+            # filter elongated components
+            original_num_components = self.mixture_model.n_components
+            self.mixture_model = self.filter_mixture_model(self.mixture_model)
             self.centers_ = self.mixture_model.location
+            print(f"After filtering {original_num_components} components, we are left with {self.mixture_model.n_components} components")
+
 
         # compute NEB paths. This is a very time-consuming step
         (
@@ -93,6 +110,14 @@ class NEB(Graph):
         ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths(
             self.mixture_model, iterations=self.iterations
         )
+
+        # check quality of generated paths
+        equidistance_factor, all_factors = corc.graph_metrics.tmm_gmm_neb.evaluate_equidistance(self.paths_)
+        if equidistance_factor>10:
+            print(f"WARNING: the path is not equidistant! longest segment {equidistance_factor} times too long")
+            for edge in all_factors.keys():
+                if all_factors[edge]>10:
+                    print(f"{edge} has factor {all_factors[edge]}")
 
         # normalize adjacency
         norm_adjacency = self.adjacency_ - np.min(self.adjacency_)
@@ -281,3 +306,25 @@ class NEB(Graph):
                 color="black",
                 # color=cmap(normalized_component_labels[i]),
             )
+
+    def filter_mixture_model(self, mixture_model, max_elongation=100):
+        # compute cluster elongations
+        elongations = []
+        for i in range(mixture_model.scale_.shape[2]):
+            eigenvalues = np.linalg.eigvalsh(mixture_model.scale_[:, :, i])
+            elongation = max(eigenvalues) / min(eigenvalues)
+            elongations.append(elongation)
+
+        # create filter to remove elongated components
+        elongation_filter = np.array(elongations) < max_elongation
+
+        # remove components that are too elongated
+        mixture_model.location_ = mixture_model.location_[elongation_filter]
+        mixture_model.scale_ = mixture_model.scale_[:, :, elongation_filter]
+        mixture_model.n_components = np.count_nonzero(elongation_filter)
+        mixture_model.mix_weights_ = mixture_model.mix_weights_[elongation_filter]
+        mixture_model.df_ = mixture_model.df_[elongation_filter]
+        mixture_model.scale_inv_cholesky_ = mixture_model.scale_inv_cholesky_[:, :, elongation_filter]
+        mixture_model.scale_cholesky = mixture_model.scale_cholesky_[:, :, elongation_filter]
+
+        return mixture_model
