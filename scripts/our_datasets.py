@@ -21,7 +21,7 @@ DATASET_SELECTOR = [
     # "zigzag", # missing gwg-parameters
     # "zigzig", # missing gwg-parameters
     # "uniform_circle", # missing gwg-parameters
-    # "clusterlab10", # missing gwg-parameters
+    "clusterlab10",  # missing gwg-parameters
     ###########################
     ##### fig 2 datasets ######
     ###########################
@@ -44,11 +44,21 @@ DATASET_SELECTOR = [
 ]
 
 DATASETS2D = [
+    # "Clusterlab1",
+    # "Clusterlab2",
+    # "Clusterlab3",
+    # "Clusterlab4",
+    # "Clusterlab5",
+    # "Clusterlab6",
+    # "Clusterlab7",
+    # "Clusterlab8",
+    # "Clusterlab9",
     "noisy_circles",
     "noisy_moons",
     "varied",
     "aniso",
     "blobs",
+    "Clusterlab10",
 ]
 
 COMPLEX_DATASETS = [
