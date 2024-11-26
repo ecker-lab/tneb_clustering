@@ -49,7 +49,6 @@ class GWGMara(GWGGraph):
             seed,
         )
 
-
     def create_graph(self, save=True, plot=True, return_graph=False):
         """'
         1. Overcluster data using a GMM
@@ -64,7 +63,9 @@ class GWGMara(GWGGraph):
         knn_dict = self._get_knn_dict(
             center_points,
             k=self.n_neighbors,
-            thresh=self._get_threshold_filter_edges(center_points, k=self.n_components - 1),
+            thresh=self._get_threshold_filter_edges(
+                center_points, k=self.n_components - 1
+            ),
         )
         dip_dict = self._get_weight_dict(center_points, pred_labels, knn_dict)
         edges = self._get_edges_dict_initial(knn_dict, dip_dict, thresh=np.inf)
@@ -97,9 +98,10 @@ class GWGMara(GWGGraph):
                     cm, n, means, labels
                 )
 
-                dip = (1 - # take the inverse of the dip statistic to have low values if the clusters are bimodal and high values if unimodal
-                    diptest.dipstat(np.concatenate([cluster1_proj, cluster2_proj]))
-                    * 2 # the *2 in here scales the output such that the maximum value is 1
+                dip = (
+                    1  # take the inverse of the dip statistic to have low values if the clusters are bimodal and high values if unimodal
+                    - diptest.dipstat(np.concatenate([cluster1_proj, cluster2_proj]))
+                    * 2  # the *2 in here scales the output such that the maximum value is 1
                 )
                 dip_list.append(dip)
             dip_dict[cm] = dip_list
@@ -175,7 +177,7 @@ class GWGMara(GWGGraph):
         else:
             plt.show()
 
-    def plot_graph(self, X2D=None):
+    def plot_graph(self, X2D=None, n_clusters=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(

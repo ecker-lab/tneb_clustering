@@ -1,3 +1,9 @@
+import os
+
+# make sure that jax does not try allocating the whole GPU
+os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+
 import time
 import warnings
 import numpy as np
@@ -8,7 +14,6 @@ import our_algorithms
 from openTSNE import TSNE
 import re
 import pickle
-import os
 import sys
 
 """
@@ -29,7 +34,7 @@ def main():
     )
     datasets = my_datasets.select_datasets(dataset_selector)
 
-    path = 'cache'
+    path = "cache"
     os.makedirs(path, exist_ok=True)
 
     print(f"Datasets: {[algo_params['name'] for _, algo_params in datasets]}")

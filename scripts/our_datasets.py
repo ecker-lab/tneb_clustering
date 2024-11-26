@@ -111,6 +111,9 @@ class our_datasets:
             "resolution_leiden": 1.0,
             "random_state": 42,
             "use_rep": "X",
+            "gwg_n_components": 15,
+            "gwg_n_neighbors": 3,
+            "gwg_covariance": "diag",
         }
 
         # ============
@@ -296,6 +299,9 @@ class our_datasets:
                     "n_clusters": 1,
                     "resolution": 0.1,
                     "resolution_leiden": 0.01,
+                    "gwg_n_components": 5,
+                    "gwg_n_neighbors": 3,
+                    "gwg_covariance": "spherical",
                 },
             ),
             # (

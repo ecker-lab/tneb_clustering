@@ -8,7 +8,8 @@ import sklearn
 import corc.graph_metrics.neb
 from corc.graph_metrics import tmm_gmm_neb
 
-GRID_RESOLUTION = 128 # the resolution for the "heatmap" computation for TMM plotting
+GRID_RESOLUTION = 128  # the resolution for the "heatmap" computation for TMM plotting
+
 
 def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
     """plotting probabilities between the direct line and the nudged elastic band"""
@@ -58,7 +59,9 @@ def plot_field(
     XY = np.stack(np.meshgrid(x, y), -1)
 
     # get scores for the grid values
-    mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(GRID_RESOLUTION, GRID_RESOLUTION)
+    mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
+        GRID_RESOLUTION, GRID_RESOLUTION
+    )
 
     if axis is None:
         figure, axis = plt.subplots(1, 1)
@@ -79,15 +82,16 @@ def plot_field(
         axis.annotate(f"{i}", xy=location - 1, color="black")
 
     # print paths between centers (by default: all)
-    if selection is None and paths is not None:
-        selection = (
-            (i, j)
-            for i, j in itertools.combinations(range(n_components), r=2)
-            if i != j
-        )
-    for i, j in selection:
-        path = paths[(i, j)]
-        axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5)
+    if paths is not None:
+        if selection is None:
+            selection = (
+                (i, j)
+                for i, j in itertools.combinations(range(n_components), r=2)
+                if i != j
+            )
+        for i, j in selection:
+            path = paths[(i, j)]
+            axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5)
 
     if save_path is not None:
         plt.savefig(save_path)

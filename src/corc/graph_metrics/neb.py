@@ -4,6 +4,7 @@ import itertools
 import tqdm
 import scipy
 import sklearn
+from sklearn.mixture import GaussianMixture
 import studenttmixture
 from pandas.core.common import random_state
 import numpy as np
@@ -26,8 +27,8 @@ class NEB(Graph):
         seed=42,
         mixture_model_type="tmm",
         n_init=5,
-        optimization_iterations=1000, # for NEB
-        max_iter_on_retries=10000, # for TMM fitting, 10x the default
+        optimization_iterations=1000,  # for NEB
+        max_iter_on_retries=10000,  # for TMM fitting, 10x the default
         dataset_name=None,
         n_clusters=None,
     ):
@@ -52,14 +53,15 @@ class NEB(Graph):
         if mixture_model_type == "tmm":
             self.mixture_model = studenttmixture.EMStudentMixture(
                 n_components=n_components,
-                n_init=1, # note that in the fit function we give it more tries.
-                fixed_df=False,
-                # df=1.0,  # the minimum value, for df=infty we get gmm
+                reg_covar=1e-4,  # this makes the TMM favor ball-like shapes (and avoid extreme elongations)
+                n_init=1,  # note that in the fit function we give it more tries.
+                fixed_df=True,
+                df=1.0,  # the minimum value, for df=infty we get gmm
                 init_type="k++",
                 random_state=seed,
             )
         elif mixture_model_type == "gmm":
-            self.mixture_model = sklearn.mixture.GaussianMixture(
+            self.mixture_model = GaussianMixture(
                 n_components=n_components,
                 n_init=n_init,
                 random_state=seed,
@@ -74,7 +76,6 @@ class NEB(Graph):
         self.iterations = optimization_iterations
         self.n_init = n_init
         self.max_iter_on_retries = max_iter_on_retries
-
 
     def fit(self, data, max_elongation=100):
         # data: data to be fitted on.
@@ -92,6 +93,7 @@ class NEB(Graph):
                     # we have not converged
                     print("retrying tmm fit with more iterations")
                     self.mixture_model.max_iter = self.max_iter_on_retries
+                    self.mixture_model.tol = 1e-4  # default is 1e-5
                     self.mixture_model.fit(data)
 
             # filter elongated components
@@ -310,16 +312,34 @@ class NEB(Graph):
         # drawing the background for NEB in the 2D case
         if self.latent_dim == 2:
             image_resolution = 128
+            if self.data is not None:
+                # if the data is available, we span all datapoints when plotting the contour plot.
+                margin = 0.1
+                our_data = self.data
+            else:
+                # as fallback, use the cluster means as a proxy for where data points are (with increased margin)
+                margin = 0.5
+                our_data = cluster_means
+
+            # creating the grid
             linspace_x = np.linspace(
-                self.data[:, 0].min() - 0.1, self.data[:, 0].max() + 0.1, image_resolution
+                our_data[:, 0].min() - margin,
+                our_data[:, 0].max() + margin,
+                image_resolution,
             )
             linspace_y = np.linspace(
-                self.data[:, 1].min() - 0.1, self.data[:, 1].max() + 0.1, image_resolution
+                our_data[:, 1].min() - margin,
+                our_data[:, 1].max() + margin,
+                image_resolution,
             )
             XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
-            tmm_probs = self.mixture_model.score_samples(
-                XY.reshape(-1, 2)
-            ).reshape(image_resolution, image_resolution)
+
+            # scoring the grid points
+            tmm_probs = self.mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
+                image_resolution, image_resolution
+            )
+
+            # and plotting the energy landscape
             plt.contourf(
                 linspace_x,
                 linspace_y,
@@ -385,7 +405,13 @@ class NEB(Graph):
             elongations.append(elongation)
 
         # create filter to remove elongated components
-        elongation_filter = np.array(elongations) < max_elongation
+        if min(elongations) < max_elongation:
+            elongation_filter = np.array(elongations) < max_elongation
+        else:
+            print(
+                f"this step would filter everything, so we don't filter. Min elongation {min(elongations)} (Mean {np.average(elongations)})"
+            )
+            return mixture_model
 
         # remove components that are too elongated
         mixture_model.location_ = mixture_model.location_[elongation_filter]
