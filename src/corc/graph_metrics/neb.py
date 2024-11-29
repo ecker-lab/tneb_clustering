@@ -53,8 +53,10 @@ class NEB(Graph):
         if mixture_model_type == "tmm":
             self.mixture_model = studenttmixture.EMStudentMixture(
                 n_components=n_components,
-                reg_covar=1e-4,  # this makes the TMM favor ball-like shapes (and avoid extreme elongations)
-                n_init=1,  # note that in the fit function we give it more tries.
+                reg_covar=5e-5,  # this makes the TMM favor ball-like shapes (and avoid extreme elongations)
+                n_init=(
+                    1 if latent_dim > 10 else n_init
+                ),  # convergence is slow in high dimension so we give the model more tries in the fit function if it does not converge immediately.
                 fixed_df=True,
                 df=1.0,  # the minimum value, for df=infty we get gmm
                 init_type="k++",
@@ -96,9 +98,11 @@ class NEB(Graph):
                     self.mixture_model.tol = 1e-4  # default is 1e-5
                     self.mixture_model.fit(data)
 
-            # filter elongated components
+            # filter components (remove elongated and very small components)
             original_num_components = self.mixture_model.n_components
-            self.mixture_model = self.filter_mixture_model(self.mixture_model)
+            self.mixture_model = self.filter_mixture_model_components(mixture_model=self.mixture_model, data_X=data, max_elongation=1000, factor=15)
+            
+            # store centers in a central place
             self.centers_ = self.mixture_model.location
             print(
                 f"After filtering {original_num_components} components, we are left with {self.mixture_model.n_components} components"
@@ -396,34 +400,90 @@ class NEB(Graph):
                 # color=cmap(normalized_component_labels[i]),
             )
 
-    def filter_mixture_model(self, mixture_model, max_elongation=100):
-        # compute cluster elongations
-        elongations = []
-        for i in range(mixture_model.scale_.shape[2]):
-            eigenvalues = np.linalg.eigvalsh(mixture_model.scale_[:, :, i])
-            elongation = max(eigenvalues) / min(eigenvalues)
-            elongations.append(elongation)
-
-        # create filter to remove elongated components
-        if min(elongations) < max_elongation:
-            elongation_filter = np.array(elongations) < max_elongation
-        else:
-            print(
-                f"this step would filter everything, so we don't filter. Min elongation {min(elongations)} (Mean {np.average(elongations)})"
-            )
-            return mixture_model
-
-        # remove components that are too elongated
-        mixture_model.location_ = mixture_model.location_[elongation_filter]
-        mixture_model.scale_ = mixture_model.scale_[:, :, elongation_filter]
-        mixture_model.n_components = np.count_nonzero(elongation_filter)
-        mixture_model.mix_weights_ = mixture_model.mix_weights_[elongation_filter]
-        mixture_model.df_ = mixture_model.df_[elongation_filter]
+    @classmethod
+    def filter_mixture_model(self, mixture_model, data_X, component_filter):
+        """
+        This function removes components based on component_filter. 
+        Since the mixture model is "unbalanced" after just removing some components, 
+        it is re-adjusted by fitting with the reduced components for two rounds.
+        
+        component_filter: Boolean array containing True for components that should be kept
+        """
+        # remove components as indicated by component_filter
+        mixture_model.location_ = mixture_model.location_[component_filter]
+        mixture_model.scale_ = mixture_model.scale_[:, :, component_filter]
+        mixture_model.n_components = np.count_nonzero(component_filter)
+        intermediate_weights = mixture_model.mix_weights_[component_filter]
+        mixture_model.mix_weights_ = intermediate_weights/sum(intermediate_weights)
+        mixture_model.df_ = mixture_model.df_[component_filter]
         mixture_model.scale_inv_cholesky_ = mixture_model.scale_inv_cholesky_[
-            :, :, elongation_filter
+            :, :, component_filter
         ]
         mixture_model.scale_cholesky = mixture_model.scale_cholesky_[
-            :, :, elongation_filter
+            :, :, component_filter
         ]
+        
+        '''
+        without the mixture_model.fit() call, something is very off (maybe the normalization of mixture component weights, but probably something more) - the energy landscape looks completely different in that case. After "refitting" (essentially doing one E and one M step, or two, just to be sure) the plot looks just as expected (similar to the one before, but without the additional weird components)
+        '''
+        # perform 2 rounds of model fitting to re-adjust everything
+        orig_n_iter = mixture_model.n_iter_
+        mixture_model.n_iter_ = 2
+        mixture_model.fit(data_X)
+        mixture_model.n_iter = orig_n_iter
+
+        return mixture_model
+
+    @classmethod
+    def filter_mixture_model_elongation(self, mixture_model, data_X, max_elongation=1000):
+        # removes very elongated components one-by-one
+
+        while True:
+            # compute cluster elongations
+            elongations = []
+            for i in range(mixture_model.scale_.shape[2]):
+                eigenvalues = np.linalg.eigvalsh(mixture_model.scale_[:, :, i])
+                elongation = max(eigenvalues) / min(eigenvalues)
+                elongations.append(elongation)
+            elongation_filter = np.array(elongations) < (max(elongations)-1)
+        
+            # remove worst component
+            if max(elongations) > max_elongation:
+                mixture_model = self.filter_mixture_model(mixture_model=mixture_model, data_X= data_X, component_filter=elongation_filter)
+            else:
+                break
+        
+        return mixture_model
+
+    @classmethod
+    def filter_mixture_model_small_components(self, mixture_model, data_X, factor=15):
+        
+        # compute min size of a component to keep
+        n_items = len(data_X)
+        n_components = len(mixture_model.location_)
+        min_n_items = n_items / n_components / factor
+
+        # check sizes of predicted cluster classes
+        y_pred = mixture_model.predict(data_X)
+        _, counts = np.unique(y_pred, return_counts=True)
+        component_filter = counts > min_n_items
+
+        self.filter_mixture_model(mixture_model=mixture_model, data_X=data_X, component_filter=component_filter)
+
+        return mixture_model
+
+    @classmethod
+    def filter_mixture_model_components(self, mixture_model, data_X, max_elongation, factor):
+        """Performs both types of filtering until the model stabilizes"""
+        previous_num_components = len(mixture_model.location_)
+        while True:
+            # perform both types of filtering
+            mixture_model = self.filter_mixture_model_elongation(mixture_model=mixture_model, data_X=data_X, max_elongation=max_elongation)
+            mixture_model = self.filter_mixture_model_small_components(mixture_model=mixture_model,data_X=data_X,factor=factor)
+            if previous_num_components != len(mixture_model.location_):
+                previous_num_components = len(mixture_model.location_)
+            else:
+                # nothing changed, so we are done.
+                break
 
         return mixture_model

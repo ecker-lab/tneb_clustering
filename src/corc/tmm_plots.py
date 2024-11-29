@@ -294,3 +294,47 @@ def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
 
     if save_path is not None:
         plt.savefig(save_path)
+
+
+def plot_tmm_models(tmm_models, data_X, data_y, dataset_name):
+    plt.figure(figsize=(20, 10))
+
+    for i, tmm_model in enumerate(tmm_models):
+        plt.subplot(1 + (len(tmm_models) // 5), min(len(tmm_models),5), i+1)
+        # draw background for MEP plots
+        image_resolution = 128
+        linspace_x = np.linspace(
+            data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, image_resolution
+        )
+        linspace_y = np.linspace(
+            data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, image_resolution
+        )
+        XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
+        tmm_probs = tmm_model.mixture_model.score_samples(
+            XY.reshape(-1, 2)
+        ).reshape(image_resolution, image_resolution)
+        # plt.contourf(
+        #     linspace_x,
+        #     linspace_y,
+        #     tmm_probs,
+        #     levels=20,
+        #     cmap="coolwarm",
+        #     alpha=0.5,
+        # )
+        
+        # extracting the predictions
+        num_classes = len(np.unique(data_y))
+        y_pred = tmm_model.predict_with_target(data=data_X, target_number_classes=num_classes)
+        
+        # draw points
+        y_pred_permuted = corc.utils.reorder_colors(y_pred, data_y)
+        plt.scatter(data_X[:, 0], data_X[:, 1], s=10, c=y_pred_permuted, cmap='tab20')
+        
+        tmm_model.plot_graph()
+
+        # Compute ARI score
+        ari_score = sklearn.metrics.adjusted_rand_score(data_y, y_pred)
+        plt.title(f'{dataset_name}: {tmm_model.n_components} clusters, ARI: {ari_score:.2f}')
+        
+    # return the figure
+    return plt.gcf()

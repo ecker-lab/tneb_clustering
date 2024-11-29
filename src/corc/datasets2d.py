@@ -394,7 +394,7 @@ def aniso_blobs(n=256):
 
 
 DATASETS = {
-    "Clusterlab1": clusterlab_dataset1,
+    # "Clusterlab1": clusterlab_dataset1,
     "Clusterlab2": clusterlab_dataset2,
     "Clusterlab3": clusterlab_dataset3,
     "Clusterlab4": clusterlab_dataset4,
