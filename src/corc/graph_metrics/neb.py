@@ -9,6 +9,7 @@ import studenttmixture
 from pandas.core.common import random_state
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 from corc.graph_metrics.graph import Graph
 import corc.graph_metrics.tmm_gmm_neb
@@ -79,7 +80,7 @@ class NEB(Graph):
         self.n_init = n_init
         self.max_iter_on_retries = max_iter_on_retries
 
-    def fit(self, data, max_elongation=100):
+    def fit(self, data, max_elongation=1000):
         # data: data to be fitted on.
         # max_elongation: for TMM ignore all components that are highly elongated.
         # max_elongation gives an upper bound on biggest_eigenvalue/smallest_eigenvalue
@@ -100,8 +101,13 @@ class NEB(Graph):
 
             # filter components (remove elongated and very small components)
             original_num_components = self.mixture_model.n_components
-            self.mixture_model = self.filter_mixture_model_components(mixture_model=self.mixture_model, data_X=data, max_elongation=1000, factor=15)
-            
+            self.mixture_model = self.filter_mixture_model_components(
+                mixture_model=self.mixture_model,
+                data_X=data,
+                max_elongation=max_elongation,
+                factor=15,
+            )
+
             # store centers in a central place
             self.centers_ = self.mixture_model.location
             print(
@@ -274,6 +280,7 @@ class NEB(Graph):
     def apply_tsne(self, X2D, transform_paths=True, samples_per_path=50):
         # we assume that fitting did take place
         self.transformed_centers_ = X2D.transform(self.centers_)
+        n_components = len(self.centers_)
 
         if transform_paths:
             self.transformed_paths_ = dict()
@@ -281,8 +288,8 @@ class NEB(Graph):
                 samples_per_path, self.paths_[(0, 1)].shape[0]
             )  # do not upsample
             for i, j in tqdm.tqdm(
-                itertools.combinations(range(self.n_components), 2),
-                total=self.n_components * (self.n_components - 1) // 2,
+                itertools.combinations(range(n_components), 2),
+                total=n_components * (n_components - 1) // 2,
                 desc="converting paths",
             ):
                 if i == j:
@@ -377,20 +384,59 @@ class NEB(Graph):
                 target_num_classes=target_num_clusters, only_mst_edges=True
             )
 
+        # transforming paths for plotting (if necessary)
+        path_resolution = 10  # number of points to sample per path for plotting
         if hasattr(self, "transformed_paths_"):
             paths_store = self.transformed_paths_
-        else:
+        elif self.latent_dim == 2:
             paths_store = self.paths_
+        else:  # we have to transform the paths
+            assert (
+                transformation is not None
+            )  # otherwise the transformation would not work
+            paths_orig_space = self.paths_
+            paths_store = dict()
+
+            # collect all the points
+            path_points = list()
+            for i, j in pairs:
+                if i == j:
+                    continue
+                path = paths_orig_space[(i, j)]
+                path = path[
+                    np.linspace(
+                        0, len(path) - 1, path_resolution, dtype=int, endpoint=True
+                    )
+                ]
+                path_points.append(path)  # concatenate all paths
+            path_points = np.concatenate(path_points)
+            # actually transform them
+            transformation_starttime = time.time()
+            print(
+                f"Transforming paths of shape {path_points.shape}... ",
+                end="",
+                flush=True,
+            )
+            transformed_path_points = transformation.transform(path_points, n_iter=100)
+            print(f"done ({time.time() - transformation_starttime:.2f}sec)")
+            # sort them back into paths
+            counter = 0
+            for i, j in pairs:
+                if i == j:
+                    continue
+                paths_store[(i, j)] = transformed_path_points[
+                    counter * path_resolution : (counter + 1) * path_resolution
+                ]
+                paths_store[(j, i)] = paths_store[(i, j)]
+                counter += 1
 
         for i, j in pairs:
             if i == j:
                 continue
             path = paths_store[(i, j)]
-            path = path[np.linspace(0, len(path) - 1, 100, dtype=int, endpoint=True)]
-            if path.shape[-1] > 2 and transformation is not None:
-                print(f"transforming a path of shape {path.shape}")
-                path = transformation.transform(path)
-
+            path = path[
+                np.linspace(0, len(path) - 1, path_resolution, dtype=int, endpoint=True)
+            ]
             plt.plot(
                 path[:, 0],
                 path[:, 1],
@@ -403,10 +449,10 @@ class NEB(Graph):
     @classmethod
     def filter_mixture_model(self, mixture_model, data_X, component_filter):
         """
-        This function removes components based on component_filter. 
-        Since the mixture model is "unbalanced" after just removing some components, 
+        This function removes components based on component_filter.
+        Since the mixture model is "unbalanced" after just removing some components,
         it is re-adjusted by fitting with the reduced components for two rounds.
-        
+
         component_filter: Boolean array containing True for components that should be kept
         """
         # remove components as indicated by component_filter
@@ -414,7 +460,7 @@ class NEB(Graph):
         mixture_model.scale_ = mixture_model.scale_[:, :, component_filter]
         mixture_model.n_components = np.count_nonzero(component_filter)
         intermediate_weights = mixture_model.mix_weights_[component_filter]
-        mixture_model.mix_weights_ = intermediate_weights/sum(intermediate_weights)
+        mixture_model.mix_weights_ = intermediate_weights / sum(intermediate_weights)
         mixture_model.df_ = mixture_model.df_[component_filter]
         mixture_model.scale_inv_cholesky_ = mixture_model.scale_inv_cholesky_[
             :, :, component_filter
@@ -422,10 +468,10 @@ class NEB(Graph):
         mixture_model.scale_cholesky = mixture_model.scale_cholesky_[
             :, :, component_filter
         ]
-        
-        '''
+
+        """
         without the mixture_model.fit() call, something is very off (maybe the normalization of mixture component weights, but probably something more) - the energy landscape looks completely different in that case. After "refitting" (essentially doing one E and one M step, or two, just to be sure) the plot looks just as expected (similar to the one before, but without the additional weird components)
-        '''
+        """
         # perform 2 rounds of model fitting to re-adjust everything
         orig_n_iter = mixture_model.n_iter_
         mixture_model.n_iter_ = 2
@@ -435,7 +481,9 @@ class NEB(Graph):
         return mixture_model
 
     @classmethod
-    def filter_mixture_model_elongation(self, mixture_model, data_X, max_elongation=1000):
+    def filter_mixture_model_elongation(
+        self, mixture_model, data_X, max_elongation=1000
+    ):
         # removes very elongated components one-by-one
 
         while True:
@@ -445,19 +493,23 @@ class NEB(Graph):
                 eigenvalues = np.linalg.eigvalsh(mixture_model.scale_[:, :, i])
                 elongation = max(eigenvalues) / min(eigenvalues)
                 elongations.append(elongation)
-            elongation_filter = np.array(elongations) < (max(elongations)-1)
-        
+            elongation_filter = np.array(elongations) < (max(elongations) - 1)
+
             # remove worst component
             if max(elongations) > max_elongation:
-                mixture_model = self.filter_mixture_model(mixture_model=mixture_model, data_X= data_X, component_filter=elongation_filter)
+                mixture_model = self.filter_mixture_model(
+                    mixture_model=mixture_model,
+                    data_X=data_X,
+                    component_filter=elongation_filter,
+                )
             else:
                 break
-        
+
         return mixture_model
 
     @classmethod
     def filter_mixture_model_small_components(self, mixture_model, data_X, factor=15):
-        
+
         # compute min size of a component to keep
         n_items = len(data_X)
         n_components = len(mixture_model.location_)
@@ -468,18 +520,30 @@ class NEB(Graph):
         _, counts = np.unique(y_pred, return_counts=True)
         component_filter = counts > min_n_items
 
-        self.filter_mixture_model(mixture_model=mixture_model, data_X=data_X, component_filter=component_filter)
+        self.filter_mixture_model(
+            mixture_model=mixture_model,
+            data_X=data_X,
+            component_filter=component_filter,
+        )
 
         return mixture_model
 
     @classmethod
-    def filter_mixture_model_components(self, mixture_model, data_X, max_elongation, factor):
+    def filter_mixture_model_components(
+        self, mixture_model, data_X, max_elongation, factor
+    ):
         """Performs both types of filtering until the model stabilizes"""
         previous_num_components = len(mixture_model.location_)
         while True:
             # perform both types of filtering
-            mixture_model = self.filter_mixture_model_elongation(mixture_model=mixture_model, data_X=data_X, max_elongation=max_elongation)
-            mixture_model = self.filter_mixture_model_small_components(mixture_model=mixture_model,data_X=data_X,factor=factor)
+            mixture_model = self.filter_mixture_model_elongation(
+                mixture_model=mixture_model,
+                data_X=data_X,
+                max_elongation=max_elongation,
+            )
+            mixture_model = self.filter_mixture_model_small_components(
+                mixture_model=mixture_model, data_X=data_X, factor=factor
+            )
             if previous_num_components != len(mixture_model.location_):
                 previous_num_components = len(mixture_model.location_)
             else:

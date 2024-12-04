@@ -23,7 +23,7 @@ ALGORITHM_SELECTOR = [
     "Leiden",
     "PAGA",
     "Ward",
-    "Stavia",
+    # "Stavia",
     "GWG-dip",
     "GWG-pvalue",
     "TMM-NEB",
@@ -149,7 +149,7 @@ def get_clustering_objects(
         n_clusters=params["n_clusters"],
         seed=params["random_state"],
         mixture_model_type="tmm",
-        n_init=20, # they are run one after the other and not as in the GMM case all at once
+        n_init=20,  # they are run one after the other and not as in the GMM case all at once
         optimization_iterations=300,
     )
     gmm_neb = neb.NEB(

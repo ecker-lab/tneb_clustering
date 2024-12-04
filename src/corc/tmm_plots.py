@@ -4,6 +4,9 @@ import itertools
 import scipy
 import studenttmixture
 import sklearn
+from openTSNE import TSNE
+import time
+
 
 import corc.graph_metrics.neb
 from corc.graph_metrics import tmm_gmm_neb
@@ -296,45 +299,77 @@ def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
         plt.savefig(save_path)
 
 
-def plot_tmm_models(tmm_models, data_X, data_y, dataset_name):
+def plot_tmm_models(tmm_models, data_X, data_y, dataset_name, tsne_transform=None):
     plt.figure(figsize=(20, 10))
+    dimension = data_X.shape[1]
+
+    # compute TSNE if necessary
+    if dimension > 2:
+        if tsne_transform is not None:
+            transformed_X = tsne_transform
+        else:
+            print("computing TSNE...", end="")
+            start_tsne = time.time()
+            tsne = TSNE(
+                n_components=2,
+                random_state=42,
+                perplexity=30,
+                metric="euclidean",
+                n_jobs=16,
+            )
+            transformed_X = tsne.fit(data_X)
+            print(f"done. ({time.time() - start_tsne:.2f}s)")
+    else:  # dimension == 2
+        transformed_X = data_X
 
     for i, tmm_model in enumerate(tmm_models):
-        plt.subplot(1 + (len(tmm_models) // 5), min(len(tmm_models),5), i+1)
-        # draw background for MEP plots
-        image_resolution = 128
-        linspace_x = np.linspace(
-            data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, image_resolution
-        )
-        linspace_y = np.linspace(
-            data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, image_resolution
-        )
-        XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
-        tmm_probs = tmm_model.mixture_model.score_samples(
-            XY.reshape(-1, 2)
-        ).reshape(image_resolution, image_resolution)
-        # plt.contourf(
-        #     linspace_x,
-        #     linspace_y,
-        #     tmm_probs,
-        #     levels=20,
-        #     cmap="coolwarm",
-        #     alpha=0.5,
-        # )
-        
+        plt.subplot(1 + (len(tmm_models) // 5), min(len(tmm_models), 5), i + 1)
+
+        # draw background for MEP/NEB plots (if dim=2)
+        if dimension == 2:
+            image_resolution = 128
+            linspace_x = np.linspace(
+                data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, image_resolution
+            )
+            linspace_y = np.linspace(
+                data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, image_resolution
+            )
+            XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
+            tmm_probs = tmm_model.mixture_model.score_samples(
+                XY.reshape(-1, 2)
+            ).reshape(image_resolution, image_resolution)
+            plt.contourf(
+                linspace_x,
+                linspace_y,
+                tmm_probs,
+                levels=20,
+                cmap="coolwarm",
+                alpha=0.5,
+            )
+
         # extracting the predictions
         num_classes = len(np.unique(data_y))
-        y_pred = tmm_model.predict_with_target(data=data_X, target_number_classes=num_classes)
-        
+        y_pred = tmm_model.predict_with_target(
+            data=data_X, target_number_classes=num_classes
+        )
+
         # draw points
         y_pred_permuted = corc.utils.reorder_colors(y_pred, data_y)
-        plt.scatter(data_X[:, 0], data_X[:, 1], s=10, c=y_pred_permuted, cmap='tab20')
-        
-        tmm_model.plot_graph()
+        plt.scatter(
+            transformed_X[:, 0],
+            transformed_X[:, 1],
+            s=10,
+            c=y_pred_permuted,
+            cmap="tab20",
+        )
+
+        tmm_model.plot_graph(X2D=transformed_X)
 
         # Compute ARI score
         ari_score = sklearn.metrics.adjusted_rand_score(data_y, y_pred)
-        plt.title(f'{dataset_name}: {tmm_model.n_components} clusters, ARI: {ari_score:.2f}')
-        
+        plt.title(
+            f"{dataset_name}: {tmm_model.n_components} clusters, ARI: {ari_score:.2f}"
+        )
+
     # return the figure
     return plt.gcf()
