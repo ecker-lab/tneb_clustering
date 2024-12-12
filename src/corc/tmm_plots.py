@@ -222,7 +222,6 @@ def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
         plt.savefig(save_path)
 
 
-
 def plot_tmm_models(
     tmm_models, data_X, data_y, dataset_name, tsne_transform=None, ground_truth=True
 ):
@@ -248,9 +247,20 @@ def plot_tmm_models(
     else:  # dimension == 2
         transformed_X = data_X
 
+    if ground_truth:
+        plt.subplot(num_rows, num_cols, 1)
+        plt.scatter(
+            transformed_X[:, 0],
+            transformed_X[:, 1],
+            s=10,
+            c=data_y,
+            cmap="tab20",
+        )
+        plt.title(f"{dataset_name}: Ground truth")
+
     for i, tmm_model in enumerate(tmm_models):
 
-        plt.subplot(num_rows, num_cols, i + 1)
+        plt.subplot(num_rows, num_cols, i + 1 + int(ground_truth))
 
         # draw background for MEP/NEB plots (if dim=2)
         if dimension == 2:

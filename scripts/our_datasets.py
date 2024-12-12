@@ -5,6 +5,7 @@ from corc import complex_datasets, datasets2d
 
 
 DENSIRED_PATH = "datasets/densired.npz"
+DENSIRED_SOFT_PATH = "datasets/densired_soft.npz"
 MNIST_PATH = "datasets/mvae_mnist_nd_saved.pkl"
 
 # ============
@@ -37,6 +38,10 @@ DATASET_SELECTOR = [
     "densired16",
     "densired32",
     "densired64",
+    "densired_soft_8",
+    "densired_soft_16",
+    "densired_soft_32",
+    "densired_soft_64",
     "mnist8",
     "mnist16",
     "mnist32",
@@ -44,15 +49,15 @@ DATASET_SELECTOR = [
 ]
 
 DATASETS2D = [
-    # "Clusterlab1",
-    # "Clusterlab2",
-    # "Clusterlab3",
-    # "Clusterlab4",
-    # "Clusterlab5",
-    # "Clusterlab6",
-    # "Clusterlab7",
-    # "Clusterlab8",
-    # "Clusterlab9",
+    # "clusterlab1",
+    # "clusterlab2",
+    # "clusterlab3",
+    # "clusterlab4",
+    # "clusterlab5",
+    # "clusterlab6",
+    # "clusterlab7",
+    # "clusterlab8",
+    # "clusterlab9",
     "noisy_circles",
     "noisy_moons",
     "varied",
@@ -74,6 +79,10 @@ COMPLEX_DATASETS = [
     "densired16",
     "densired32",
     "densired64",
+    "densired_soft_8",
+    "densired_soft_16",
+    "densired_soft_32",
+    "densired_soft_64",
     "mnist8",
     "mnist16",
     "mnist32",
@@ -202,6 +211,19 @@ class our_datasets:
         densired1 = complex_datasets.load_densired(dim=dims[1], path=DENSIRED_PATH)
         densired2 = complex_datasets.load_densired(dim=dims[2], path=DENSIRED_PATH)
         densired3 = complex_datasets.load_densired(dim=dims[3], path=DENSIRED_PATH)
+
+        densired_soft_0 = complex_datasets.load_densired(
+            dim=dims[0], path=DENSIRED_SOFT_PATH
+        )
+        densired_soft_1 = complex_datasets.load_densired(
+            dim=dims[1], path=DENSIRED_SOFT_PATH
+        )
+        densired_soft_2 = complex_datasets.load_densired(
+            dim=dims[2], path=DENSIRED_SOFT_PATH
+        )
+        densired_soft_3 = complex_datasets.load_densired(
+            dim=dims[3], path=DENSIRED_SOFT_PATH
+        )
 
         # MNIST-Nd
         mnist0 = complex_datasets.make_mnist_nd(dim=dims[0], path=MNIST_PATH)
@@ -525,6 +547,66 @@ class our_datasets:
                 densired3,
                 {
                     "name": "densired64",
+                    "dim": dims[3],
+                    "n_clusters": 6,
+                    "gwg_n_components": 25,
+                    "gwg_n_neighbors": 5,
+                    "gwg_covariance": "full",
+                    "resolution": 0.1,
+                    "resolution_leiden": 0.1,
+                    "quantile": 0.052,
+                    "preference": -14_000,
+                },
+            ),
+            (
+                densired_soft_0,
+                {
+                    "name": "densired_soft_8",
+                    "dim": dims[0],
+                    "n_clusters": 6,
+                    "gwg_n_components": 50,
+                    "gwg_n_neighbors": 5,
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.2,
+                    "resolution_leiden": 0.2,
+                    "quantile": 0.03,
+                    "preference": -2000,
+                },
+            ),
+            (
+                densired_soft_1,
+                {
+                    "name": "densired_soft_16",
+                    "dim": dims[1],
+                    "n_clusters": 6,
+                    "gwg_n_components": 50,
+                    "gwg_n_neighbors": 2,
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.2,
+                    "resolution_leiden": 0.2,
+                    "quantile": 0.04,
+                    "preference": -7000,
+                },
+            ),
+            (
+                densired_soft_2,
+                {
+                    "name": "densired_soft_32",
+                    "dim": dims[2],
+                    "n_clusters": 6,
+                    "gwg_n_components": 50,
+                    "gwg_n_neighbors": 3,
+                    "gwg_covariance": "spherical",
+                    "resolution": 0.1,
+                    "resolution_leiden": 0.1,
+                    "quantile": 0.035,
+                    "preference": -7000,
+                },
+            ),
+            (
+                densired_soft_3,
+                {
+                    "name": "densired_soft_64",
                     "dim": dims[3],
                     "n_clusters": 6,
                     "gwg_n_components": 25,
