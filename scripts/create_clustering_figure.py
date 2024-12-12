@@ -144,6 +144,7 @@ def main():
                 continue
             with open(alg_filename, "rb") as f:
                 algorithm = pickle.load(f)
+            algorithm.data = X
 
             # extracting the predictions
             if hasattr(algorithm, "labels_"):
@@ -178,7 +179,7 @@ def main():
                 algorithm.plot_graph(X2D=X2D, n_clusters=len(np.unique(y)))
 
             ari_score = sklearn.metrics.adjusted_rand_score(y, y_pred)
-            plt.text(0.01, 0.99, f'ARI {ari_score:.2f}', transform=plt.gca().transAxes)
+            plt.text(0.02, 0.9, f"ARI {ari_score:.2f}", transform=plt.gca().transAxes)
 
             plt.xticks(())
             plt.yticks(())

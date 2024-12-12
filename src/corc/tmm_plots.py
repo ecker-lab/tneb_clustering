@@ -4,14 +4,12 @@ import itertools
 import scipy
 import studenttmixture
 import sklearn
-from openTSNE import TSNE
+import corc.utils
 import time
-
-
 import corc.graph_metrics.neb
 from corc.graph_metrics import tmm_gmm_neb
 
-GRID_RESOLUTION = 128  # the resolution for the "heatmap" computation for TMM plotting
+GRID_RESOLUTION = 128
 
 
 def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
@@ -32,81 +30,6 @@ def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
 
     if path is not None:
         plt.savefig(path)
-
-
-def plot_field(
-    data_X,
-    mixture_model,
-    paths=None,
-    levels=20,
-    selection=None,
-    save_path=None,
-    axis=None,
-):
-    """Plots the TMM/GMM field and the optimized paths (if available).
-    tmm: trained studenttmixture model
-    gmm: trained Gaussian mixture model
-    selection: selects which paths are included in the plot, by default, all paths are included.
-      other typical options: MST through selection=zip(mst.row,mst.col) and individuals via e.g. [(0,1), (3,4)]
-      One needs to set tmm or gmm, matching the mixture_model parameter
-    """
-    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
-        locations = mixture_model.means_
-    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
-        locations = mixture_model.location
-    n_components = len(locations)
-
-    # grid coordinates
-    x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, GRID_RESOLUTION)
-    y = np.linspace(data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, GRID_RESOLUTION)
-    XY = np.stack(np.meshgrid(x, y), -1)
-
-    # get scores for the grid values
-    mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
-        GRID_RESOLUTION, GRID_RESOLUTION
-    )
-
-    if axis is None:
-        figure, axis = plt.subplots(1, 1)
-    # plot the mixture model field
-    axis.contourf(x, y, mm_probs, levels=levels, cmap="coolwarm", alpha=0.5)
-    # the raw data
-    axis.scatter(data_X[:, 0], data_X[:, 1], s=10, label="raw data")
-    # cluster centers and IDs
-    axis.scatter(
-        locations[:, 0],
-        locations[:, 1],
-        color="black",
-        marker="X",
-        label="mixture centers",
-        s=100,
-    )
-    for i, location in enumerate(locations):
-        axis.annotate(f"{i}", xy=location - 1, color="black")
-
-    # print paths between centers (by default: all)
-    if paths is not None:
-        if selection is None:
-            selection = (
-                (i, j)
-                for i, j in itertools.combinations(range(n_components), r=2)
-                if i != j
-            )
-        for i, j in selection:
-            path = paths[(i, j)]
-            axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5)
-
-    if save_path is not None:
-        plt.savefig(save_path)
-
-    # not returning the axis object since it is modified in-place
-
-
-def compute_mst_edges(raw_adjacency):
-    mst = -scipy.sparse.csgraph.minimum_spanning_tree(-raw_adjacency)
-    rows, cols = mst.nonzero()
-    entries = list(zip(rows, cols))
-    return entries
 
 
 def computations_for_plot_row(
@@ -143,7 +66,7 @@ def computations_for_plot_row(
     )
 
     # extracting the smallest edges to only draw them in the heatmap
-    mst_edges = compute_mst_edges(raw_adjacency)
+    mst_edges = corc.utils.compute_mst_edges(raw_adjacency)
 
     return model, adjacency, paths, thresholds_dict, mst_edges, clusterings_dict
 
@@ -198,7 +121,7 @@ def plot_row(
 
     # heatmap with arrows
     mst_edges = tmm_model.compute_mst_edges(tmm_model.raw_adjacency_)
-    plot_field(
+    corc.utils.plot_field(
         data_X,
         tmm_model.mixture_model,
         paths=tmm_model.paths_,
@@ -299,31 +222,35 @@ def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
         plt.savefig(save_path)
 
 
-def plot_tmm_models(tmm_models, data_X, data_y, dataset_name, tsne_transform=None):
+
+def plot_tmm_models(
+    tmm_models, data_X, data_y, dataset_name, tsne_transform=None, ground_truth=True
+):
+    # general setup for plotting
     plt.figure(figsize=(20, 10))
-    dimension = data_X.shape[1]
+    num_tiles = len(tmm_models) + int(ground_truth)
+    num_rows = 1 + (num_tiles // 5)
+    num_cols = min(num_tiles, 5)
+
+    # fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 10), sharex=True, sharey=True)
+    # axes = axes.flatten()
 
     # compute TSNE if necessary
+    dimension = data_X.shape[1]
     if dimension > 2:
         if tsne_transform is not None:
             transformed_X = tsne_transform
         else:
             print("computing TSNE...", end="")
             start_tsne = time.time()
-            tsne = TSNE(
-                n_components=2,
-                random_state=42,
-                perplexity=30,
-                metric="euclidean",
-                n_jobs=16,
-            )
-            transformed_X = tsne.fit(data_X)
+            transformed_X = corc.utils.get_TSNE_embedding(data_X)
             print(f"done. ({time.time() - start_tsne:.2f}s)")
     else:  # dimension == 2
         transformed_X = data_X
 
     for i, tmm_model in enumerate(tmm_models):
-        plt.subplot(1 + (len(tmm_models) // 5), min(len(tmm_models), 5), i + 1)
+
+        plt.subplot(num_rows, num_cols, i + 1)
 
         # draw background for MEP/NEB plots (if dim=2)
         if dimension == 2:

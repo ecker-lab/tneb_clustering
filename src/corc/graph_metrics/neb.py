@@ -13,6 +13,7 @@ import time
 
 from corc.graph_metrics.graph import Graph
 import corc.graph_metrics.tmm_gmm_neb
+import corc.utils
 
 
 class NEB(Graph):
@@ -146,52 +147,6 @@ class NEB(Graph):
             self.fit(data)
         return self.mixture_model.predict(data)
 
-    # def get_merging_strategy(self, target_number_classes):
-    #     if target_number_classes >= self.mixture_model.n_components:
-    #         raise "too many classes"
-
-    #     # merging classes if necessary
-    #     thresholds_dict, clustering_dict = self.get_thresholds_and_cluster_numbers()
-
-    #     num_classes = self._get_best_cluster_number(
-    #         thresholds_dict, target_number_classes
-    #     )
-    #     threshold = thresholds_dict[num_classes]
-
-    #     # find cluster pairs that need to be merged. We assume a "distance" matrix, so smaller is better
-    #     adjacency = self._get_adjacency_matrix()
-    #     tmp_adj = np.array(adjacency >= threshold, dtype=int)
-    #     _, component_labels = scipy.sparse.csgraph.connected_components(
-    #         tmp_adj, directed=False
-    #     )
-
-    #     # all pairs of clusters that will be joined
-    #     pairs_to_be_merged = [(i, j) for i, j in zip(*np.nonzero(tmp_adj)) if i < j]
-
-    #     return component_labels, pairs_to_be_merged
-
-    # def get_merged_pairs(self, target_num_classes):
-    #     merged_classes = list()
-
-    #     thresholds_dict, clustering_dict = self.get_thresholds_and_cluster_numbers()
-    #     num_classes = self.get_best_cluster_number(thresholds_dict, target_num_classes)
-    #     merging_strategy = clustering_dict[num_classes]
-
-    #     # extract all pairs of merged classes
-    #     for id in np.unique(merging_strategy):
-    #         # get indices that make a certain class
-    #         indices = [i for i, x in enumerate(merging_strategy) if x == id]
-    #         # get all pairs of these indices
-    #         merged_classes += list(itertools.combinations(indices, 2))
-
-    #     return merged_classes
-
-    def compute_mst_edges(self, raw_adjacency):
-        mst = -scipy.sparse.csgraph.minimum_spanning_tree(-raw_adjacency)
-        rows, cols = mst.nonzero()
-        entries = list(zip(rows, cols))
-        return entries
-
     def get_merged_pairs(self, target_num_classes, only_mst_edges=True):
         thresholds_dict, clustering_dict = self.get_thresholds_and_cluster_numbers()
         num_classes = self.get_best_cluster_number(thresholds_dict, target_num_classes)
@@ -206,7 +161,7 @@ class NEB(Graph):
 
         if only_mst_edges:
             # only those that are also part of the MST
-            mst_edges = self.compute_mst_edges(self.raw_adjacency_)
+            mst_edges = corc.utils.compute_mst_edges(self.raw_adjacency_)
             pairs = [pair for pair in pairs if pair in mst_edges]
 
         return pairs
@@ -277,93 +232,11 @@ class NEB(Graph):
         if return_graph:
             return self.graph_data
 
-    def apply_tsne(self, X2D, transform_paths=True, samples_per_path=50):
-        # we assume that fitting did take place
-        self.transformed_centers_ = X2D.transform(self.centers_)
-        n_components = len(self.centers_)
-
-        if transform_paths:
-            self.transformed_paths_ = dict()
-            samples_per_path = min(
-                samples_per_path, self.paths_[(0, 1)].shape[0]
-            )  # do not upsample
-            for i, j in tqdm.tqdm(
-                itertools.combinations(range(n_components), 2),
-                total=n_components * (n_components - 1) // 2,
-                desc="converting paths",
-            ):
-                if i == j:
-                    continue
-                path = self.paths_[(i, j)]
-                path = path[
-                    np.linspace(
-                        0, len(path) - 1, samples_per_path, dtype=int, endpoint=True
-                    )
-                ]
-                self.transformed_paths_[(i, j)] = X2D.transform(path)
-                self.transformed_paths_[(j, i)] = self.transformed_paths_[(i, j)]
-
     def plot_graph(self, X2D=None, pairs=None, n_clusters=None):
         """
         Note: automatic "pairs" computation only works if self.labels or self.n_clusters is set.
         """
-        transformation = X2D
         self.get_graph()  # populates self.graph_data
-        # print("got the graph")
-
-        # get means
-        if hasattr(self, "transformed_centers_"):
-            cluster_means = self.transformed_centers_
-        else:
-            cluster_means = np.array(self.graph_data["nodes"])
-            if transformation is not None and cluster_means.shape[-1] > 2:
-                cluster_means = transformation.transform(cluster_means)
-                print("transformed means")
-
-        # drawing the background for NEB in the 2D case
-        if self.latent_dim == 2:
-            image_resolution = 128
-            if self.data is not None:
-                # if the data is available, we span all datapoints when plotting the contour plot.
-                margin = 0.1
-                our_data = self.data
-            else:
-                # as fallback, use the cluster means as a proxy for where data points are (with increased margin)
-                margin = 0.5
-                our_data = cluster_means
-
-            # creating the grid
-            linspace_x = np.linspace(
-                our_data[:, 0].min() - margin,
-                our_data[:, 0].max() + margin,
-                image_resolution,
-            )
-            linspace_y = np.linspace(
-                our_data[:, 1].min() - margin,
-                our_data[:, 1].max() + margin,
-                image_resolution,
-            )
-            XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
-
-            # scoring the grid points
-            tmm_probs = self.mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
-                image_resolution, image_resolution
-            )
-
-            # and plotting the energy landscape
-            plt.contourf(
-                linspace_x,
-                linspace_y,
-                tmm_probs,
-                levels=20,
-                cmap="coolwarm",
-                alpha=0.5,
-                zorder=-10,
-            )
-
-        # plot cluster means
-        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
-
         cmap = plt.get_cmap("viridis")  # choose a colormap
 
         if pairs is None:
@@ -375,7 +248,7 @@ class NEB(Graph):
                 target_num_clusters = self.n_clusters
             else:
                 target_num_clusters = len(
-                    cluster_means
+                    self.centers_
                 )  # no clusters are merged, so no edges are drawn
 
             # by default we do not draw lines for all pairs of nodes that are merged (because some may not have converged)
@@ -384,67 +257,39 @@ class NEB(Graph):
                 target_num_classes=target_num_clusters, only_mst_edges=True
             )
 
-        # transforming paths for plotting (if necessary)
-        path_resolution = 10  # number of points to sample per path for plotting
-        if hasattr(self, "transformed_paths_"):
-            paths_store = self.transformed_paths_
-        elif self.latent_dim == 2:
-            paths_store = self.paths_
-        else:  # we have to transform the paths
-            assert (
-                transformation is not None
-            )  # otherwise the transformation would not work
-            paths_orig_space = self.paths_
-            paths_store = dict()
+        # drawing the background for NEB in the 2D case
+        if self.latent_dim == 2:
 
-            # collect all the points
-            path_points = list()
-            for i, j in pairs:
-                if i == j:
-                    continue
-                path = paths_orig_space[(i, j)]
-                path = path[
-                    np.linspace(
-                        0, len(path) - 1, path_resolution, dtype=int, endpoint=True
-                    )
-                ]
-                path_points.append(path)  # concatenate all paths
-            path_points = np.concatenate(path_points)
-            # actually transform them
-            transformation_starttime = time.time()
-            print(
-                f"Transforming paths of shape {path_points.shape}... ",
-                end="",
-                flush=True,
+            our_data = self.data if self.data is not None else self.centers_
+            ax = plt.gca()
+            corc.utils.plot_field(
+                data_X=our_data,
+                mixture_model=self.mixture_model,
+                paths=self.paths_,
+                selection=pairs,
+                axis=ax,
+                plot_points=False,
             )
-            transformed_path_points = transformation.transform(path_points, n_iter=100)
-            print(f"done ({time.time() - transformation_starttime:.2f}sec)")
-            # sort them back into paths
-            counter = 0
-            for i, j in pairs:
-                if i == j:
-                    continue
-                paths_store[(i, j)] = transformed_path_points[
-                    counter * path_resolution : (counter + 1) * path_resolution
-                ]
-                paths_store[(j, i)] = paths_store[(i, j)]
-                counter += 1
 
-        for i, j in pairs:
-            if i == j:
-                continue
-            path = paths_store[(i, j)]
-            path = path[
-                np.linspace(0, len(path) - 1, path_resolution, dtype=int, endpoint=True)
-            ]
-            plt.plot(
-                path[:, 0],
-                path[:, 1],
-                lw=1,
-                alpha=0.5,
-                color="black",
-                # color=cmap(normalized_component_labels[i]),
-            )
+        else:  # more than 2 dims
+
+            # get (pseudo) TSNE embedding
+            if not hasattr(self, "transformed_centers_"):
+                self.transformed_centers_ = corc.utils.snap_points_to_TSNE(
+                    points=self.graph_data["nodes"],
+                    data_X=self.data,
+                    transformed_X=X2D,
+                )
+            cluster_means = self.transformed_centers_
+            plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
+
+            # plot paths as straight lines
+            if pairs is not None and len(pairs) > 0:
+                xs, ys = zip(*pairs)
+                for pair in pairs:
+                    start = cluster_means[pair[0]]
+                    end = cluster_means[pair[1]]
+                    plt.plot(*zip(start, end), color="black", alpha=0.5, lw=1)
 
     @classmethod
     def filter_mixture_model(self, mixture_model, data_X, component_filter):
@@ -470,7 +315,12 @@ class NEB(Graph):
         ]
 
         """
-        without the mixture_model.fit() call, something is very off (maybe the normalization of mixture component weights, but probably something more) - the energy landscape looks completely different in that case. After "refitting" (essentially doing one E and one M step, or two, just to be sure) the plot looks just as expected (similar to the one before, but without the additional weird components)
+        without the mixture_model.fit() call, something is very off 
+        (maybe the normalization of mixture component weights, but probably 
+        something more) - the energy landscape looks completely different in 
+        that case. After "refitting" (essentially doing one E and one M step, 
+        or two, just to be sure) the plot looks just as expected (similar to 
+        the one before, but without the additional weird components)
         """
         # perform 2 rounds of model fitting to re-adjust everything
         orig_n_iter = mixture_model.n_iter_

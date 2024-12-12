@@ -64,15 +64,8 @@ def main():
             if params["dim"] > 2:
                 starttime = time.time()
                 perplexity = 100 if dataset in ["Paul15"] else 30
-                tsne = TSNE(
-                    perplexity=perplexity,
-                    metric="euclidean",
-                    n_jobs=8,
-                    random_state=42,
-                    verbose=False,
-                )
                 print("computing TSNE", end="")
-                X2D = tsne.fit(X)
+                X2D = corc.utils.get_TSNE_embedding(data_X=X, perplexity=perplexity)
                 print(
                     f"finished TSNE fit for {params['name']} in {time.time()-starttime:.2f} seconds"
                 )
@@ -132,10 +125,10 @@ def main():
                 else:
                     y_pred = algorithm.predict(X)
 
-            if params["dim"] > 2 and hasattr(algorithm, "apply_tsne"):
-                algorithm.apply_tsne(
-                    X2D=X2D
-                )  # stores TSNE transformed centers and paths
+            # store dataset in NEB algorithm object
+            if "NEB" in name:
+                algorithm.data = X
+                algorithm.labels = y
 
             # saving algorithm object (containing everything we computed)
             alg_name = re.sub("\n", "", name)

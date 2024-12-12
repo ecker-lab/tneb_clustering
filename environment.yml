@@ -20,6 +20,7 @@ dependencies:
   - scanpy
   - openblas
   - dask
+  - tsnecuda
   - pip:
     - jax[cuda12]
     - jaxtyping

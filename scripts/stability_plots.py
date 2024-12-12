@@ -2,9 +2,9 @@ import os
 
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-import corc.complex_datasets
-import jax
 
+import jax
+import argparse
 import jax.random as jrandom
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,14 +18,17 @@ import time
 
 # own code
 import corc.datasets2d
+import corc.complex_datasets
+
 
 # import corc.datasets_refactor as datasets2d
 from corc.graph_metrics import tmm_gmm_neb
 import corc.tmm_plots as tmm_plots
 import corc.utils
 
-# we create the plots with 10 different seeds
-NUM_SEEDS = 10
+
+# we create the plots with 9 different seeds/overclustering values plus GT
+NUM_MODELS = 9
 
 
 def load_datasets():
@@ -59,7 +62,6 @@ def load_datasets():
 
 
 def train_multiple_tmm_models_seeds(data_X, data_y, num_seeds=10, neb_iterations=25):
-
     tmm_models = list()
     for i in range(num_seeds):
         tmm_model = corc.graph_metrics.neb.NEB(
@@ -72,6 +74,30 @@ def train_multiple_tmm_models_seeds(data_X, data_y, num_seeds=10, neb_iterations
                 5 if data_X.shape[1] < 10 else 1
             ),  # fitting becomes slow in high dimensions
             n_components=15,
+            mixture_model_type="tmm",
+        )
+        tmm_model.fit(data=data_X)
+        tmm_models.append(tmm_model)
+
+    return tmm_models
+
+
+def train_multiple_tmm_models_overclustering(
+    data_X, data_y, num_models=10, neb_iterations=25
+):
+    num_classes = len(np.unique(data_y))
+    tmm_models = list()
+    for i in range(num_models):
+        tmm_model = corc.graph_metrics.neb.NEB(
+            latent_dim=data_X.shape[1],
+            data=data_X,
+            labels=data_y,
+            optimization_iterations=neb_iterations,
+            seed=42,
+            n_init=(
+                5 if data_X.shape[1] < 10 else 1
+            ),  # fitting becomes slow in high dimensions
+            n_components=num_classes + 2 * i,
             mixture_model_type="tmm",
         )
         tmm_model.fit(data=data_X)
@@ -123,7 +149,10 @@ def load_tsne_from_disk(dataset_filename):
     return tsne
 
 
-def main():
+def main(plot_type="seeds"):
+    """Computes the stability plots. Two modes are seeds (stability against re-creating the plot
+    with different seeds) and overclustering (stability against choosing a different number of
+    clusters to start with)"""
     datasets = load_datasets()
 
     avg_pairwise_aris = dict()
@@ -142,25 +171,39 @@ def main():
         # if os.path.exists(f"figures/stability_{dataset_filename}.pdf"):
         #     continue
 
+        if plot_type == "seeds":
+            cache_filename = f"cache/stability_seeds_{dataset_filename}.pkl"
+        elif plot_type == "overclustering":
+            cache_filename = f"cache/stability_overclustering_{dataset_filename}.pkl"
+        else:
+            raise "invalid plot type"
+
         # check if the data is already computed
         tmm_models = None
-        if os.path.exists(f"cache/stability_seeds_{dataset_filename}.pkl"):
-            with open(f"cache/stability_seeds_{dataset_filename}.pkl", "rb") as f:
+        if os.path.exists(cache_filename):
+            with open(cache_filename, "rb") as f:
                 tmm_models = pickle.load(f)
                 # recompute when not enough seeds have been computed
-                if len(tmm_models) < NUM_SEEDS:
+                if len(tmm_models) < NUM_MODELS:
                     tmm_models = None
 
         # compute tmm models
         if tmm_models is None:
             print("computing tmm models...")
             tmm_model_starttime = time.time()
-            tmm_models = train_multiple_tmm_models_seeds(
-                data_X, data_y, num_seeds=NUM_SEEDS
-            )
-            with open(f"cache/stability_seeds_{dataset_filename}.pkl", "wb") as f:
+            if plot_type == "seeds":
+                tmm_models = train_multiple_tmm_models_seeds(
+                    data_X, data_y, num_seeds=NUM_MODELS
+                )
+            else:
+                tmm_models = train_multiple_tmm_models_overclustering(
+                    data_X, data_y, num_models=NUM_MODELS
+                )
+            with open(cache_filename, "wb") as f:
                 pickle.dump(tmm_models, f)
-            print(f"done. ({time.time() - tmm_model_starttime:.2f}s)")
+            print(
+                f"done with model computation. ({time.time() - tmm_model_starttime:.2f}s)"
+            )
 
         # get ari scores
         avg_pairwise_aris[dataset_name], avg_aris[dataset_name] = (
@@ -174,9 +217,9 @@ def main():
             tmm_models, data_X, data_y, dataset_name, tsne_transform=tsne
         )
         figure.suptitle(
-            f"Stability of TMMs on {dataset_name} (avg pairwise ari: {avg_pairwise_aris[dataset_name]:.2f})"
+            f"{plot_type.capitalize()} Stability of TMMs on {dataset_name} (avg pairwise ari: {avg_pairwise_aris[dataset_name]:.2f})"
         )
-        figure.savefig(f"figures/stability_{dataset_filename}.pdf")
+        figure.savefig(f"figures/stability_{plot_type}_{dataset_filename}.pdf")
 
     # output ari overview
     for dataset_name in datasets.keys():
@@ -186,4 +229,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Computing Stability plots for TMM")
+    parser.add_argument(
+        "-t",
+        "--plot_type",
+        help="either 'seeds' or 'overclustering'",
+        default="seeds",  # Set the default value here
+        choices=["seeds", "overclustering"],  # Optional: Validate input
+    )
+    args = parser.parse_args()
+
+    print(f"Creating stability plot for {args.plot_type} with {NUM_MODELS} plots.")
+    main(plot_type=args.plot_type)

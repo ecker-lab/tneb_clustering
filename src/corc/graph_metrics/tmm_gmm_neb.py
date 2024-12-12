@@ -144,52 +144,67 @@ def reinterpolate(ms):
     return rms.T
 
 
+@jax.jit
+def equidistant_interpolate(path):
+    num_points = 1024
+    # Calculate arc lengths
+    diffs = jnp.diff(path, axis=0)
+    arc_lengths = jnp.cumsum(jnp.linalg.norm(diffs, axis=1))
+    arc_lengths = jnp.pad(arc_lengths, (1, 0)) / arc_lengths[-1]
+
+    # Interpolate
+    t = jnp.linspace(0, 1, num_points)
+    interpolated_path = jax.vmap(
+        lambda t_val: jnp.interp(
+            t_val,
+            arc_lengths,
+            path[:, 0],
+            # width=3  # optional, for better gradient behavior, but not JIT compatible
+        )
+    )(t)
+
+    # Broadcast to all dimensions (assuming path shape is (N, D))
+    interpolated_path = jnp.stack([interpolated_path] * path.shape[1], axis=1)
+
+    return interpolated_path
+
+
 # given two indices i and j find interpolation between the ith and jth means
 def compute_interpolation(
-    i, j, means, covs, weights, iterations=4000, mixture_model="tmm"
+    i,
+    j,
+    means,
+    covs,
+    weights,
+    iterations=400,
+    mixture_model="tmm",
 ):
-    m1, m2 = means[i], means[j]
+    mean_1, mean_2 = means[i], means[j]
+    num_points = 1024  # hardcoded since otherwise JIT does not work.
 
     # linear interpolation between m1 and m2
-    ts = jnp.linspace(0, 1, 1024)[..., None]
-    ms = (1 - ts) * m1 + ts * m2
-
-    # euclidean distance
-    dif_refrence = ((ms[0] - ms[1]) ** 2).sum()
+    temperatures = jnp.linspace(0, 1, num_points)[..., None]
+    path = (1 - temperatures) * mean_1 + temperatures * mean_2
 
     optimizer = optax.adam(0.01)
-    opt_state = optimizer.init(ms)
+    opt_state = optimizer.init(path)
     for i in range(iterations):
         grads = jax.grad(loss)(
-            ms, means, covs, weights, dif_refrence, mixture_model=mixture_model
+            path, means, covs, weights, None, mixture_model=mixture_model
         )
         updates, opt_state = optimizer.update(grads, opt_state)
-        ms = optax.apply_updates(ms, updates)
+        path = optax.apply_updates(path, updates)
 
-        # the following line effectively resamples the line through linear interpolation. Without it, all of the 1000 points will be pushed away from the low-density regions instead of finding the best possible line between the two dense regions.
-        # TODO: this does not work!!!
-        ms = scipy.signal.savgol_filter(ms, window_length=100, polyorder=5, axis=0)
-
-    # this is where the band becomes elastic and where the work is done.
-    # for _ in range(iterations):
-    #     ms, opt_state = step(
-    #         ms,
-    #         means,
-    #         covs,
-    #         weights,
-    #         dif_refrence,
-    #         mixture_model=mixture_model,
-    #     )
-    #     ms = reinterpolate(ms)
+        path = equidistant_interpolate(path)
 
     # compute logprobs with the given mixture model
     if mixture_model == "tmm":
-        ps = tmm_jax(ms, means, covs, weights)
+        probabilities = tmm_jax(path, means, covs, weights)
     elif mixture_model == "gmm":
-        ps = gmm_jax(ms, means, covs, weights)
+        probabilities = gmm_jax(path, means, covs, weights)
     else:
         raise ValueError("mixture_model must be either 'tmm' or 'gmm'")
-    return ms, ts, ps
+    return path, temperatures, probabilities
 
 
 def compute_neb_paths(mixture_model, iterations=1000):

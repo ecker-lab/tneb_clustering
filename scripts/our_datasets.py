@@ -58,7 +58,7 @@ DATASETS2D = [
     "varied",
     "aniso",
     "blobs",
-    "Clusterlab10",
+    "clusterlab10",
 ]
 
 COMPLEX_DATASETS = [
