@@ -28,7 +28,7 @@ import corc.utils
 
 
 # we create the plots with 9 different seeds/overclustering values plus GT
-NUM_MODELS = 9
+NUM_MODELS = 10
 
 
 def load_datasets():
@@ -149,10 +149,16 @@ def load_tsne_from_disk(dataset_filename):
     return tsne
 
 
-def main(plot_type="seeds"):
-    """Computes the stability plots. Two modes are seeds (stability against re-creating the plot
-    with different seeds) and overclustering (stability against choosing a different number of
-    clusters to start with)"""
+def main(plot_type="seeds", just_ari=False):
+    """Computes the stability plots.
+
+    plot_type: ["seeds","overclustering"] Where seeds shows stability against re-creating the plot
+    with different seeds and overclustering shows stability against choosing a different number of
+    clusters to start with
+
+    just_ari: if True, no figure is created and only ARI scores are printed to the commandline.
+    """
+
     datasets = load_datasets()
 
     avg_pairwise_aris = dict()
@@ -171,12 +177,7 @@ def main(plot_type="seeds"):
         # if os.path.exists(f"figures/stability_{dataset_filename}.pdf"):
         #     continue
 
-        if plot_type == "seeds":
-            cache_filename = f"cache/stability_seeds_{dataset_filename}.pkl"
-        elif plot_type == "overclustering":
-            cache_filename = f"cache/stability_overclustering_{dataset_filename}.pkl"
-        else:
-            raise "invalid plot type"
+        cache_filename = f"cache/stability_{plot_type}_{dataset_filename}.pkl"
 
         # check if the data is already computed
         tmm_models = None
@@ -212,14 +213,15 @@ def main(plot_type="seeds"):
             )
         )
 
-        # create the figure
-        figure = tmm_plots.plot_tmm_models(
-            tmm_models, data_X, data_y, dataset_name, tsne_transform=tsne
-        )
-        figure.suptitle(
-            f"{plot_type.capitalize()} Stability of TMMs on {dataset_name} (avg pairwise ari: {avg_pairwise_aris[dataset_name]:.2f})"
-        )
-        figure.savefig(f"figures/stability_{plot_type}_{dataset_filename}.pdf")
+        if not just_ari:
+            # create the figure
+            figure = tmm_plots.plot_tmm_models(
+                tmm_models, data_X, data_y, dataset_name, tsne_transform=tsne
+            )
+            figure.suptitle(
+                f"{plot_type.capitalize()} Stability of TMMs on {dataset_name} (avg pairwise ari: {avg_pairwise_aris[dataset_name]:.2f})"
+            )
+            figure.savefig(f"figures/stability_{plot_type}_{dataset_filename}.pdf")
 
     # output ari overview
     for dataset_name in datasets.keys():
@@ -237,7 +239,10 @@ if __name__ == "__main__":
         default="seeds",  # Set the default value here
         choices=["seeds", "overclustering"],  # Optional: Validate input
     )
+    parser.add_argument(
+        "--just_ari", help="just compute ARI values, no plot", action="store_true"
+    )
     args = parser.parse_args()
 
     print(f"Creating stability plot for {args.plot_type} with {NUM_MODELS} plots.")
-    main(plot_type=args.plot_type)
+    main(plot_type=args.plot_type, just_ari=args.just_ari)

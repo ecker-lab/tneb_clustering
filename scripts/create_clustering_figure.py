@@ -107,8 +107,12 @@ def main():
 
     # now start the computation
     for i_dataset, dataset_name in enumerate(tqdm.tqdm(opt.datasets)):
+
         # load dataset
         dataset_filename = f"{opt.cache_path}/{dataset_name}.pickle"
+        if dataset_filename in missing_files:
+            print(f"Skipping dataset {dataset_name}. (file does not exist)")
+            continue
         with open(dataset_filename, "rb") as f:
             dataset_info = pickle.load(f)
 

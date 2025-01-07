@@ -40,3 +40,15 @@ export XLA_PYTHON_CLIENT_MEM_FRACTION=0.01; echo """
 
 
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.01
+
+export XLA_PYTHON_CLIENT_MEM_FRACTION=0.01; echo """
+    varied
+    aniso
+    densired8
+    densired16
+    densired_soft_8
+    densired_soft_16
+    mnist8
+    mnist16
+    """ | xargs -P 6 -I {} nice -6 python scripts/plot_join_strategies.py -d {}
+

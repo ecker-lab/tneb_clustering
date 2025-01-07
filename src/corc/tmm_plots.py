@@ -6,6 +6,7 @@ import studenttmixture
 import sklearn
 import corc.utils
 import time
+import math
 import corc.graph_metrics.neb
 from corc.graph_metrics import tmm_gmm_neb
 
@@ -102,11 +103,7 @@ def plot_row_with_computation(
     plot_cluster_levels(levels, tmm_model, data_X)
 
 
-def plot_row(
-    data_X,
-    data_y,
-    tmm_model,
-):
+def plot_row(data_X, data_y, tmm_model, transformed_points=None):
     """
     Creates a plot consisting of
     1) the GT clustering,
@@ -116,17 +113,26 @@ def plot_row(
     fig, axes = plt.subplots(1, 3, figsize=(16, 6))
 
     # ground truth
-    axes[0].scatter(data_X[:, 0], data_X[:, 1], c=data_y, cmap="viridis")
+    if transformed_points is None:
+        if data_X.shape[-1] == 2:
+            transformed_points = data_X
+        else:
+            transformed_points = corc.utils.get_TSNE_embedding(data_X)
+
+    axes[0].scatter(
+        transformed_points[:, 0], transformed_points[:, 1], c=data_y, cmap="viridis"
+    )
     axes[0].set_title("Ground Truth")
 
     # heatmap with arrows
-    mst_edges = tmm_model.compute_mst_edges(tmm_model.raw_adjacency_)
+    mst_edges = corc.utils.compute_mst_edges(tmm_model.raw_adjacency_)
     corc.utils.plot_field(
         data_X,
         tmm_model.mixture_model,
         paths=tmm_model.paths_,
         selection=mst_edges,
         axis=axes[1],
+        transformed_points=transformed_points,
     )
     axes[1].set_title("Heatmap")
 
@@ -136,12 +142,12 @@ def plot_row(
     # axes[2].set_xlabel('Threshold')
 
     # clusters vs thresholds
-    thresholds, cluster_numbers_per_threshold, clusterings = (
+    threshold_dict, merging_strategy_dict = (
         tmm_model.get_thresholds_and_cluster_numbers()
     )
     axes[2].plot(
-        cluster_numbers_per_threshold[:, 1],
-        cluster_numbers_per_threshold[:, 0],
+        threshold_dict.keys(),
+        threshold_dict.values(),
         marker="o",
     )
     axes[2].axvline(x=len(np.unique(data_y)), color="r")
@@ -151,72 +157,45 @@ def plot_row(
     axes[2].grid()
 
 
-def plot_cluster_levels(levels, tmm_model, data_X, save_path=None):
+def plot_cluster_levels(
+    levels, tmm_model, data_X, save_path=None, transformed_points=None
+):
     """
     creates a 1-line plot of the tmm clustering such but with different target_number_cluster, so with different merging strategies.
     levels: a list of integers of how many clusters should be in each plot, its length determines the size of the plot.
     """
     n_plots = len(levels)
+    n_cols = min(4, n_plots)
+    n_rows = math.ceil(n_plots / n_cols)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 4, 2 + n_rows * 4))
+    if n_rows > 1:
+        axes = axes.flatten()
 
-    fig, axes = plt.subplots(1, n_plots, figsize=(n_plots * 4, 6))
-    threshold_dict, clusterings_dict = tmm_model.get_thresholds_and_cluster_numbers()
-
-    # grid coordinates
-    x = np.linspace(data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, GRID_RESOLUTION)
-    y = np.linspace(data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, GRID_RESOLUTION)
-    XY = np.stack(np.meshgrid(x, y), -1)
-    tmm_probs = tmm_model.mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
-        GRID_RESOLUTION, GRID_RESOLUTION
-    )
-
-    cmap = plt.get_cmap("viridis")  # choose a colormap
+    # TSNE
+    centers = tmm_model.get_centers()
+    if data_X.shape[-1] == 2:
+        transformed_points = data_X
+    else:
+        if transformed_points is None:
+            transformed_points = corc.utils.get_TSNE_embedding(data_X)
+        centers = corc.utils.snap_points_to_TSNE(centers, data_X, transformed_points)
 
     for index, level in enumerate(levels):
         axis = axes[index]
-        if level not in threshold_dict.keys():
-            axis.set_title(f"no threshold leads to {level} clusters")
-            print(f"{level} clusters is not achievable.")
-            continue
 
-        threshold = threshold_dict[level]
-        # all pairs that are merged (i.e. are below threshold)
-        tmp_adj = np.array(tmm_model.adjacency_ >= threshold, dtype=int)
-        pairs = np.transpose(np.nonzero(tmp_adj))
-        _, component_labels = scipy.sparse.csgraph.connected_components(
-            tmp_adj, directed=False
-        )
-        if np.max(component_labels) > 0:
-            normalized_component_labels = component_labels / np.max(component_labels)
-        else:
-            normalized_component_labels = component_labels
-
-        axis.contourf(x, y, tmm_probs, levels=20, cmap="coolwarm", alpha=0.5)
-        axis.scatter(data_X[:, 0], data_X[:, 1], s=10, label="raw data")
+        y = tmm_model.predict_with_target(data_X, level)
         axis.scatter(
-            tmm_model.mixture_model.location[:, 0],
-            tmm_model.mixture_model.location[:, 1],
-            c=component_labels,
-            cmap="viridis",
-            marker="X",
-            label="Student's t-mixture",
-            s=60,
+            transformed_points[:, 0],
+            transformed_points[:, 1],
+            c=y,
+            s=10,
+            label="raw data",
+        )
+        tmm_model.plot_graph(
+            X2D=transformed_points, target_num_clusters=level, axis=axis
         )
 
-        for i, j in pairs:
-            if i == j:
-                continue
-            path = tmm_model.paths_[(i, j)]
-            axis.plot(
-                path[:, 0],
-                path[:, 1],
-                lw=3,
-                alpha=0.5,
-                color=cmap(normalized_component_labels[i]),
-            )
-
-        axis.set_title(
-            f"{level} target clusters ({len(tmm_model.mixture_model.location)} total)"
-        )
+        axis.set_title(f"{level} target clusters ({len(centers)} total)")
 
     if save_path is not None:
         plt.savefig(save_path)
@@ -300,6 +279,7 @@ def plot_tmm_models(
             cmap="tab20",
         )
 
+        tmm_model.labels = data_y
         tmm_model.plot_graph(X2D=transformed_X)
 
         # Compute ARI score

@@ -1,6 +1,6 @@
 from sklearn import cluster, mixture
 import studenttmixture
-from corc.graph_metrics import paga, gwg, gwgmara, neb, stavia
+from corc.graph_metrics import paga, gwg, gwgmara, neb #, stavia
 from scipy.sparse import csr_matrix
 import scanpy
 import anndata
@@ -21,7 +21,7 @@ ALGORITHM_SELECTOR = [
     "Affinity\nPropagation",
     "MeanShift",
     "Leiden",
-    "PAGA",
+    # "PAGA",
     "Ward",
     # "Stavia",
     "GWG-dip",
@@ -161,12 +161,12 @@ def get_clustering_objects(
         n_init=5,
         optimization_iterations=300,
     )
-    stavia_algo = stavia.Stavia(
-        latent_dim=params["dim"],
-        n_neighbors=20,
-        resolution=0.15,
-        seed=params["random_state"],
-    )
+    # stavia_algo = stavia.Stavia(
+    #     latent_dim=params["dim"],
+    #     n_neighbors=20,
+    #     resolution=0.15,
+    #     seed=params["random_state"],
+    # )
 
     clustering_algorithms = [
         ("MiniBatch\nKMeans", two_means),
@@ -182,8 +182,8 @@ def get_clustering_objects(
         ("MeanShift", ms),
         ("Ward", ward),
         ("Leiden", leiden),
-        ("PAGA", mpaga),
-        ("Stavia", stavia_algo),
+        # ("PAGA", mpaga),
+        # ("Stavia", stavia_algo),
         ("GWG-dip", mgwgmara),
         ("GWG-pvalue", mgwg),
         ("GMM-NEB", gmm_neb),

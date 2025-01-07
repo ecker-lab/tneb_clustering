@@ -15,6 +15,7 @@ from openTSNE import TSNE
 import re
 import pickle
 import sys
+import corc.utils
 
 """
 This file performs the clustering computation and TSNE conversion of all selected datasets and clustering algorithms. The results will be stored in the cache/*.pickle files.

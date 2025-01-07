@@ -8,6 +8,7 @@ import matplotlib.pylab as plt
 from scipy.sparse import csr_matrix
 
 from corc.graph_metrics.graph import Graph
+import corc.utils
 
 
 class PAGA(Graph):
@@ -268,7 +269,10 @@ class PAGA(Graph):
                 cluster_means = self.transformed_centers_
             else:
                 if X2D is not None:
-                    cluster_means = X2D.transform(cluster_means)
+                    # cluster_means = X2D.transform(cluster_means)
+                    cluster_means = corc.utils.snap_points_to_TSNE(
+                        points=cluster_means, data_X=self.data, transformed_X=X2D
+                    )
                     self.graph_data["nodes"] = cluster_means
                     self.transformed_centers_ = cluster_means
                 else:

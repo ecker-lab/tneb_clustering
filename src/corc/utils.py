@@ -5,6 +5,7 @@ import yaml
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import corc.utils
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 import numpy as np
@@ -13,6 +14,7 @@ import sklearn
 import studenttmixture
 import itertools
 import scipy
+import corc.studentmixture
 
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
@@ -120,7 +122,22 @@ def generate_overview_visplot(log_dir):
 
 def reorder_colors(y_pred, y_true):
     cm = confusion_matrix(y_true, y_pred)
-    _, col_ind = linear_sum_assignment(
+    # Use the Hungarian algorithm to find the optimal assignment
+    row_ind, col_ind = linear_sum_assignment(
+        -cm
+    )  # col_ind returns how to reorder the columns (colors of y_pred)
+    # Create a mapping based on the optimal column assignments
+    permuted_indices = np.zeros_like(y_pred)
+
+    for r, c in zip(row_ind, col_ind):
+        permuted_indices[y_pred == c] = r
+    return permuted_indices
+
+
+def reorder_colors2(y_pred, y_true):
+    cm = confusion_matrix(y_true, y_pred)
+    # Use the Hungarian algorithm to find the optimal assignment
+    row_ind, col_ind = linear_sum_assignment(
         -cm
     )  # col_ind returns how to reorder the columns (colors of y_pred)
     y_pred_permuted = np.argsort(col_ind)[
@@ -222,51 +239,65 @@ def plot_field(
     save_path=None,
     axis=None,
     plot_points=True,  # whether data_X is plotted
+    transformed_points=None,
 ):
     """Plots the TMM/GMM field and the optimized paths (if available).
     selection: selects which paths are included in the plot, by default, all paths are included.
       other typical options: MST through selection=zip(mst.row,mst.col) and individuals via e.g. [(0,1), (3,4)]
 
     """
+    # extract cluster centers
     if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
         locations = mixture_model.means_
     elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
         locations = mixture_model.location
+    elif isinstance(mixture_model, corc.studentmixture.StudentMixture):
+        locations = mixture_model.centers
     n_components = len(locations)
+
+    # Compute TSNE if necessary
+    if data_X.shape[-1] > 2:    
+        if transformed_points is None:
+            transformed_points = corc.utils.get_TSNE_embedding(data_X)
+        locations = corc.utils.snap_points_to_TSNE(locations, data_X, transformed_points)
+    else:
+        transformed_points = data_X
 
     if axis is None:
         figure, axis = plt.subplots(1, 1)
 
-    # grid coordinates
-    margin = 0.5
-    x = np.linspace(
-        data_X[:, 0].min() - margin, data_X[:, 0].max() + margin, GRID_RESOLUTION
-    )
-    y = np.linspace(
-        data_X[:, 1].min() - margin, data_X[:, 1].max() + margin, GRID_RESOLUTION
-    )
-    XY = np.stack(np.meshgrid(x, y), -1)
+    # plot the energy landscape if possible
+    if data_X.shape[-1] == 2:
+        # grid coordinates
+        margin = 0.5
+        x = np.linspace(
+            data_X[:, 0].min() - margin, data_X[:, 0].max() + margin, GRID_RESOLUTION
+        )
+        y = np.linspace(
+            data_X[:, 1].min() - margin, data_X[:, 1].max() + margin, GRID_RESOLUTION
+        )
+        XY = np.stack(np.meshgrid(x, y), -1)
 
-    # get scores for the grid values
-    mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
-        GRID_RESOLUTION, GRID_RESOLUTION
-    )
-    # plotting the energy landscape
-    axis.contourf(
-        x,
-        y,
-        mm_probs,
-        levels=levels,
-        cmap="coolwarm",
-        alpha=0.5,
-        zorder=-10,
-    )
+        # get scores for the grid values
+        mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
+            GRID_RESOLUTION, GRID_RESOLUTION
+        )
+        # plotting the energy landscape
+        axis.contourf(
+            x,
+            y,
+            mm_probs,
+            levels=levels,
+            cmap="coolwarm",
+            alpha=0.5,
+            zorder=-10,
+        )
 
-    # the raw data
+    # plot the raw data
     if plot_points:
-        axis.scatter(data_X[:, 0], data_X[:, 1], s=10, label="raw data")
+        axis.scatter(transformed_points[:, 0], transformed_points[:, 1], s=10, label="raw data")
 
-    # cluster centers and IDs
+    # plot cluster centers and IDs
     axis.scatter(
         locations[:, 0],
         locations[:, 1],
@@ -276,9 +307,11 @@ def plot_field(
         s=100,
     )
     for i, location in enumerate(locations):
-        axis.annotate(f"{i}", xy=location - 1, color="black")
+        y_min, y_max = axis.get_ylim()
+        scale = y_max - y_min
+        axis.annotate(f"{i}", xy=location - 0.05 * scale, color="black")
 
-    # print paths between centers (by default: all)
+    # plot paths between centers (by default: all)
     if paths is not None:
         if selection is None:
             selection = (
@@ -288,9 +321,87 @@ def plot_field(
             )
         for i, j in selection:
             path = paths[(i, j)]
-            axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5)
+            axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5, color="red")
 
     if save_path is not None:
         plt.savefig(save_path)
 
     # not returning the axis object since it is modified in-place
+
+
+def best_possible_labels_from_overclustering(y_true, y_pred):
+    confusion = sklearn.metrics.confusion_matrix(y_true, y_pred)
+
+    # Create a mapping of predicted clusters to the majority true label
+    best_labels = np.zeros(confusion.shape[1], dtype=int)
+
+    for predicted_label in range(confusion.shape[1]):
+        if (
+            confusion[:, predicted_label].sum() > 0
+        ):  # Check if there are any samples for this predicted label
+            best_labels[predicted_label] = np.argmax(confusion[:, predicted_label])
+        else:
+            best_labels[predicted_label] = -1  # Handle cases where there's no count
+
+    # Map the new labels back to the original predicted labels
+    y_best = np.array(
+        [best_labels[label] if label < len(best_labels) else -1 for label in y_pred]
+    )
+
+    return y_best
+
+
+def predict_by_joining_closest_clusters(centers, y_pred, num_classes):
+
+    def find_root(mapping, class_index):
+        if mapping[class_index] != class_index:
+            mapping[class_index] = find_root(mapping, mapping[class_index])
+        return mapping[class_index]
+
+    def merge_classes(mapping, class_i, class_j):
+        root_i = find_root(mapping, class_i)
+        root_j = find_root(mapping, class_j)
+
+        # Merge by attaching root_j to root_i
+        if root_i != root_j:
+            mapping[root_j] = root_i
+        return mapping
+
+    mapping = np.array(range(len(centers)))
+
+    distances = np.ones((len(centers), len(centers))) * np.inf
+    for i in range(len(centers)):
+        for j in range(i + 1, len(centers)):
+            if i != j:
+                distances[i, j] = np.linalg.norm(centers[i] - centers[j])
+
+    num_classes_to_join = len(centers) - num_classes
+    for _ in range(num_classes_to_join):
+        i, j = np.unravel_index(np.argmin(distances), distances.shape)
+        mapping = merge_classes(mapping, i, j)
+        distances[i, j] = np.inf
+        print(f"joined {i} and {j} (both now in class {find_root(mapping,i)})")
+
+    final_mapping = np.zeros(len(centers))
+    for i in range(len(centers)):
+        final_mapping[i] = find_root(mapping, i)
+
+    joined_predictions = final_mapping[y_pred]
+    return joined_predictions
+
+
+def load_dataset(dataset_name, cache_path="../cache"):
+
+    dataset_filename = f"{cache_path}/{dataset_name}.pickle"
+    with open(dataset_filename, "rb") as f:
+        dataset_info = pickle.load(f)
+
+    X, y = dataset_info["dataset"]
+    dimension = X.shape[-1]
+    if "X2D" in dataset_info.keys():
+        transformed_points = dataset_info["X2D"]
+    elif dimension > 2:
+        transformed_points = corc.utils.get_TSNE_embedding(X)
+    else:
+        transformed_points = X
+    return X, y, transformed_points

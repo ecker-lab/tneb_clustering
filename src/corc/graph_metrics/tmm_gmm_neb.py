@@ -25,7 +25,7 @@ def t_logpdf2(x, loc, shape, df):
     if not loc.shape:
         return jstats.t.logpdf(x, df, loc=loc, scale=jnp.sqrt(shape))
     else:
-        n = loc.shape[-1]
+        n_dims = loc.shape[-1]
         if not np.shape(shape):
             y = x - loc
             # TODO: Implement this
@@ -33,16 +33,16 @@ def t_logpdf2(x, loc, shape, df):
                 "multivariate_t.logpdf doesn't support scalar shape"
             )
         else:
-            if shape.ndim < 2 or shape.shape[-2:] != (n, n):
+            if shape.ndim < 2 or shape.shape[-2:] != (n_dims, n_dims):
                 raise ValueError("multivariate_t.logpdf got incompatible shapes")
 
             # actual computation starts here
-            u = 1 / 2 * (df + n)
+            u = 1 / 2 * (df + n_dims)
             L = lax.linalg.cholesky(shape)
             y = lax.linalg.triangular_solve(L, x - loc, lower=True, transpose_a=True)
             return (
                 -u * jnp.log(1 + 1 / df * jnp.einsum("...i,...i->...", y, y))
-                - n / 2 * jnp.log(df * np.pi)
+                - n_dims / 2 * jnp.log(df * np.pi)
                 + jax.scipy.special.gammaln(u)
                 - jax.scipy.special.gammaln(1 / 2 * df)
                 - jnp.log(L.diagonal(axis1=-1, axis2=-2)).sum(-1)
@@ -54,13 +54,13 @@ def t_logpdf2(x, loc, shape, df):
 @jax.jit
 def t_logpdf(x, loc, shape, df):
     # we trust that everything comes in the right shape
-    n = loc.shape[-1]
-    u = 1 / 2 * (df + n)
+    n_dims = loc.shape[-1]
+    u = 1 / 2 * (df + n_dims)
     L = lax.linalg.cholesky(shape)
     y = lax.linalg.triangular_solve(L, x - loc, lower=True, transpose_a=True)
     return (
         -u * jnp.log(1 + 1 / df * jnp.einsum("...i,...i->...", y, y))
-        - n / 2 * jnp.log(df * np.pi)
+        - n_dims / 2 * jnp.log(df * np.pi)
         + jax.scipy.special.gammaln(u)
         - jax.scipy.special.gammaln(1 / 2 * df)
         - jnp.log(L.diagonal(axis1=-1, axis2=-2)).sum(-1)
@@ -94,6 +94,26 @@ def tmm_jax(x, means, scales, weights):
     p = jnp.stack(p, axis=-1)
     p = jax.scipy.special.logsumexp(p, axis=-1)
     return p
+
+
+@jax.jit
+def predict_tmm_jax(X, means, covs, weights):
+    # Initialize an array to hold log probabilities for each component
+    logprobs_jax = jnp.zeros((len(weights), X.shape[0]))  # (n_components, n_samples)
+
+    for i, (mean, cov, weight) in enumerate(zip(means, covs, weights)):
+        # Calculate logpdf for each component and add the log weight
+        logprobs_jax = logprobs_jax.at[i].set(
+            t_logpdf(x=X, df=1.0, loc=mean, shape=cov) + jnp.log(weight)
+        )
+    # print(logprobs_jax.shape)
+    # logprobs_jax = logprobs_jax - jax.scipy.special.logsumexp(logprobs_jax, axis=0)
+
+    # Find the index of the maximum log probability for each sample
+    probs = jnp.exp(logprobs_jax)
+    probs = jnp.nan_to_num(probs, nan=0.0)
+    predictions_jax = jnp.argmax(probs, axis=0)
+    return predictions_jax, probs
 
 
 # the loss of the interpolation
@@ -155,16 +175,10 @@ def equidistant_interpolate(path):
     # Interpolate
     t = jnp.linspace(0, 1, num_points)
     interpolated_path = jax.vmap(
-        lambda t_val: jnp.interp(
-            t_val,
-            arc_lengths,
-            path[:, 0],
-            # width=3  # optional, for better gradient behavior, but not JIT compatible
+        lambda t_val: jnp.apply_along_axis(
+            lambda x: jnp.interp(t_val, arc_lengths, x), 0, path
         )
     )(t)
-
-    # Broadcast to all dimensions (assuming path shape is (N, D))
-    interpolated_path = jnp.stack([interpolated_path] * path.shape[1], axis=1)
 
     return interpolated_path
 
@@ -207,17 +221,7 @@ def compute_interpolation(
     return path, temperatures, probabilities
 
 
-def compute_neb_paths(mixture_model, iterations=1000):
-    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
-        locations = mixture_model.means_
-        covs = mixture_model.covariances_
-        weights = mixture_model.weights_
-        model_type = "gmm"
-    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
-        locations = mixture_model.location
-        covs = np.transpose(mixture_model.scale, axes=(2, 0, 1))
-        weights = mixture_model.mix_weights
-        model_type = "tmm"
+def compute_neb_paths(locations, covs, weights, model_type, iterations=1000):
     n_components = len(locations)
 
     adjacency = np.zeros(
@@ -250,7 +254,7 @@ def compute_neb_paths(mixture_model, iterations=1000):
         logprobs[(i, j)] = logprobs[(j, i)] = interpolation_probs
 
         # evaluate score of elastic band (minimum value along the path)
-        adjacency[i, j] = adjacency[j, i] = min(interpolation_probs)
+        adjacency[i, j] = adjacency[j, i] = jnp.min(interpolation_probs)
 
     raw_adjacency = adjacency.copy()
     adjacency = compute_mst_distances(raw_adjacency)

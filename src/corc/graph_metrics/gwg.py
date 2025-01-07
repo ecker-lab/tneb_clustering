@@ -7,6 +7,7 @@ import seaborn as sns
 
 
 from corc.graph_metrics.graph import GWGGraph
+import corc.utils
 
 
 class GWG(GWGGraph):
@@ -175,8 +176,10 @@ class GWG(GWGGraph):
         cluster_means = self.graph_data["nodes"]
 
         if X2D is not None:
-            cluster_means = X2D.transform(cluster_means)
-        self.graph_data["nodes"] = cluster_means
+            cluster_means = corc.utils.snap_points_to_TSNE(
+                points=cluster_means, data_X=self.data, transformed_X=X2D
+            )
+            self.graph_data["nodes"] = cluster_means
 
         plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
 
