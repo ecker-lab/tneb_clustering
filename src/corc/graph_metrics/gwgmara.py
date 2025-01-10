@@ -178,7 +178,7 @@ class GWGMara(GWGGraph):
         else:
             plt.show()
 
-    def plot_graph(self, X2D=None, n_clusters=None):
+    def plot_graph(self, X2D=None, target_num_clusters=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(

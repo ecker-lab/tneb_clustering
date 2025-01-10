@@ -180,7 +180,7 @@ def main():
                 "TMM-NEB",
                 "GMM-NEB",
             ]:
-                algorithm.plot_graph(X2D=X2D, n_clusters=len(np.unique(y)))
+                algorithm.plot_graph(X2D=X2D, target_num_clusters=len(np.unique(y)))
 
             ari_score = sklearn.metrics.adjusted_rand_score(y, y_pred)
             plt.text(0.02, 0.9, f"ARI {ari_score:.2f}", transform=plt.gca().transAxes)

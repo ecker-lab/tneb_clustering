@@ -102,7 +102,7 @@ class Graph:
             self.create_graph(save=False, plot=False, return_graph=False)
         return self.graph_data
 
-    def plot_graph(self, transformation=None, n_clusters=None):
+    def plot_graph(self, transformation=None, target_num_clusters=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(
