@@ -96,10 +96,8 @@ class NEB(Graph):
         """
         self.mixture_model.fit(data)
 
-        # extract centers for TMM/GMM
-        if isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
-            self.centers_ = self.mixture_model.means_
-        elif isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
+        # make sure that TMM converged (this is sometimes problematic)
+        if isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
             # retry fitting if it failed before - happens regularly for high-dim datasets
             for _ in range(self.n_init):
                 if self.mixture_model.df_ is None:
@@ -109,42 +107,35 @@ class NEB(Graph):
                     self.mixture_model.tol = 1e-4  # default is 1e-5
                     self.mixture_model.fit(data)
 
-            # extract mixture model components
-            self.old_mixture_model = self.mixture_model
+        self.old_mixture_model = self.mixture_model
+        if isinstance(self.old_mixture_model, studenttmixture.EMStudentMixture):
             self.mixture_model = (
                 corc.studentmixture.StudentMixture.from_EMStudentMixture(
                     mixture_model=self.old_mixture_model
                 )
             )
-            original_num_components = len(self.mixture_model.weights)
-            self.mixture_model.print_elongations_and_counts(data)
-            self.mixture_model.filter_components(
-                data_X=data,
-                min_cluster_size=self.min_cluster_size,
-                max_elongation=self.max_elongation,
-            )
-            self.centers_ = self.mixture_model.centers
-
-            print(
-                f"After filtering {original_num_components} components, we are left with {len(self.mixture_model.weights)} components"
-            )
-            ## TODO - remove later or add debug flag
-            if original_num_components != len(self.mixture_model.weights):
-                self.mixture_model.print_elongations_and_counts(data)
-
-        # extract mixture model parameters
-        if isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
-            locations = self.mixture_model.means_
-            covs = self.mixture_model.covariances_
-            weights = self.mixture_model.weights_
-            model_type = "gmm"
-        elif isinstance(self.mixture_model, corc.studentmixture.StudentMixture):
-            locations = self.mixture_model.centers
-            covs = self.mixture_model.covs
-            weights = self.mixture_model.weights
             model_type = "tmm"
-        else:
-            raise Exception("self.mixture model is not a valied Mixture Model.")
+        elif isinstance(self.old_mixture_model, sklearn.mixture.GaussianMixture):
+            self.mixture_model = corc.studentmixture.GaussianMixtureModel.from_sklearn(
+                self.old_mixture_model
+            )
+            model_type = "gmm"
+
+        original_num_components = len(self.mixture_model.weights)
+        self.mixture_model.print_elongations_and_counts(data)
+        self.mixture_model.filter_components(
+            data_X=data,
+            min_cluster_size=self.min_cluster_size,
+            max_elongation=self.max_elongation,
+        )
+        self.centers_ = self.mixture_model.centers
+
+        print(
+            f"After filtering {original_num_components} components, we are left with {len(self.mixture_model.weights)} components"
+        )
+        ## TODO - remove later or add debug flag
+        if original_num_components != len(self.mixture_model.weights):
+            self.mixture_model.print_elongations_and_counts(data)
 
         # compute NEB paths. This is a very time-consuming step
         (
@@ -154,25 +145,15 @@ class NEB(Graph):
             self.temps_,
             self.logprobs_,
         ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths(
-            locations=locations,
-            covs=covs,
-            weights=weights,
+            means=self.mixture_model.centers,
+            covs=self.mixture_model.covs,
+            weights=self.mixture_model.weights,
             model_type=model_type,
             iterations=self.iterations,
             knn=knn,
         )
-
         # check quality of generated paths
-        equidistance_factor, all_factors = (
-            corc.graph_metrics.tmm_gmm_neb.evaluate_equidistance(self.paths_)
-        )
-        if equidistance_factor > 10:
-            print(
-                f"WARNING: the path is not equidistant! longest segment {equidistance_factor} times too long"
-            )
-            for edge in all_factors.keys():
-                if all_factors[edge] > 10:
-                    print(f"{edge} has factor {all_factors[edge]}")
+        corc.graph_metrics.tmm_gmm_neb.evaluate_equidistance(self.paths_)
 
     def predict(self, data_X):
         if self.paths_ is None:  # fitting did not yet take place
@@ -221,20 +202,12 @@ class NEB(Graph):
         return norm_adjacency
 
     def get_centers(self):
-        # just extract mixture model centers from the different mixture model types
-        if isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
-            locations = self.mixture_model.means_
-        elif isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
-            locations = self.mixture_model.location
-        elif isinstance(self.mixture_model, corc.studentmixture.StudentMixture):
-            locations = self.mixture_model.centers
-        self.centers_ = locations
-        return locations
+        self.centers_ = self.mixture_model.centers
+        return self.centers_
 
     def get_merged_pairs(self, target_num_classes, only_mst_edges=True):
         thresholds_dict, clustering_dict = self.get_thresholds_and_cluster_numbers()
         num_classes = self.get_best_cluster_number(thresholds_dict, target_num_classes)
-        threshold = thresholds_dict[num_classes]
         merging_strategy = clustering_dict[num_classes]
 
         pairs = [

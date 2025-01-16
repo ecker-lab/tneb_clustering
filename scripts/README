@@ -28,6 +28,10 @@ mnist32
 mnist64
 """ | xargs -P 6 -I {} nice -6 python scripts/compute_clustering_pickles.py {}
 
+
+""" | xargs -P 6 -I {} nice -6 python scripts/stability_plots.py -t overclustering -d {} 
+""" | xargs -P 6 -I {} nice -6 python scripts/stability_plots.py -t overclustering -d {} --gmm 
+
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.01; echo """
     noisy_circles
     noisy_moons

@@ -256,10 +256,12 @@ def plot_field(
     n_components = len(locations)
 
     # Compute TSNE if necessary
-    if data_X.shape[-1] > 2:    
+    if data_X.shape[-1] > 2:
         if transformed_points is None:
             transformed_points = corc.utils.get_TSNE_embedding(data_X)
-        locations = corc.utils.snap_points_to_TSNE(locations, data_X, transformed_points)
+        locations = corc.utils.snap_points_to_TSNE(
+            locations, data_X, transformed_points
+        )
     else:
         transformed_points = data_X
 
@@ -295,7 +297,9 @@ def plot_field(
 
     # plot the raw data
     if plot_points:
-        axis.scatter(transformed_points[:, 0], transformed_points[:, 1], s=10, label="raw data")
+        axis.scatter(
+            transformed_points[:, 0], transformed_points[:, 1], s=10, label="raw data"
+        )
 
     # plot cluster centers and IDs
     axis.scatter(
@@ -392,6 +396,7 @@ def predict_by_joining_closest_clusters(centers, y_pred, num_classes):
 
 def load_dataset(dataset_name, cache_path="../cache"):
 
+    dataset_name = dataset_name.replace(" ", "_")
     dataset_filename = f"{cache_path}/{dataset_name}.pickle"
     with open(dataset_filename, "rb") as f:
         dataset_info = pickle.load(f)

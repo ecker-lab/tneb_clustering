@@ -17,29 +17,29 @@ import optax
 # evaluates multivariate T dist at x, return logpdf - checks input
 # from https://gist.github.com/yuneg11/5b493ab689f2c46fce50f19aec2df5b4
 @jax.jit
-def t_logpdf2(x, loc, shape, df):
+def t_logpdf2(X, mean, cov, df):
     # TODO: Properly handle df == np.inf
     # if df == np.inf:
     #   return multivariate_normal.logpdf(x, loc, shape)
     # x, loc, shape, df = jnp._promote_dtypes_inexact(x, loc, shape, df)
-    if not loc.shape:
-        return jstats.t.logpdf(x, df, loc=loc, scale=jnp.sqrt(shape))
+    if not mean.shape:
+        return jstats.t.logpdf(X, df, loc=mean, scale=jnp.sqrt(cov))
     else:
-        n_dims = loc.shape[-1]
-        if not np.shape(shape):
-            y = x - loc
+        n_dims = mean.shape[-1]
+        if not np.shape(cov):
+            y = X - mean
             # TODO: Implement this
             raise NotImplementedError(
                 "multivariate_t.logpdf doesn't support scalar shape"
             )
         else:
-            if shape.ndim < 2 or shape.shape[-2:] != (n_dims, n_dims):
+            if cov.ndim < 2 or cov.shape[-2:] != (n_dims, n_dims):
                 raise ValueError("multivariate_t.logpdf got incompatible shapes")
 
             # actual computation starts here
             u = 1 / 2 * (df + n_dims)
-            L = lax.linalg.cholesky(shape)
-            y = lax.linalg.triangular_solve(L, x - loc, lower=True, transpose_a=True)
+            L = lax.linalg.cholesky(cov)
+            y = lax.linalg.triangular_solve(L, X - mean, lower=True, transpose_a=True)
             return (
                 -u * jnp.log(1 + 1 / df * jnp.einsum("...i,...i->...", y, y))
                 - n_dims / 2 * jnp.log(df * np.pi)
@@ -52,12 +52,12 @@ def t_logpdf2(x, loc, shape, df):
 # evaluates multivariate T dist at x, return logpdf - this version does not check the input
 # from https://gist.github.com/yuneg11/5b493ab689f2c46fce50f19aec2df5b4
 @jax.jit
-def t_logpdf(x, loc, shape, df):
+def t_logpdf(X, mean, cov, df):
     # we trust that everything comes in the right shape
-    n_dims = loc.shape[-1]
+    n_dims = mean.shape[-1]
     u = 1 / 2 * (df + n_dims)
-    L = lax.linalg.cholesky(shape)
-    y = lax.linalg.triangular_solve(L, x - loc, lower=True, transpose_a=True)
+    L = lax.linalg.cholesky(cov)
+    y = lax.linalg.triangular_solve(L, X - mean, lower=True, transpose_a=True)
     return (
         -u * jnp.log(1 + 1 / df * jnp.einsum("...i,...i->...", y, y))
         - n_dims / 2 * jnp.log(df * np.pi)
@@ -76,23 +76,23 @@ def gmm_jax(x, means, covs, weights):
     for mean, cov, weight in zip(means, covs, weights):
         p.append(jstats.multivariate_normal.logpdf(x, mean, cov) + jnp.log(weight))
 
-    # logsumexp
+    # logsumexp (note that logpdf might return NaN because jax only operates on 32bit precision)
     p = jnp.stack(p, axis=-1)
-    p = jax.scipy.special.logsumexp(p, axis=-1)
+    p = jax.scipy.special.logsumexp(jnp.nan_to_num(p, nan=-jnp.inf), axis=-1)
     return p
 
 
 @jax.jit
-def tmm_jax(x, means, scales, weights):
+def tmm_jax(X, means, covs, weights):
     p = []
 
     # pdfs of the individual components
-    for mean, scale, weight in zip(means, scales, weights):
-        p.append(t_logpdf(x=x, df=1.0, loc=mean, shape=scale) + jnp.log(weight))
+    for mean, cov, weight in zip(means, covs, weights):
+        p.append(t_logpdf(X=X, df=1.0, mean=mean, cov=cov) + jnp.log(weight))
 
-    # adding them all up
+    # adding them all up (note that logpdf might return NaN because jax only operates on 32bit precision)
     p = jnp.stack(p, axis=-1)
-    p = jax.scipy.special.logsumexp(p, axis=-1)
+    p = jax.scipy.special.logsumexp(jnp.nan_to_num(p, nan=-jnp.inf), axis=-1)
     return p
 
 
@@ -104,10 +104,26 @@ def predict_tmm_jax(X, means, covs, weights):
     for i, (mean, cov, weight) in enumerate(zip(means, covs, weights)):
         # Calculate logpdf for each component and add the log weight
         logprobs_jax = logprobs_jax.at[i].set(
-            t_logpdf(x=X, df=1.0, loc=mean, shape=cov) + jnp.log(weight)
+            t_logpdf(X=X, df=1.0, mean=mean, cov=cov) + jnp.log(weight)
         )
-    # print(logprobs_jax.shape)
-    # logprobs_jax = logprobs_jax - jax.scipy.special.logsumexp(logprobs_jax, axis=0)
+
+    # Find the index of the maximum log probability for each sample
+    probs = jnp.exp(logprobs_jax)
+    probs = jnp.nan_to_num(probs, nan=0.0) # NaNs might occur in logpdf because jax uses 32bits
+    predictions_jax = jnp.argmax(probs, axis=0)
+    return predictions_jax, probs
+
+
+@jax.jit
+def predict_gmm_jax(X, means, covs, weights):
+    # Initialize an array to hold log probabilities for each component
+    logprobs_jax = jnp.zeros((len(weights), X.shape[0]))  # (n_components, n_samples)
+
+    for i, (mean, cov, weight) in enumerate(zip(means, covs, weights)):
+        # Calculate logpdf for each component and add the log weight
+        logprobs_jax = logprobs_jax.at[i].set(
+            jstats.multivariate_normal.logpdf(X, mean, cov) + jnp.log(weight)
+        )
 
     # Find the index of the maximum log probability for each sample
     probs = jnp.exp(logprobs_jax)
@@ -117,54 +133,47 @@ def predict_tmm_jax(X, means, covs, weights):
 
 
 # the loss of the interpolation
-def loss(ms, means, covs, weights, dif_refrence, mixture_model="tmm"):
+def loss(X, means, covs, weights, dif_refrence, mixture_model="tmm"):
     # maximize the negative log likelihood
     if mixture_model == "tmm":
-        nll = -tmm_jax(ms, means, covs, weights).sum()
+        nll = -tmm_jax(X, means, covs, weights).sum()
     elif mixture_model == "gmm":
-        nll = -gmm_jax(ms, means, covs, weights).sum()
+        nll = -gmm_jax(X, means, covs, weights).sum()
     else:
         raise ValueError("mixture_model must be either 'tmm' or 'gmm'")
 
-    # # calculate the difference between successive points
-    # dif = jnp.diff(ms, axis=0)
-    # dif = (dif**2).sum(axis=1)
-    #
-    # # penalize the difference between the points compared to the reference
-    # # difference from the linear interpolation
-    # dif = (dif - dif_refrence) ** 2
-    # dif = dif.sum()
-
     # the loss is just the tmm/gmm value
-    return nll * 1e-1  # + dif * 1e-2
+    return nll
 
 
 # perform gradient descent on the points
 # @jax.jit
-def step(ms, means, covs, weights, dif_refrence, mixture_model="tmm"):
-    g = jax.grad(loss)(
-        ms, means, covs, weights, dif_refrence, mixture_model=mixture_model
+def step(X, means, covs, weights, dif_refrence, mixture_model="tmm", learning_rate=0.1):
+    gradient = jax.grad(loss)(
+        X, means, covs, weights, dif_refrence, mixture_model=mixture_model
     )
-    ms_new = ms - 1e-1 * g
-    ms = ms.at[1:-1].set(ms_new[1:-1])
-    return ms
+    X_new = X - learning_rate * gradient
+    X = X.at[1:-1].set(X_new[1:-1])
+    return X
 
 
 # reinterpolate the points to have a uniform distance along the same path
+# this function seems to be no longer in use and is superseded by equidistant_interpolate
 @jax.jit
-def reinterpolate(ms):
-    dif = jnp.diff(ms, axis=0)
+def reinterpolate(X):
+    dif = jnp.diff(X, axis=0)
     dif = (dif**2).sum(axis=1) ** 0.5  # euclidean dist between successive points
     dif = jnp.cumsum(dif)
     dif = jnp.concatenate([jnp.array([0]), dif])
     dif = dif / dif[-1]
 
-    ts = jnp.linspace(0, 1, ms.shape[0])
-    rms = jax.vmap(jnp.interp, in_axes=(None, None, -1))(ts, dif, ms)
+    ts = jnp.linspace(0, 1, X.shape[0])
+    rms = jax.vmap(jnp.interp, in_axes=(None, None, -1))(ts, dif, X)
     return rms.T
 
 
 @jax.jit
+# reinterpolate the points to have a uniform distance along the same path
 def equidistant_interpolate(path):
     num_points = 1024
     # Calculate arc lengths
@@ -221,8 +230,8 @@ def compute_interpolation(
     return path, temperatures, probabilities
 
 
-def compute_neb_paths(locations, covs, weights, model_type, iterations=1000, knn=None):
-    n_components = len(locations)
+def compute_neb_paths(means, covs, weights, model_type, iterations=1000, knn=None):
+    n_components = len(means)
 
     adjacency = np.zeros(
         (n_components, n_components)
@@ -237,9 +246,7 @@ def compute_neb_paths(locations, covs, weights, model_type, iterations=1000, knn
         assert isinstance(knn, int) and knn > 0, "knn must be a positive integer"
 
         # compute k nearest neighbors for each node
-        distances = jnp.linalg.norm(
-            locations[:, None, :] - locations[None, :, :], axis=-1
-        )
+        distances = jnp.linalg.norm(means[:, None, :] - means[None, :, :], axis=-1)
         indices = jnp.argsort(distances)[
             :, 1 : (knn + 1)
         ]  # skipping (i,i) which is always is the closest
@@ -264,7 +271,7 @@ def compute_neb_paths(locations, covs, weights, model_type, iterations=1000, knn
         path_positions, temperatures, interpolation_probs = compute_interpolation(
             i,
             j,
-            means=locations,
+            means=means,
             covs=covs,
             weights=weights,
             iterations=iterations,
@@ -361,4 +368,12 @@ def evaluate_equidistance(paths):
             all_factors[path_index] = factor
             if factor > worst_factor:
                 worst_factor = factor
+
+    if worst_factor > 10:
+        print(
+            f"WARNING: the path is not equidistant! longest segment {equidistance_factor} times too long"
+        )
+        for edge in all_factors.keys():
+            if all_factors[edge] > 10:
+                print(f"{edge} has factor {all_factors[edge]}")
     return worst_factor, all_factors
