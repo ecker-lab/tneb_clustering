@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import sklearn.datasets
 import functools
+from sklearn.preprocessing import StandardScaler
 
 
 def vec2d_from_angle(angle: float | np.ndarray) -> np.ndarray:
@@ -20,6 +21,7 @@ def clusterlab_dataset1() -> tuple[np.ndarray, np.ndarray]:
     """
     # generate the normally distributed data
     X = np.random.normal(size=(100, 2))
+    X = StandardScaler().fit_transform(X)
 
     # the cluster label is always zero, because there is only one cluster
     y = np.zeros(100)
@@ -62,6 +64,7 @@ def clusterlab_dataset2() -> tuple[np.ndarray, np.ndarray]:
     # combine the data points and the cluster labels into single arrays
     Xs = np.vstack(Xs)
     ys = np.concatenate(ys)
+    Xs = StandardScaler().fit_transform(Xs)
     return Xs, ys
 
 
@@ -296,6 +299,7 @@ def bowtie_dataset(n=256):
     R = np.array([[c, -s], [s, c]], dtype="float32")
 
     X = X @ R
+    X = StandardScaler().fit_transform(X)
     return X, y
 
 
@@ -331,6 +335,7 @@ def zigzag_dataset(n=64, rho=0.8):
 
     X = np.concatenate(Xs)
     y = np.concatenate(ys)
+    X = StandardScaler().fit_transform(X)
     return X, y
 
 
@@ -352,6 +357,7 @@ def zigzig_dataset(n=64, rho=0.9):
 
     X = np.concatenate(Xs)
     y = np.concatenate(ys)
+    X = StandardScaler().fit_transform(X)
     return X, y
 
 
@@ -368,6 +374,7 @@ def uniform_circle(n=256, r=1):
     X += z
 
     y = np.zeros(n)
+    X = StandardScaler().fit_transform(X)
     return X, y
 
 
@@ -377,6 +384,7 @@ def uniform_square(n=256, r=1):
     """
     X = np.random.uniform(-r, r, size=(n, 2))
     y = np.zeros(n)
+    X = StandardScaler().fit_transform(X)
     return X, y
 
 
@@ -390,6 +398,7 @@ def aniso_blobs(n=256):
     )
 
     X = X @ np.array([[0.6, -0.6], [-0.4, 0.8]], dtype="float32")
+    X = StandardScaler().fit_transform(X)
     return X, y
 
 

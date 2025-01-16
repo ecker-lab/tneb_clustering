@@ -280,7 +280,7 @@ def plot_tmm_models(
         )
 
         tmm_model.labels = data_y
-        tmm_model.plot_graph(X2D=transformed_X)
+        tmm_model.plot_graph(X2D=transformed_X, target_num_clusters=num_classes)
 
         # Compute ARI score
         ari_score = sklearn.metrics.adjusted_rand_score(data_y, y_pred)

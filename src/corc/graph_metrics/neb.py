@@ -75,7 +75,7 @@ class NEB(Graph):
                 n_init=n_init,
                 random_state=seed,
                 init_params="kmeans",
-                covariance_type="spherical",
+                covariance_type="full",  # `full` to make it consistent with the TMM covariance
             )
         self.n_components = n_components
         self.n_neighbors = (
@@ -90,7 +90,7 @@ class NEB(Graph):
             max_elongation if max_elongation is not None else 500 * latent_dim**2
         )
 
-    def fit(self, data):
+    def fit(self, data, knn=5):
         """
         data: data to be fitted on.
         """
@@ -128,7 +128,9 @@ class NEB(Graph):
             print(
                 f"After filtering {original_num_components} components, we are left with {len(self.mixture_model.weights)} components"
             )
-            self.mixture_model.print_elongations_and_counts(data)
+            ## TODO - remove later or add debug flag
+            if original_num_components != len(self.mixture_model.weights):
+                self.mixture_model.print_elongations_and_counts(data)
 
         # extract mixture model parameters
         if isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
@@ -143,6 +145,7 @@ class NEB(Graph):
             model_type = "tmm"
         else:
             raise Exception("self.mixture model is not a valied Mixture Model.")
+
         # compute NEB paths. This is a very time-consuming step
         (
             self.adjacency_,
@@ -156,6 +159,7 @@ class NEB(Graph):
             weights=weights,
             model_type=model_type,
             iterations=self.iterations,
+            knn=knn,
         )
 
         # check quality of generated paths
@@ -169,10 +173,6 @@ class NEB(Graph):
             for edge in all_factors.keys():
                 if all_factors[edge] > 10:
                     print(f"{edge} has factor {all_factors[edge]}")
-
-        # normalize adjacency
-        norm_adjacency = self.adjacency_ - np.min(self.adjacency_)
-        self.adjacency_ = norm_adjacency / np.max(norm_adjacency)
 
     def predict(self, data_X):
         if self.paths_ is None:  # fitting did not yet take place
@@ -201,7 +201,27 @@ class NEB(Graph):
 
         return predictions
 
+    def normalize_adjacency(adjacency):
+        """
+        normalize adjacency to be between 0 and 1 for the sake of plotting
+        """
+        if np.isnan(adjacency).any():
+            print(f"Adjacency contains {np.isnan(adjacency).sum()} NaN values.")
+
+        # adjacency may contain inf values which we need to actively ignore
+        finite_vals = adjacency[np.isfinite(adjacency)]
+        norm_adjacency = adjacency - np.nanmin(finite_vals)
+
+        finite_vals = norm_adjacency[np.isfinite(norm_adjacency)]
+        norm_adjacency = norm_adjacency / np.nanmax(finite_vals)
+
+        # reset selfloops
+        np.fill_diagonal(norm_adjacency, 0)
+
+        return norm_adjacency
+
     def get_centers(self):
+        # just extract mixture model centers from the different mixture model types
         if isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
             locations = self.mixture_model.means_
         elif isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
@@ -242,23 +262,20 @@ class NEB(Graph):
         # apply TSNE to get down to 2D
         # embeddings, cluster_means = self._dim_reduction(self.centers_)
 
-        # edges are expected in the form of a dictionary, so we have to convert out np array
+        # edges are expected in the form of a dictionary, so we have to convert our np array
         edges = {
             (i, j): self.adjacency_[i, j]
             for i, j in itertools.combinations(range(self.adjacency_.shape[0]), 2)
         }
 
-        # normalized edges
-        norm_adjacency = self.adjacency_ - np.min(self.adjacency_)
-        norm_adjacency /= np.max(norm_adjacency)
-
+        normalized_adjacency = self.normalize_adjacency(self.adjacency_)
         normalized_edges = {
-            (i, j): norm_adjacency[i, j]
-            for i, j in itertools.combinations(range(self.adjacency_.shape[0]), 2)
+            (i, j): normalized_adjacency[i, j]
+            for i, j in itertools.combinations(range(normalized_adjacency.shape[0]), 2)
         }
 
         self.graph_data = {
-            "nodes": self.centers_,
+            "nodes": self.get_centers(),
             # "nodes_org_space": self.centers_,
             "edges": normalized_edges,
             "raw_edges": edges,
@@ -278,7 +295,6 @@ class NEB(Graph):
         """
         Note: automatic "pairs" computation only works if self.labels or self.n_clusters is set.
         """
-        self.get_graph()  # populates self.graph_data
         cmap = plt.get_cmap("viridis")  # choose a colormap
         if axis is None:
             axis = plt.gca()
@@ -316,15 +332,23 @@ class NEB(Graph):
         else:  # more than 2 dims
 
             # get (pseudo) TSNE embedding
-            if not hasattr(self, "transformed_centers_"):
-                self.transformed_centers_ = corc.utils.snap_points_to_TSNE(
-                    points=self.graph_data["nodes"],
-                    data_X=self.data,
-                    transformed_X=X2D,
+            if X2D is None:
+                raise Exception(
+                    "TSNE transform must be given for high-dimensional datasets"
                 )
-            cluster_means = self.transformed_centers_
+            # if not hasattr(self, "transformed_centers_"):
+            cluster_means = corc.utils.snap_points_to_TSNE(
+                points=self.get_centers(),
+                data_X=self.data,
+                transformed_X=X2D,
+            )
             axis.scatter(
-                *cluster_means.T, alpha=1.0, rasterized=True, marker="X", s=30, c="red"
+                *cluster_means.T,
+                alpha=1.0,
+                rasterized=True,
+                marker="X",
+                s=90,
+                c="black",
             )
 
             # plot paths as straight lines
@@ -333,4 +357,4 @@ class NEB(Graph):
                 for pair in pairs:
                     start = cluster_means[pair[0]]
                     end = cluster_means[pair[1]]
-                    axis.plot(*zip(start, end), color="red", alpha=0.5, lw=1)
+                    axis.plot(*zip(start, end), color="black", alpha=0.5, lw=1)

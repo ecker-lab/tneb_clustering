@@ -1,5 +1,6 @@
 import os
 
+
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
@@ -11,6 +12,7 @@ import matplotlib.pyplot as plt
 import studenttmixture
 import scipy
 import tqdm
+import sklearn.preprocessing
 import sklearn.mixture
 import pickle
 import itertools
@@ -28,7 +30,7 @@ import corc.utils
 
 
 # we create the plots with 9 different seeds/overclustering values plus GT
-NUM_MODELS = 10
+NUM_MODELS = 9
 
 
 def load_datasets():
@@ -83,7 +85,7 @@ def train_multiple_tmm_models_seeds(data_X, data_y, num_seeds=10, neb_iterations
 
 
 def train_multiple_tmm_models_overclustering(
-    data_X, data_y, num_models=10, neb_iterations=25
+    data_X, data_y, num_models=3, neb_iterations=25
 ):
     num_classes = len(np.unique(data_y))
     tmm_models = list()
@@ -97,7 +99,7 @@ def train_multiple_tmm_models_overclustering(
             n_init=(
                 5 if data_X.shape[1] < 10 else 1
             ),  # fitting becomes slow in high dimensions
-            n_components=num_classes + 2 * i,
+            n_components=num_classes + 5 * i,
             mixture_model_type="tmm",
         )
         tmm_model.fit(data=data_X)
@@ -177,7 +179,7 @@ def main(plot_type="seeds", just_ari=False):
         # if os.path.exists(f"figures/stability_{dataset_filename}.pdf"):
         #     continue
 
-        cache_filename = f"cache/stability_{plot_type}_{dataset_filename}.pkl"
+        cache_filename = f"cache/stability/{plot_type}_{dataset_filename}.pkl"
 
         # check if the data is already computed
         tmm_models = None
@@ -187,6 +189,8 @@ def main(plot_type="seeds", just_ari=False):
                 # recompute when not enough seeds have been computed
                 if len(tmm_models) < NUM_MODELS:
                     tmm_models = None
+                else:
+                    print("successfully loaded precomputed TMM models from disk")
 
         # compute tmm models
         if tmm_models is None:

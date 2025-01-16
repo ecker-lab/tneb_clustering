@@ -147,9 +147,9 @@ class Graph:
             return adjacency_matrix
 
     def get_thresholds_and_cluster_numbers(self):
-        adjacency = self._get_adjacency_matrix()
-        thresholds, counts = np.unique(adjacency, return_counts=True)
-        thresholds = sorted(thresholds.tolist())
+        adjacency = self._get_adjacency_matrix().copy()
+        adjacency[adjacency == np.inf] = -np.inf  # np.inf values mean "disconnected"
+        thresholds = sorted(np.append(np.unique(adjacency), np.inf))
 
         threshold_dict = dict()
         clustering_dict = dict()

@@ -685,7 +685,7 @@ class our_datasets:
         ]
 
     def get_datasets(self):
-        return self.select_datasets(self.dataset_selector)
+        return self.select_datasets(DATASET_SELECTOR)
 
     def select_datasets(self, dataset_selector):
         datasets = [

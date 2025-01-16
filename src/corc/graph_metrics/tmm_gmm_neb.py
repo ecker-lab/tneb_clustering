@@ -221,7 +221,7 @@ def compute_interpolation(
     return path, temperatures, probabilities
 
 
-def compute_neb_paths(locations, covs, weights, model_type, iterations=1000):
+def compute_neb_paths(locations, covs, weights, model_type, iterations=1000, knn=None):
     n_components = len(locations)
 
     adjacency = np.zeros(
@@ -233,9 +233,31 @@ def compute_neb_paths(locations, covs, weights, model_type, iterations=1000):
     )  # "procentual" values of the path (used for plotting logprob against distance)
     logprobs = dict()  # actual values at path positions
 
+    if knn is not None:
+        assert isinstance(knn, int) and knn > 0, "knn must be a positive integer"
+
+        # compute k nearest neighbors for each node
+        distances = jnp.linalg.norm(
+            locations[:, None, :] - locations[None, :, :], axis=-1
+        )
+        indices = jnp.argsort(distances)[
+            :, 1 : (knn + 1)
+        ]  # skipping (i,i) which is always is the closest
+        pairs = [
+            (i, int(j))  # the order does not matter
+            for i, row in enumerate(indices)
+            for j in row
+        ]
+        total_pairs = len(pairs)
+
+    else:
+        # compute paths for all pairs
+        pairs = itertools.combinations(range(n_components), r=2)
+        total_pairs = n_components * (n_components - 1) // 2
+
     for i, j in tqdm.tqdm(
-        itertools.combinations(range(n_components), r=2),
-        total=n_components * (n_components - 1) // 2,
+        pairs,
+        total=total_pairs,
         desc=model_type,
     ):
         # compute nudged elastic band
@@ -268,43 +290,39 @@ def compute_mst_distances(adjacency):
     especially useful in cases where NEB did not fully converge for all paths. This is already used in compute_neb_paths
     """
     mst = -scipy.sparse.csgraph.minimum_spanning_tree(-adjacency)
+    dist_matrix, predecessors = scipy.sparse.csgraph.shortest_path(
+        mst, directed=False, unweighted=True, return_predecessors=True, method="BF"
+    )  # note that we use unweighted because we are only interested in the pairwise paths
+    # which are encoded in "predecessors". The dist_matrix would sum up the path instead of
+    # returning the longest path segment.
+
+    # Check whether the MST is "whole" (dist_matrix contains inf values for disconnected graphs)
+    if not np.isfinite(dist_matrix).all():
+        print(
+            "Warning: MST contains multiple connected components. Please consider increasing knn."
+        )
+
+    # compute pairwise distances using shortest path information from the MST
+    distances = -np.ones_like(adjacency) * float("inf")
     num_nodes = adjacency.shape[0]
+    for start_node, target_node in itertools.combinations(range(num_nodes), 2):
+        max_step_length = np.inf
 
-    node_array, predecessors = scipy.sparse.csgraph.breadth_first_order(
-        mst, 0, directed=False, return_predecessors=True
-    )
+        if np.isfinite(dist_matrix[start_node, target_node]):
+            # Walk along path from start to target using "predecessors"
+            current_node = target_node
+            while current_node != start_node:
+                next_node = predecessors[start_node, current_node]
+                max_step_length = min(
+                    max_step_length, adjacency[current_node, next_node]
+                )
+                current_node = next_node
 
-    # initialize distance matrix, -'inf' is neutral
-    distances = np.ones_like(adjacency) * -float("inf")
+        distances[start_node, target_node] = distances[target_node, start_node] = (
+            max_step_length
+        )
 
-    # self-loops
-    for i in range(num_nodes):
-        distances[i][i] = float("inf")
-
-    # insert values
-    mst = mst.tocoo()
-    for u, v, weight in zip(mst.row, mst.col, mst.data):
-        distances[u][v] = distances[v][u] = weight
-
-    marked = np.zeros(adjacency.shape[0])
-    for node in node_array:
-        for other_node in range(num_nodes):
-            if marked[other_node]:
-                # distance is either "direct" or using the parent information
-                direct_dist = distances[node][
-                    other_node
-                ]  # not touched before, possibly -inf
-                indirect_dist = min(
-                    distances[node][predecessors[node]],
-                    distances[predecessors[node]][other_node],
-                )  # the latter is already computed and the first has a value
-                # assign to both directions
-                distances[node][other_node] = max(direct_dist, indirect_dist)
-                distances[other_node][node] = distances[node][other_node]
-
-        marked[node] = 1
-
-    # reset self-loops
+    # set self-loops
     for i in range(num_nodes):
         distances[i, i] = 0
 

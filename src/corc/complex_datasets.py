@@ -3,6 +3,7 @@ from scipy.spatial import distance
 
 # import densired
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 from corc import generation
 
@@ -22,8 +23,10 @@ def make_gaussians(
         distance=None,
         random_state=random_state,
     )
-
-    return gen.sample_embedding(), gen.labels
+    X = gen.sample_embedding()
+    y = gen.labels
+    X = StandardScaler().fit_transform(X)
+    return X, y
 
 
 def make_2d_worms(max_clusters, noise=False, random_state=42):
@@ -58,10 +61,10 @@ def make_2d_worms(max_clusters, noise=False, random_state=42):
         )
 
     X = np.array(X)
-    minX = X.min(axis=0)
-    X = X - minX
+    y = np.array([i[0] for i in labels])
+    X = StandardScaler().fit_transform(X)
 
-    return X, np.array([i[0] for i in labels])
+    return X, y
 
 
 def _gen_one_worm(
@@ -128,9 +131,10 @@ def _gen_one_worm(
 
 def make_Paul15(path="../datasets/paul15_dataset.pkl"):
     df = pd.read_pickle(path)
-    data = np.array(df.iloc[:, :-2], dtype="float64")
-    labels_num = np.array(df["paul15_clusters_num"])
-    return data, labels_num
+    X = np.array(df.iloc[:, :-2], dtype="float64")
+    y = np.array(df["paul15_clusters_num"])
+    X = StandardScaler().fit_transform(X)
+    return X, y
 
 
 def make_densired(dim, n_samples, std=1.0, random_state=42):
@@ -149,16 +153,25 @@ def make_densired(dim, n_samples, std=1.0, random_state=42):
         seed=random_state,
     )
     data = skeleton.generate_data(data_num=n_samples)
-    return data[:, :-1], data[:, -1]
+    X = data[:, :-1]
+    y = data[:, -1]
+    X = StandardScaler().fit_transform(X)
+    return X, y
 
 
 def load_densired(dim, path="../datasets/densired.npz"):
     with open(path, "rb") as f:
         data = np.load(f)
         # "files" within a npz-file cannot be named with numbers only, thus the f-string
-        return data[f"d{dim}"][:, :-1], data[f"d{dim}"][:, -1]
+        X = data[f"d{dim}"][:, :-1]
+        y = data[f"d{dim}"][:, -1]
+        X = StandardScaler().fit_transform(X)
+        return X, y
 
 
 def make_mnist_nd(dim, path="../datasets/mvae_mnist_nd_saved.pkl"):
     df = pd.read_pickle(path)
-    return df["data"][dim], df["labels"][dim]
+    X = df["data"][dim]
+    y = df["labels"][dim]
+    X = StandardScaler().fit_transform(X)
+    return X, y
