@@ -11,10 +11,7 @@ class MixtureModel(ABC):
         self.covs = covs
 
     @abstractmethod
-    def predict(self, data_X, return_probs=False):
-
-    @abstractmethod
-    def score_samples(self, data_X):
+    def predict(self, data_X, return_probs=False): ...
 
     def filter_components(self, data_X, min_cluster_size=10, max_elongation=1000):
         # compute elongations and cluster sizes
