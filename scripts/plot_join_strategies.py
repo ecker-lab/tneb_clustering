@@ -62,7 +62,7 @@ def main():
         default=42,
         help="dataset for the figure",
     )
-    parser.add_argument(
+    p.add_argument(
         "--n_components",
         help="Number of mixture model components. Only used for seed-stability plots",
         default=15,
