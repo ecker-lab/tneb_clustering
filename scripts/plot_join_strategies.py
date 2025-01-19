@@ -98,7 +98,7 @@ def main():
     plt.savefig(f"figures/join_strategies_{opt.dataset}_seed_{opt.seed}_n_components_{opt.n_components}.pdf")
 
 
-def create_plot(X, transformed_points, y, tmm_model):
+def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
     fig, axs = plt.subplots(5, 2, figsize=(24, 20))
     marker_size = 60
 
