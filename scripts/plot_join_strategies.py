@@ -81,7 +81,7 @@ def main():
     if not os.path.exists(alg_filename):
         print(f"File {alg_filename} not found. training a new model.")
         # return -1
-        tmm_model = tmm_model = corc.graph_metrics.neb.NEB(
+        tmm_model = corc.graph_metrics.neb.NEB(
             data=X, labels=y, n_components=opt.n_components, optimization_iterations=500, seed=opt.seed,
         )
         tmm_model.fit(X)
