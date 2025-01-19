@@ -86,7 +86,7 @@ def main():
 
 
 def create_plot(X, transformed_points, y, tmm_model):
-    fig, axs = plt.subplots(4, 2, figsize=(24, 20))
+    fig, axs = plt.subplots(5, 2, figsize=(24, 20))
     marker_size = 60
 
     # ground truth
@@ -139,6 +139,8 @@ def create_plot(X, transformed_points, y, tmm_model):
         centers=tmm_model.mixture_model.centers,
         y_pred=y_pred_full,
         num_classes=len(np.unique(y)),
+        dip_stat=False,
+        data=X
     )
     y_baseline = corc.utils.reorder_colors(y_baseline, y)
     ari_baseline = sklearn.metrics.adjusted_rand_score(y, y_baseline)
@@ -165,7 +167,7 @@ def create_plot(X, transformed_points, y, tmm_model):
     centers = kmeans.cluster_centers_
     kmeans_pred = kmeans.predict(X)
     kmeans_pred_joined = corc.utils.predict_by_joining_closest_clusters(
-        centers=centers, y_pred=kmeans_pred, num_classes=len(np.unique(y))
+        centers=centers, y_pred=kmeans_pred, num_classes=len(np.unique(y)), dip_stat=False, data=X
     )
     kmeans_pred_joined = corc.utils.reorder_colors(kmeans_pred_joined, y)
     ari_kmeans = sklearn.metrics.adjusted_rand_score(y, kmeans_pred_joined)
@@ -190,6 +192,39 @@ def create_plot(X, transformed_points, y, tmm_model):
         title=f"K-Means Baseline (ARI: {ari_kmeans:.2f})",
     )
     print("kmeans done.")
+
+    # now lets add dip-stats merge
+    dip_stat_pred_joined = corc.utils.predict_by_joining_closest_clusters(
+        centers=tmm_model.mixture_model.centers, 
+        y_pred=np.asarray(tmm_model.predict(X).tolist()), 
+        num_classes=len(np.unique(y)), 
+        dip_stat=True, 
+        data=tmm_model.data
+    )
+
+    dip_stat_pred_joined = corc.utils.reorder_colors(dip_stat_pred_joined, y)
+    ari_dip_stat = sklearn.metrics.adjusted_rand_score(y, dip_stat_pred_joined)
+
+    axs[4, 0].scatter(
+        transformed_points[:, 0],
+        transformed_points[:, 1],
+        c=dip_stat_pred_joined,
+        cmap="viridis",
+        s=10,
+    )
+    centers = corc.utils.snap_points_to_TSNE(
+        tmm_model.mixture_model.centers, X, transformed_points
+    )
+    axs[4, 0].scatter(centers[:, 0], centers[:, 1], c="red", marker="X", s=marker_size)
+    axs[4, 0].set_title("TMM-dip stats")
+    plot_mask(
+        transformed_points,
+        (y == dip_stat_pred_joined),
+        correct_mask,
+        axs[4, 1],
+        title=f"TMM-dip stats (ARI: {ari_dip_stat:.2f})",
+    )
+    print("TMM+dip stats done.")
 
     return plt.gcf()
 
