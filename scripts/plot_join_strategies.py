@@ -55,6 +55,19 @@ def main():
         default="densired_soft_8",
         help="dataset for the figure",
     )
+    p.add_argument(
+        "-s",
+        "--seed",
+        type=int,
+        default=42,
+        help="dataset for the figure",
+    )
+    parser.add_argument(
+        "--n_components",
+        help="Number of mixture model components. Only used for seed-stability plots",
+        default=15,
+        type=int,
+    )
     opt = p.parse_args()
 
     # load dataset
@@ -69,7 +82,7 @@ def main():
         print(f"File {alg_filename} not found. training a new model.")
         # return -1
         tmm_model = tmm_model = corc.graph_metrics.neb.NEB(
-            data=X, labels=y, n_components=15, optimization_iterations=500
+            data=X, labels=y, n_components=opt.n_components, optimization_iterations=500, seed=opt.seed,
         )
         tmm_model.fit(X)
         with open(alg_filename, "wb") as f:
@@ -80,9 +93,9 @@ def main():
             print("successfully loaded model from disk")
 
     figure = create_plot(
-        X=X, transformed_points=transformed_points, y=y, tmm_model=tmm_model
+        X=X, transformed_points=transformed_points, y=y, tmm_model=tmm_model, seed=opt.seed, n_components=opt.n_components
     )
-    plt.savefig(f"figures/join_strategies_{opt.dataset}.pdf")
+    plt.savefig(f"figures/join_strategies_{opt.dataset}_seed_{opt.seed}_n_components_{opt.n_components}.pdf")
 
 
 def create_plot(X, transformed_points, y, tmm_model):
@@ -163,7 +176,7 @@ def create_plot(X, transformed_points, y, tmm_model):
     print("Closest done.")
 
     # kmeans
-    kmeans = sklearn.cluster.KMeans(n_clusters=15).fit(X)
+    kmeans = sklearn.cluster.KMeans(n_clusters=n_components, random_state=seed).fit(X)
     centers = kmeans.cluster_centers_
     kmeans_pred = kmeans.predict(X)
     kmeans_pred_joined = corc.utils.predict_by_joining_closest_clusters(
