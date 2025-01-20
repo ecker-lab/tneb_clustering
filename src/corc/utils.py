@@ -15,12 +15,29 @@ import studenttmixture
 import itertools
 import scipy
 import corc.studentmixture
+import diptest
 
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 import jax
 
 GRID_RESOLUTION = 128  # the resolution for the "heatmap" computation for TMM plotting
+
+def compute_projection(data, cluster1, cluster2, means, predictions):
+        c = means[cluster1] - means[cluster2]
+        unit_vector = c / np.linalg.norm(c)
+
+        points1 = data[predictions == cluster1]
+        points2 = data[predictions == cluster2]
+        cluster1_proj = np.dot(points1, unit_vector)
+        cluster2_proj = np.dot(points2, unit_vector)
+
+        mean = (np.mean(cluster1_proj) + np.mean(cluster2_proj)) / 2
+
+        cluster1_proj -= mean
+        cluster2_proj -= mean
+
+        return cluster1_proj, cluster2_proj
 
 
 def cond_mkdir(path):
@@ -310,11 +327,7 @@ def plot_field(
     # plot paths between centers (by default: all)
     if paths is not None:
         if selection is None:
-            selection = (
-                (i, j)
-                for i, j in itertools.combinations(range(n_components), r=2)
-                if i != j
-            )
+            selection = list(itertools.combinations(range(n_components), r=2))
         for i, j in selection:
             path = paths[(i, j)]
             axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5, color="red")
@@ -347,7 +360,7 @@ def best_possible_labels_from_overclustering(y_true, y_pred):
     return y_best
 
 
-def predict_by_joining_closest_clusters(centers, y_pred, num_classes):
+def predict_by_joining_closest_clusters(centers, y_pred, num_classes, data, dip_stat=False, debug=False):
 
     def find_root(mapping, class_index):
         if mapping[class_index] != class_index:
@@ -363,20 +376,77 @@ def predict_by_joining_closest_clusters(centers, y_pred, num_classes):
             mapping[root_j] = root_i
         return mapping
 
-    mapping = np.array(range(len(centers)))
+    def update_centers_after_merge(centers, mapping, i, j):
+        # Get all points that belong to either cluster
+        mask_i = (y_pred == i)
+        mask_j = (y_pred == j)
+        combined_points = data[mask_i | mask_j]
+        
+        # Compute new center as center of mass
+        new_center = np.mean(combined_points, axis=0)
+        
+        # Update the center for cluster i (which is the root)
+        centers[i] = new_center
+        return centers
 
+    def update_distances_after_merge(distances, mapping, i, j, centers, data, y_pred, dip_stat):
+        root_i = find_root(mapping, i)
+        
+        # Set distances between merged clusters to infinity
+        distances[i, j] = distances[j, i] = np.inf
+        
+        if dip_stat:
+            # Recompute dip statistics for the merged cluster with all others
+            for k in range(len(centers)):
+                if k != i and k != j and find_root(mapping, k) == k:  # Only update for active clusters
+                    # Compute new projections with merged cluster
+                    pr1, pr2 = compute_projection(data, root_i, k, centers, y_pred)
+                    dip, _ = diptest.diptest(np.concatenate([pr1, pr2]))
+                    distances[min(root_i, k), max(root_i, k)] = -dip
+        else:
+            # Recompute Euclidean distances from merged cluster to all others
+            for k in range(len(centers)):
+                if k != i and k != j and find_root(mapping, k) == k:  # Only update for active clusters
+                    dist = np.linalg.norm(centers[root_i] - centers[k])
+                    distances[min(root_i, k), max(root_i, k)] = dist
+        
+        # Set all distances involving j to infinity since it's now merged
+        distances[j, :] = distances[:, j] = np.inf
+        
+        return distances
+
+    mapping = np.array(range(len(centers)))
+    centers = centers.copy()  # Create a copy to modify
     distances = np.ones((len(centers), len(centers))) * np.inf
-    for i in range(len(centers)):
-        for j in range(i + 1, len(centers)):
-            if i != j:
+    if dip_stat:
+        for i in range(len(centers)):
+            for j in range(i + 1, len(centers)):
+                pr1, pr2 = compute_projection(data, i, j, centers, y_pred)
+                dip, _ = diptest.diptest(
+                    np.concatenate([pr1, pr2])
+                )
+                distances[i, j] = -dip
+    else:
+        for i in range(len(centers)):
+            for j in range(i + 1, len(centers)):
                 distances[i, j] = np.linalg.norm(centers[i] - centers[j])
 
+    if debug:
+        plt.figure(figsize=(8,8))
+        sns.heatmap(distances.T * (-1), annot=True,  fmt='.2g')
+        plt.show()
     num_classes_to_join = len(centers) - num_classes
     for _ in range(num_classes_to_join):
         i, j = np.unravel_index(np.argmin(distances), distances.shape)
         mapping = merge_classes(mapping, i, j)
-        distances[i, j] = np.inf
+        # Update centers and distances
+        centers = update_centers_after_merge(centers, mapping, i, j)
+        distances = update_distances_after_merge(distances, mapping, i, j, centers, data, y_pred, dip_stat)
         print(f"joined {i} and {j} (both now in class {find_root(mapping,i)})")
+        if debug:
+            plt.figure(figsize=(8,8))
+            sns.heatmap(distances.T * (-1), annot=True,  fmt='.2g')
+            plt.show()
 
     final_mapping = np.zeros(len(centers))
     for i in range(len(centers)):

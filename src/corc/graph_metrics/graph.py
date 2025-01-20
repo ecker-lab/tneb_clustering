@@ -7,6 +7,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sklearn.neighbors import kneighbors_graph
 from abc import ABC, abstractmethod
+from corc.utils import compute_projection
 
 
 class Graph(ABC):
@@ -334,20 +335,7 @@ class GWGGraph(Graph):
 
 
     def _compute_projection(self, cluster1, cluster2, means, predictions):
-        c = means[cluster1] - means[cluster2]
-        unit_vector = c / np.linalg.norm(c)
-
-        points1 = self.data[predictions == cluster1]
-        points2 = self.data[predictions == cluster2]
-        cluster1_proj = np.dot(points1, unit_vector)
-        cluster2_proj = np.dot(points2, unit_vector)
-
-        mean = (np.mean(cluster1_proj) + np.mean(cluster2_proj)) / 2
-
-        cluster1_proj -= mean
-        cluster2_proj -= mean
-
-        return cluster1_proj, cluster2_proj
+        return compute_projection(self.data, cluster1, cluster2, means, predictions)
 
     def plot_thresholds(self):
         threshold_dict, _ = self.get_thresholds_and_cluster_numbers
