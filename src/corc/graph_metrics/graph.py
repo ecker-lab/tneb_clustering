@@ -3,11 +3,13 @@ import os
 import scipy
 import random
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sklearn.neighbors import kneighbors_graph
+from abc import ABC, abstractmethod
 
 
-class Graph:
+class Graph(ABC):
     def __init__(self, latent_dim, data=None, labels=None, path=None, seed=42):
         """
         Initialize the Graph class.
@@ -31,28 +33,21 @@ class Graph:
 
         self.graph_data = {"nodes": None, "edges": None, "nodes_org_space": None}
 
-    def fit(self, data):
+    @abstractmethod
+    def fit(self, data): 
         """
         Abstract method that fits the model. To be implemented by subclasses.
         """
-        pass
+        ...
 
-    def predict(self, data, target_number_classes=0):
-        """
-        Abstract method that predicts the model. To be implemented by subclasses.
-
-        target_number_classes contains number of classes that may be predicted
-            (i.e. possibly merging existing classes to get to the right number)
-        """
-        pass
-
-    def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs):
+    @abstractmethod
+    def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs): 
         """
         Abstract method to create a graph.
 
         This method should be implemented by subclasses.
         """
-        pass
+        ...
 
     def apply_tsne(self, X2D, transform_paths=True, samples_per_path=50):
         # we assume that fitting did take place
@@ -102,7 +97,7 @@ class Graph:
             self.create_graph(save=False, plot=False, return_graph=False)
         return self.graph_data
 
-    def plot_graph(self, transformation=None, target_num_clusters=None):
+    def plot_graph(self, X2D=None, target_num_clusters=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(
@@ -112,15 +107,18 @@ class Graph:
             random_state=42,
             verbose=False,
         )
-        transformation = tsne.fit(self.data)
+        X2D = tsne.fit(self.data)
         """
 
         self.get_graph()  # populates self.graph_data
 
         cluster_means = np.array(self.graph_data["nodes"])
 
-        # if transformation is not None:
-        #     cluster_means = transformation.transform(cluster_means)
+        if X2D is not None:
+            cluster_means = corc.utils.snap_points_to_TSNE(
+                points=cluster_means, data_X=self.data, transformed_X=X2D
+            )
+            self.graph_data["nodes"] = cluster_means
 
         plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
 
@@ -145,6 +143,13 @@ class Graph:
 
             self.adjacency_ = adjacency_matrix
             return adjacency_matrix
+
+    def _get_recoloring(self, pred_labels):
+        adjacency = self._get_adjacency_matrix()
+        n_components, component_labels = scipy.sparse.csgraph.connected_components(
+            adjacency, directed=False
+        )
+        return component_labels[pred_labels]
 
     def get_thresholds_and_cluster_numbers(self):
         adjacency = self._get_adjacency_matrix().copy()
@@ -182,6 +187,82 @@ class Graph:
             )
             print(f"Working with {num_classes} clusters instead.")
             return num_classes
+    
+    def _plt_graph_compare(self, embeddings, pred_labels, save=None, to_norm=False):
+        '''
+        this function makes a plot with right panel being ground truth and left panel being the original overclustered components (before merge) and the weights of the edges across these components. 
+        '''
+        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+        palette = (
+            sns.color_palette(cc.glasbey, n_colors=self.n_components)
+            if self.n_components > 20
+            else sns.color_palette("tab20")
+        )
+
+        # colored by labels
+        axs[0].set_title("Embeddings colored by GT label")
+        for c in range(len(np.unique(self.labels))):
+            axs[0].scatter(
+                *embeddings[self.labels == c].T,
+                s=5,
+                color=palette[c],
+                alpha=1.0,
+                rasterized=True,
+                label=c,
+            )
+        axs[0].legend(bbox_to_anchor=(1, 1), markerscale=3)
+
+        # colored by gmm clustering prediction
+        axs[1].set_title("Clustering and graph")
+        for c in range(self.n_components):
+            axs[1].scatter(
+                *embeddings[pred_labels == c].T,
+                s=5,
+                color=palette[c],
+                alpha=1.0,
+                rasterized=True,
+                label=c,
+            )
+
+        cluster_means = self.graph_data["nodes"]
+        axs[1].scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
+
+        if to_norm:
+            norm = mpl.colors.Normalize(
+                vmin=self.graph_data["norm"][0], vmax=self.graph_data["norm"][1]
+            )
+        for (cm, neigh), dip in self.graph_data["edges"].items():
+            if to_norm:
+                alpha = (1 - norm(dip))
+            else:
+                alpha = dip
+            axs[1].plot(
+                [cluster_means[cm][0], cluster_means[neigh][0]],
+                [cluster_means[cm][1], cluster_means[neigh][1]],
+                alpha=alpha, #1.0,
+                c="black",
+            )
+
+            axs[1].text(
+                (cluster_means[cm][0] + cluster_means[neigh][0]) / 2,
+                (cluster_means[cm][1] + cluster_means[neigh][1]) / 2,
+                f"{dip:.3f}",
+                fontsize=8,
+                alpha=1.0,
+            )
+
+        for ax in axs:
+            ax.axis("off")
+
+        if save:
+            self.path.mkdir(parents=True, exist_ok=True)
+            path = self.path / f"graph_compare{save}"
+            plt.savefig(path, bbox_inches="tight")
+            plt.show()
+            plt.close()
+            print(f"WARNING: saving figure to file {path}")
+        else:
+            plt.show()
 
 
 class GWGGraph(Graph):
@@ -249,27 +330,8 @@ class GWGGraph(Graph):
             pred_labels = tmm.predict(self.data)
             return tmm.location, pred_labels
         else:
-            print("[ERROR] Clustering method not yet implemented.")
-            exit()
+            raise NotImplementedError("[ERROR] Clustering method not yet implemented.")
 
-    def _dim_reduction(self, gmm_means):
-        from openTSNE import TSNE
-
-        if self.latent_dim > 2:
-            tsne = TSNE(
-                perplexity=len(self.data) / 100,
-                metric="euclidean",
-                n_jobs=8,
-                random_state=self.seed,
-                verbose=False,
-            )
-            embeddings = tsne.fit(self.data)
-            cluster_means = embeddings.transform(gmm_means)
-        else:
-            embeddings = self.data
-            cluster_means = gmm_means
-
-        return embeddings, cluster_means
 
     def _compute_projection(self, cluster1, cluster2, means, predictions):
         c = means[cluster1] - means[cluster2]
@@ -286,26 +348,6 @@ class GWGGraph(Graph):
         cluster2_proj -= mean
 
         return cluster1_proj, cluster2_proj
-
-    def _get_recoloring(self, level, clusterings, pred_labels):
-        _, threshold, component_labels = clusterings[level]
-        return component_labels[pred_labels], threshold
-
-    def _get_recoloring(self, pred_labels):
-        adjacency = self._get_adjacency_matrix()
-        n_components, component_labels = scipy.sparse.csgraph.connected_components(
-            adjacency, directed=False
-        )
-        return component_labels[pred_labels]
-
-    def _get_adjacency_matrix(self):
-        adjacency_matrix = np.zeros(shape=(self.n_components, self.n_components))
-
-        for (cm, neigh), weight in self.graph_data["edges"].items():
-            adjacency_matrix[(cm, neigh)] = weight
-            adjacency_matrix[(neigh, cm)] = weight
-
-        return adjacency_matrix
 
     def plot_thresholds(self):
         threshold_dict, _ = self.get_thresholds_and_cluster_numbers

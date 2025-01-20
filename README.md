@@ -33,16 +33,6 @@ Install repo with
 pip install -e .
 ```
 
-## Run experiments
-
-Experiments include the generation of toy data, visualization of data distribution, clustering and calculating a metric to assess clustering tendency.
-
-Start program with
-```
-python main.py
-```
-which loads parameters set in `configs/config.yaml`.
-
 ## Notebooks
 
 There is a folder with example notebooks for different clustering tendency assessment algorithms.
@@ -66,3 +56,5 @@ git submodule deinit -f path/to/submodule
 git rm -f path/to/submodule
 rm -rf .git/modules/path/to/submodule
 ```
+## tsnecude installation
+If tsne-cuda installation causes problem, it is likely that your cuda drivers have different version. For more details and installation, see [here](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).

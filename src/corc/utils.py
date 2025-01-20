@@ -126,23 +126,15 @@ def reorder_colors(y_pred, y_true):
     row_ind, col_ind = linear_sum_assignment(
         -cm
     )  # col_ind returns how to reorder the columns (colors of y_pred)
-    # Create a mapping based on the optimal column assignments
-    permuted_indices = np.zeros_like(y_pred)
 
-    for r, c in zip(row_ind, col_ind):
-        permuted_indices[y_pred == c] = r
-    return permuted_indices
+    mapping = np.argsort(col_ind) # we need the inverse of the assignment
+    y_pred_permuted = mapping[y_pred]
 
+    # equivalent assignment using a for loop
+    # y_pred_permuted = np.zeros_like(y_pred)
+    # for r, c in zip(row_ind, col_ind):
+    #     y_pred_permuted[y_pred == c] = r
 
-def reorder_colors2(y_pred, y_true):
-    cm = confusion_matrix(y_true, y_pred)
-    # Use the Hungarian algorithm to find the optimal assignment
-    row_ind, col_ind = linear_sum_assignment(
-        -cm
-    )  # col_ind returns how to reorder the columns (colors of y_pred)
-    y_pred_permuted = np.argsort(col_ind)[
-        y_pred
-    ]  # we need the inverse mapping which we get through argsort
     return y_pred_permuted
 
 

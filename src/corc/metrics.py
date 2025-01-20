@@ -75,8 +75,7 @@ class Metric():
             results = self.calc_hopkins_statistics(train_latents)
             self.k_results['hopkins'][k, s] = results.mean()
         else:
-            print('[ERROR] Metric not yet implemented.')
-            exit()
+            raise NotImplementedError('[ERROR] Metric not yet implemented.')
 
 
     def summarize(self):
