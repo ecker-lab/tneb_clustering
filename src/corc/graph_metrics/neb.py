@@ -300,6 +300,7 @@ class NEB(Graph):
                 selection=pairs,
                 axis=axis,
                 plot_points=False,
+                plot_ids=False,
             )
 
         else:  # more than 2 dims
@@ -320,7 +321,7 @@ class NEB(Graph):
                 alpha=1.0,
                 rasterized=True,
                 marker="X",
-                s=90,
+                s=60,
                 c="black",
             )
 

@@ -13,6 +13,9 @@ class MixtureModel(ABC):
     @abstractmethod
     def predict(self, data_X, return_probs=False): ...
 
+    @abstractmethod
+    def score_samples(self, data_X): ...
+
     def filter_components(self, data_X, min_cluster_size=10, max_elongation=1000):
         # compute elongations and cluster sizes
         counts = self.get_counts(data_X)
@@ -76,6 +79,11 @@ class GaussianMixtureModel(MixtureModel):
             return predictions, probs
         else:
             return predictions
+
+    def score_samples(self, data_X):
+        return corc.graph_metrics.tmm_gmm_neb.gmm_jax(
+            X=data_X, means=self.centers, covs=self.covs, weights=self.weights
+        )
 
 
 class StudentMixture(MixtureModel):

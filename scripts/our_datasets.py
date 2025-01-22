@@ -60,9 +60,9 @@ DATASETS2D = [
     # "clusterlab9",
     "noisy_circles",
     "noisy_moons",
+    "blobs",
     "varied",
     "aniso",
-    "blobs",
     "clusterlab10",
 ]
 
@@ -75,6 +75,21 @@ COMPLEX_DATASETS = [
     "blobs2_16",
     "blobs2_32",
     "blobs2_64",
+    "densired8",
+    "densired16",
+    "densired32",
+    "densired64",
+    "densired_soft_8",
+    "densired_soft_16",
+    "densired_soft_32",
+    "densired_soft_64",
+    "mnist8",
+    "mnist16",
+    "mnist32",
+    "mnist64",
+]
+
+CORE_HD_DATASETS = [
     "densired8",
     "densired16",
     "densired32",
@@ -109,7 +124,7 @@ class our_datasets:
             "preference": -200,
             "n_neighbors": 3,
             "n_clusters": 3,
-            "n_components": 15,
+            "n_components": 25,
             "min_samples": 7,
             "xi": 0.05,
             "min_cluster_size": 0.1,
@@ -250,6 +265,7 @@ class our_datasets:
                     "gwg_n_components": 15,
                     "gwg_n_neighbors": 3,
                     "gwg_covariance": "diag",
+                    "n_components": 15,
                 },
             ),
             (
@@ -266,6 +282,7 @@ class our_datasets:
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "diag",
+                    "n_components": 15,
                 },
             ),
             (
@@ -282,6 +299,7 @@ class our_datasets:
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "full",
+                    "n_components": 15,
                 },
             ),
             (
@@ -298,6 +316,7 @@ class our_datasets:
                     "gwg_n_components": 5,
                     "gwg_n_neighbors": 5,
                     "gwg_covariance": "full",
+                    "n_components": 15,
                 },
             ),
             (
@@ -312,6 +331,7 @@ class our_datasets:
                     "gwg_n_components": 5,
                     "gwg_n_neighbors": 3,
                     "gwg_covariance": "spherical",
+                    "n_components": 15,
                 },
             ),
             (
@@ -376,6 +396,7 @@ class our_datasets:
                     "n_clusters": 6,
                     "resolution": 1.0,
                     "resolution_leiden": 0.01,
+                    "n_components": 15,
                 },
             ),
             (

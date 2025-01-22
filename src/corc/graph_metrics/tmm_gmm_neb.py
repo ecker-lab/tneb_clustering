@@ -67,14 +67,14 @@ def t_logpdf(X, mean, cov, df):
     )
 
 
+# @functools.partial(jax.vmap, in_axes=(0, None, None, None))
 @jax.jit
-@functools.partial(jax.vmap, in_axes=(0, None, None, None))
-def gmm_jax(x, means, covs, weights):
+def gmm_jax(X, means, covs, weights):
     p = []
 
     # pdf of the individual components
     for mean, cov, weight in zip(means, covs, weights):
-        p.append(jstats.multivariate_normal.logpdf(x, mean, cov) + jnp.log(weight))
+        p.append(jstats.multivariate_normal.logpdf(X, mean, cov) + jnp.log(weight))
 
     # logsumexp (note that logpdf might return NaN because jax only operates on 32bit precision)
     p = jnp.stack(p, axis=-1)
@@ -109,7 +109,9 @@ def predict_tmm_jax(X, means, covs, weights):
 
     # Find the index of the maximum log probability for each sample
     probs = jnp.exp(logprobs_jax)
-    probs = jnp.nan_to_num(probs, nan=0.0) # NaNs might occur in logpdf because jax uses 32bits
+    probs = jnp.nan_to_num(
+        probs, nan=0.0
+    )  # NaNs might occur in logpdf because jax uses 32bits
     predictions_jax = jnp.argmax(probs, axis=0)
     return predictions_jax, probs
 

@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.neighbors import kneighbors_graph
 from abc import ABC, abstractmethod
 from corc.utils import compute_projection
+import corc.utils
 
 
 class Graph(ABC):
@@ -35,14 +36,14 @@ class Graph(ABC):
         self.graph_data = {"nodes": None, "edges": None, "nodes_org_space": None}
 
     @abstractmethod
-    def fit(self, data): 
+    def fit(self, data):
         """
         Abstract method that fits the model. To be implemented by subclasses.
         """
         ...
 
     @abstractmethod
-    def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs): 
+    def create_graph(self, save=True, plot=True, return_graph=False, *args, **kwargs):
         """
         Abstract method to create a graph.
 
@@ -188,11 +189,11 @@ class Graph(ABC):
             )
             print(f"Working with {num_classes} clusters instead.")
             return num_classes
-    
+
     def _plt_graph_compare(self, embeddings, pred_labels, save=None, to_norm=False):
-        '''
-        this function makes a plot with right panel being ground truth and left panel being the original overclustered components (before merge) and the weights of the edges across these components. 
-        '''
+        """
+        this function makes a plot with right panel being ground truth and left panel being the original overclustered components (before merge) and the weights of the edges across these components.
+        """
         fig, axs = plt.subplots(1, 2, figsize=(15, 5))
         palette = (
             sns.color_palette(cc.glasbey, n_colors=self.n_components)
@@ -234,13 +235,13 @@ class Graph(ABC):
             )
         for (cm, neigh), dip in self.graph_data["edges"].items():
             if to_norm:
-                alpha = (1 - norm(dip))
+                alpha = 1 - norm(dip)
             else:
                 alpha = dip
             axs[1].plot(
                 [cluster_means[cm][0], cluster_means[neigh][0]],
                 [cluster_means[cm][1], cluster_means[neigh][1]],
-                alpha=alpha, #1.0,
+                alpha=alpha,  # 1.0,
                 c="black",
             )
 
@@ -332,7 +333,6 @@ class GWGGraph(Graph):
             return tmm.location, pred_labels
         else:
             raise NotImplementedError("[ERROR] Clustering method not yet implemented.")
-
 
     def _compute_projection(self, cluster1, cluster2, means, predictions):
         return compute_projection(self.data, cluster1, cluster2, means, predictions)

@@ -21,23 +21,22 @@ os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 import jax
 
-GRID_RESOLUTION = 128  # the resolution for the "heatmap" computation for TMM plotting
 
 def compute_projection(data, cluster1, cluster2, means, predictions):
-        c = means[cluster1] - means[cluster2]
-        unit_vector = c / np.linalg.norm(c)
+    c = means[cluster1] - means[cluster2]
+    unit_vector = c / np.linalg.norm(c)
 
-        points1 = data[predictions == cluster1]
-        points2 = data[predictions == cluster2]
-        cluster1_proj = np.dot(points1, unit_vector)
-        cluster2_proj = np.dot(points2, unit_vector)
+    points1 = data[predictions == cluster1]
+    points2 = data[predictions == cluster2]
+    cluster1_proj = np.dot(points1, unit_vector)
+    cluster2_proj = np.dot(points2, unit_vector)
 
-        mean = (np.mean(cluster1_proj) + np.mean(cluster2_proj)) / 2
+    mean = (np.mean(cluster1_proj) + np.mean(cluster2_proj)) / 2
 
-        cluster1_proj -= mean
-        cluster2_proj -= mean
+    cluster1_proj -= mean
+    cluster2_proj -= mean
 
-        return cluster1_proj, cluster2_proj
+    return cluster1_proj, cluster2_proj
 
 
 def cond_mkdir(path):
@@ -144,7 +143,7 @@ def reorder_colors(y_pred, y_true):
         -cm
     )  # col_ind returns how to reorder the columns (colors of y_pred)
 
-    mapping = np.argsort(col_ind) # we need the inverse of the assignment
+    mapping = np.argsort(col_ind)  # we need the inverse of the assignment
     y_pred_permuted = mapping[y_pred]
 
     # equivalent assignment using a for loop
@@ -249,6 +248,8 @@ def plot_field(
     axis=None,
     plot_points=True,  # whether data_X is plotted
     transformed_points=None,
+    grid_resolution=128,
+    plot_ids=True,
 ):
     """Plots the TMM/GMM field and the optimized paths (if available).
     selection: selects which paths are included in the plot, by default, all paths are included.
@@ -260,7 +261,7 @@ def plot_field(
         locations = mixture_model.means_
     elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
         locations = mixture_model.location
-    elif isinstance(mixture_model, corc.studentmixture.StudentMixture):
+    elif isinstance(mixture_model, corc.studentmixture.MixtureModel):
         locations = mixture_model.centers
     n_components = len(locations)
 
@@ -282,16 +283,16 @@ def plot_field(
         # grid coordinates
         margin = 0.5
         x = np.linspace(
-            data_X[:, 0].min() - margin, data_X[:, 0].max() + margin, GRID_RESOLUTION
+            data_X[:, 0].min() - margin, data_X[:, 0].max() + margin, grid_resolution
         )
         y = np.linspace(
-            data_X[:, 1].min() - margin, data_X[:, 1].max() + margin, GRID_RESOLUTION
+            data_X[:, 1].min() - margin, data_X[:, 1].max() + margin, grid_resolution
         )
         XY = np.stack(np.meshgrid(x, y), -1)
 
         # get scores for the grid values
         mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
-            GRID_RESOLUTION, GRID_RESOLUTION
+            grid_resolution, grid_resolution
         )
         # plotting the energy landscape
         axis.contourf(
@@ -315,22 +316,30 @@ def plot_field(
         locations[:, 0],
         locations[:, 1],
         color="black",
-        marker="X",
+        # marker="X",
         label="mixture centers",
-        s=100,
+        s=30,
     )
-    for i, location in enumerate(locations):
-        y_min, y_max = axis.get_ylim()
-        scale = y_max - y_min
-        axis.annotate(f"{i}", xy=location - 0.05 * scale, color="black")
+    if plot_ids:
+        for i, location in enumerate(locations):
+            y_min, y_max = axis.get_ylim()
+            scale = y_max - y_min
+            axis.annotate(f"{i}", xy=location - 0.05 * scale, color="black")
 
     # plot paths between centers (by default: all)
     if paths is not None:
         if selection is None:
             selection = list(itertools.combinations(range(n_components), r=2))
         for i, j in selection:
-            path = paths[(i, j)]
-            axis.plot(path[:, 0], path[:, 1], lw=3, alpha=0.5, color="red")
+            # path = paths[(i, j)]
+            # axis.plot(path[:, 0], path[:, 1], lw=2, alpha=0.5, color="black")
+            start = locations[i]
+            end = locations[j]
+            axis.plot(
+                *zip(start, end),
+                color="black",
+                alpha=1,
+            )
 
     if save_path is not None:
         plt.savefig(save_path)
@@ -360,7 +369,9 @@ def best_possible_labels_from_overclustering(y_true, y_pred):
     return y_best
 
 
-def predict_by_joining_closest_clusters(centers, y_pred, num_classes, data, dip_stat=False, debug=False):
+def predict_by_joining_closest_clusters(
+    centers, y_pred, num_classes, data, dip_stat=False, debug=False
+):
 
     def find_root(mapping, class_index):
         if mapping[class_index] != class_index:
@@ -378,27 +389,31 @@ def predict_by_joining_closest_clusters(centers, y_pred, num_classes, data, dip_
 
     def update_centers_after_merge(centers, mapping, i, j):
         # Get all points that belong to either cluster
-        mask_i = (y_pred == i)
-        mask_j = (y_pred == j)
+        mask_i = y_pred == i
+        mask_j = y_pred == j
         combined_points = data[mask_i | mask_j]
-        
+
         # Compute new center as center of mass
         new_center = np.mean(combined_points, axis=0)
-        
+
         # Update the center for cluster i (which is the root)
         centers[i] = new_center
         return centers
 
-    def update_distances_after_merge(distances, mapping, i, j, centers, data, y_pred, dip_stat):
+    def update_distances_after_merge(
+        distances, mapping, i, j, centers, data, y_pred, dip_stat
+    ):
         root_i = find_root(mapping, i)
-        
+
         # Set distances between merged clusters to infinity
         distances[i, j] = distances[j, i] = np.inf
-        
+
         if dip_stat:
             # Recompute dip statistics for the merged cluster with all others
             for k in range(len(centers)):
-                if k != i and k != j and find_root(mapping, k) == k:  # Only update for active clusters
+                if (
+                    k != i and k != j and find_root(mapping, k) == k
+                ):  # Only update for active clusters
                     # Compute new projections with merged cluster
                     pr1, pr2 = compute_projection(data, root_i, k, centers, y_pred)
                     dip, _ = diptest.diptest(np.concatenate([pr1, pr2]))
@@ -406,13 +421,15 @@ def predict_by_joining_closest_clusters(centers, y_pred, num_classes, data, dip_
         else:
             # Recompute Euclidean distances from merged cluster to all others
             for k in range(len(centers)):
-                if k != i and k != j and find_root(mapping, k) == k:  # Only update for active clusters
+                if (
+                    k != i and k != j and find_root(mapping, k) == k
+                ):  # Only update for active clusters
                     dist = np.linalg.norm(centers[root_i] - centers[k])
                     distances[min(root_i, k), max(root_i, k)] = dist
-        
+
         # Set all distances involving j to infinity since it's now merged
         distances[j, :] = distances[:, j] = np.inf
-        
+
         return distances
 
     mapping = np.array(range(len(centers)))
@@ -422,9 +439,7 @@ def predict_by_joining_closest_clusters(centers, y_pred, num_classes, data, dip_
         for i in range(len(centers)):
             for j in range(i + 1, len(centers)):
                 pr1, pr2 = compute_projection(data, i, j, centers, y_pred)
-                dip, _ = diptest.diptest(
-                    np.concatenate([pr1, pr2])
-                )
+                dip, _ = diptest.diptest(np.concatenate([pr1, pr2]))
                 distances[i, j] = -dip
     else:
         for i in range(len(centers)):
@@ -432,8 +447,8 @@ def predict_by_joining_closest_clusters(centers, y_pred, num_classes, data, dip_
                 distances[i, j] = np.linalg.norm(centers[i] - centers[j])
 
     if debug:
-        plt.figure(figsize=(8,8))
-        sns.heatmap(distances.T * (-1), annot=True,  fmt='.2g')
+        plt.figure(figsize=(8, 8))
+        sns.heatmap(distances.T * (-1), annot=True, fmt=".2g")
         plt.show()
     num_classes_to_join = len(centers) - num_classes
     for _ in range(num_classes_to_join):
@@ -441,11 +456,13 @@ def predict_by_joining_closest_clusters(centers, y_pred, num_classes, data, dip_
         mapping = merge_classes(mapping, i, j)
         # Update centers and distances
         centers = update_centers_after_merge(centers, mapping, i, j)
-        distances = update_distances_after_merge(distances, mapping, i, j, centers, data, y_pred, dip_stat)
+        distances = update_distances_after_merge(
+            distances, mapping, i, j, centers, data, y_pred, dip_stat
+        )
         print(f"joined {i} and {j} (both now in class {find_root(mapping,i)})")
         if debug:
-            plt.figure(figsize=(8,8))
-            sns.heatmap(distances.T * (-1), annot=True,  fmt='.2g')
+            plt.figure(figsize=(8, 8))
+            sns.heatmap(distances.T * (-1), annot=True, fmt=".2g")
             plt.show()
 
     final_mapping = np.zeros(len(centers))

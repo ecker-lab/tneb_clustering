@@ -16,6 +16,38 @@ import corc.utils
 Example call: python scripts/create_clustering_figure.py --algorithms  "MiniBatch\nKMeans, Agglomerative\nClustering" --datasets "blobs1_8, mnist64"
 """
 
+dataset_displaynames = {
+    "noisy_moons": "noisy\nmoons",
+    "noisy_circles": "noisy\ncircles",
+    "varied": "varied\ndensity",
+    "aniso": "anisotropic\nblobs",
+    "blobs": "Gaussian\nblobs",
+    "clusterlab10": "clusterlab10",
+    ###########################
+    ##### fig 2 datasets ######
+    ###########################
+    "blobs1_8": "Gaussian\nblobs 8D",
+    "blobs1_16": "Gaussian\nblobs 16D",
+    "blobs1_32": "Gaussian\nblobs 32D",
+    "blobs1_64": "Gaussian\nblobs 64D",
+    "blobs2_8": "Gaussian\nblobs 8D",
+    "blobs2_16": "Gaussian\nblobs 16D",
+    "blobs2_32": "Gaussian\nblobs 32D",
+    "blobs2_64": "Gaussian\nblobs 64D",
+    "densired8": "Densired\n'circles' 8D",
+    "densired16": "Densired\n'circles' 16D",
+    "densired32": "Densired\n'circles' 32D",
+    "densired64": "Densired\n'circles' 64D",
+    "densired_soft_8": "Densired\n'Stud-t' 8D",
+    "densired_soft_16": "Densired\n'Stud-t' 16D",
+    "densired_soft_32": "Densired\n'Stud-t' 32D",
+    "densired_soft_64": "Densired\n'Stud-t' 64D",
+    "mnist8": "MNIST-Nd\n8D",
+    "mnist16": "MNIST-Nd\n16D",
+    "mnist32": "MNIST-Nd\n32D",
+    "mnist64": "MNIST-Nd\n64D",
+}
+
 
 def main():
     p = configargparse.ArgumentParser()
@@ -58,7 +90,8 @@ def main():
     )
 
     opt = p.parse_args()
-
+    title_fontsize = 18
+    ari_fontsize = 14
     print(f"{opt.algorithms}")
 
     if isinstance(opt.algorithms, str):
@@ -72,17 +105,26 @@ def main():
             opt.datasets = our_datasets.COMPLEX_DATASETS
             if opt.figure_name == "my_figure":  # the default
                 opt.figure_name = "figure2"
+        elif opt.datasets.lower() == "main1":
+            opt.datasets = our_datasets.DATASETS2D
+            opt.algorithms = our_algorithms.CORE_SELECTOR
+            title_fontsize = 22
+            ari_fontsize = 18
+            if opt.figure_name == "my_figure":  # the default
+                opt.figure_name = "figure1_main"
+        elif opt.datasets.lower() == "main2":
+            opt.datasets = our_datasets.CORE_HD_DATASETS
+            opt.algorithms = our_algorithms.CORE_SELECTOR
+            title_fontsize = 20
+            ari_fontsize = 18
+            if opt.figure_name == "my_figure":  # the default
+                opt.figure_name = "figure2_main"
+
         else:  # otherwise, handle it as a list of datasets
             opt.datasets = opt.datasets.replace(" ", "").split(",")
 
     os.makedirs(opt.cache_path, exist_ok=True)
     os.makedirs(opt.figure_path, exist_ok=True)
-
-    plt.figure(figsize=(len(opt.algorithms) * 2 + 3, len(opt.datasets) * 2))
-    plt.subplots_adjust(
-        left=0.02, right=0.98, bottom=0.001, top=0.95, wspace=0.05, hspace=0.01
-    )
-    plot_num = 1
 
     # check for missing files before starting the computation
     missing_files = []
@@ -104,6 +146,12 @@ def main():
         response = input("Continue anyway? (Y/n): ")
         if response != "" and response.lower() != "y":
             sys.exit(1)
+
+    plt.figure(figsize=(len(opt.algorithms) * 2 + 3, len(opt.datasets) * 2))
+    plt.subplots_adjust(
+        left=0.02, right=0.98, bottom=0.001, top=0.95, wspace=0.05, hspace=0.01
+    )
+    plot_num = 1
 
     # now start the computation
     for i_dataset, dataset_name in enumerate(tqdm.tqdm(opt.datasets)):
@@ -127,12 +175,12 @@ def main():
         # first column ist GT
         ax = plt.subplot(len(opt.datasets), len(opt.algorithms) + 1, plot_num)
         if i_dataset == 0:
-            plt.title("Ground Truth", size=18)
+            plt.title("Ground Truth", size=title_fontsize)
         colors = get_color_scheme(y, y)
         plt.scatter(points[:, 0], points[:, 1], s=10, color=colors[y])
         plt.xticks(())
         plt.yticks(())
-        ax.set_ylabel(dataset_name, size=18)
+        ax.set_ylabel(dataset_displaynames[dataset_name], size=title_fontsize)
         plot_num += 1
 
         # plotting the other algorithms
@@ -165,13 +213,17 @@ def main():
             plt.subplot(len(opt.datasets), len(opt.algorithms) + 1, plot_num)
             if i_dataset == 0:
                 plt.title(
-                    algorithm_name.replace("\\n", "\n").replace("\n", " "), size=18
+                    algorithm_name.replace("\\n", "\n"),
+                    size=title_fontsize,
                 )
+                # algorithm_name.replace("\\n", "\n").replace("\n", " "), size=18
 
+            # plot points
             colors = get_color_scheme(y_pred, y)
             y_pred_permuted = corc.utils.reorder_colors(y_pred, y)
             plt.scatter(points[:, 0], points[:, 1], s=10, color=colors[y_pred_permuted])
 
+            # plot graph
             if algorithm_name in [
                 "GWG-dip",
                 "GWG-pvalue",
@@ -182,8 +234,16 @@ def main():
             ]:
                 algorithm.plot_graph(X2D=X2D, target_num_clusters=len(np.unique(y)))
 
+            # add ARI scores to the plot
             ari_score = sklearn.metrics.adjusted_rand_score(y, y_pred)
-            plt.text(0.02, 0.9, f"ARI {ari_score:.2f}", transform=plt.gca().transAxes)
+            plt.text(
+                0.02,
+                0.88,
+                f"ARI {ari_score:.2f}",
+                transform=plt.gca().transAxes,
+                fontweight="bold",
+                size=ari_fontsize,
+            )
 
             plt.xticks(())
             plt.yticks(())
