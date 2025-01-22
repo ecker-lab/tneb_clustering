@@ -37,7 +37,7 @@ class NEB(Graph):
         n_clusters=None,
         tmm_regularization=1e-4,
         min_cluster_size=10,  # mixture model filtering is only applied to TMM
-        max_elongation=None,  # will be set to 500 * dim**2 as "good" clusters tend to have surprisingly high elongation in high dimensions
+        max_elongation=None,  # will be set to 500 * dim
     ):
         """
         Initialize the NEB (nudged elastic band) class.
@@ -87,7 +87,7 @@ class NEB(Graph):
         self.max_iter_on_retries = max_iter_on_retries
         self.min_cluster_size = min_cluster_size
         self.max_elongation = (
-            max_elongation if max_elongation is not None else 500 * latent_dim**2
+            max_elongation if max_elongation is not None else 500 * latent_dim
         )
 
     def fit(self, data, knn=5):

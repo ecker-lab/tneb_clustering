@@ -1,7 +1,7 @@
 import pickle
 import configargparse
-import our_datasets
-import our_algorithms
+import corc.our_datasets as our_datasets
+import corc.our_algorithms as our_algorithms
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
@@ -178,6 +178,13 @@ def main():
                     )
                 else:
                     y_pred = algorithm.predict(X)
+
+            # Warn if the predictions are surprisingly bad
+            _, counts = np.unique(y_pred, return_counts=True)
+            if max(counts) > 0.7 * len(X) and "NEB" in algorithm_name:
+                print(
+                    f"WARNING: {max(counts)/len(X)*100:.2f}% of predictions are in one class. ({algorithm_name} on {dataset_name})"
+                )
 
             # create plotting area
             plt.subplot(len(opt.datasets), len(opt.algorithms) + 1, plot_num)

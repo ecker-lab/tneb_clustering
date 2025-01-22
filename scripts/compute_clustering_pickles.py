@@ -9,8 +9,8 @@ import warnings
 import numpy as np
 from sklearn import cluster
 from sklearn.preprocessing import StandardScaler
-import our_datasets
-import our_algorithms
+import corc.our_datasets as our_datasets
+import corc.our_algorithms as our_algorithms
 from openTSNE import TSNE
 import re
 import pickle
