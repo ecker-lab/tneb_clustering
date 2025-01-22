@@ -1,6 +1,6 @@
 from sklearn import cluster, mixture
 import studenttmixture
-from corc.graph_metrics import paga, gwg, gwgmara, neb #, stavia
+from corc.graph_metrics import paga, gwg, gwgmara, neb  # , stavia
 from scipy.sparse import csr_matrix
 import scanpy
 import anndata
@@ -14,18 +14,29 @@ ALGORITHM_SELECTOR = [
     "HDBSCAN",
     "Gaussian\nMixture",
     "t-Student\nMixture",
-    "DBSCAN",
-    "BIRCH",
-    "OPTICS",
+    # "DBSCAN",
+    # "BIRCH",
+    # "OPTICS",
     "Spectral\nClustering",
     "Affinity\nPropagation",
     "MeanShift",
     "Leiden",
-    # "PAGA",
-    "Ward",
+    "PAGA",
+    # "Ward",
     # "Stavia",
     "GWG-dip",
-    "GWG-pvalue",
+    # "GWG-pvalue",
+    "TMM-NEB",
+    "GMM-NEB",
+]
+
+CORE_SELECTOR = [
+    "Agglomerative\nClustering",
+    "HDBSCAN",
+    "Gaussian\nMixture",
+    # "t-Student\nMixture",
+    "Leiden",
+    "GWG-dip",
     "TMM-NEB",
     "GMM-NEB",
 ]
@@ -74,6 +85,7 @@ def get_clustering_objects(
     # ============
     # Create cluster objects
     # ============
+    # default params can be found in our_datasets.py
     ms = cluster.MeanShift(bandwidth=bandwidth, bin_seeding=True)
     two_means = cluster.MiniBatchKMeans(
         n_clusters=params["n_clusters"],
@@ -149,8 +161,8 @@ def get_clustering_objects(
         n_clusters=params["n_clusters"],
         seed=params["random_state"],
         mixture_model_type="tmm",
-        n_init=20,  # they are run one after the other and not as in the GMM case all at once
-        optimization_iterations=300,
+        n_init=20,
+        optimization_iterations=100,
     )
     gmm_neb = neb.NEB(
         latent_dim=params["dim"],
@@ -159,7 +171,7 @@ def get_clustering_objects(
         seed=params["random_state"],
         mixture_model_type="gmm",
         n_init=5,
-        optimization_iterations=300,
+        optimization_iterations=100,
     )
     # stavia_algo = stavia.Stavia(
     #     latent_dim=params["dim"],
@@ -170,19 +182,22 @@ def get_clustering_objects(
 
     clustering_algorithms = [
         ("MiniBatch\nKMeans", two_means),
-        ("Agglomerative\nClustering", average_linkage),
-        ("BIRCH", birch),
+        (
+            "Agglomerative\nClustering",
+            ward,
+        ),  # dropped average_linkage clustering as it does not work well
+        # ("BIRCH", birch), # very old method that people don't really use
         ("HDBSCAN", hdbscan),
-        ("DBSCAN", dbscan),
+        # ("DBSCAN", dbscan), # HDBSCAN is always better than DBSCAN
         ("OPTICS", optics),
         ("Gaussian\nMixture", gmm),
         ("t-Student\nMixture", tmm),
         ("Affinity\nPropagation", affinity_propagation),
         ("Spectral\nClustering", spectral),
         ("MeanShift", ms),
-        ("Ward", ward),
+        # ("Ward", ward),
         ("Leiden", leiden),
-        # ("PAGA", mpaga),
+        ("PAGA", mpaga),
         # ("Stavia", stavia_algo),
         ("GWG-dip", mgwgmara),
         ("GWG-pvalue", mgwg),

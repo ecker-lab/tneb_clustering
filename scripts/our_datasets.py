@@ -8,6 +8,42 @@ DENSIRED_PATH = "datasets/densired.npz"
 DENSIRED_SOFT_PATH = "datasets/densired_soft.npz"
 MNIST_PATH = "datasets/mvae_mnist_nd_saved.pkl"
 
+
+dataset_displaynames = {
+    ###########################
+    ##### fig 1 datasets ######
+    ###########################
+    "noisy_moons": "noisy\nmoons",
+    "noisy_circles": "noisy\ncircles",
+    "varied": "varied\ndensity",
+    "aniso": "anisotropic\nblobs",
+    "blobs": "Gaussian\nblobs",
+    "clusterlab10": "clusterlab10",
+    ###########################
+    ##### fig 2 datasets ######
+    ###########################
+    "blobs1_8": "Gaussian\nblobs 8D",
+    "blobs1_16": "Gaussian\nblobs 16D",
+    "blobs1_32": "Gaussian\nblobs 32D",
+    "blobs1_64": "Gaussian\nblobs 64D",
+    "blobs2_8": "Gaussian\nblobs 8D",
+    "blobs2_16": "Gaussian\nblobs 16D",
+    "blobs2_32": "Gaussian\nblobs 32D",
+    "blobs2_64": "Gaussian\nblobs 64D",
+    "densired8": "Densired\n'circles' 8D",
+    "densired16": "Densired\n'circles' 16D",
+    "densired32": "Densired\n'circles' 32D",
+    "densired64": "Densired\n'circles' 64D",
+    "densired_soft_8": "Densired\n'Stud-t' 8D",
+    "densired_soft_16": "Densired\n'Stud-t' 16D",
+    "densired_soft_32": "Densired\n'Stud-t' 32D",
+    "densired_soft_64": "Densired\n'Stud-t' 64D",
+    "mnist8": "MNIST-Nd\n8D",
+    "mnist16": "MNIST-Nd\n16D",
+    "mnist32": "MNIST-Nd\n32D",
+    "mnist64": "MNIST-Nd\n64D",
+}
+
 # ============
 # select which datasets to return
 # ============
@@ -60,9 +96,9 @@ DATASETS2D = [
     # "clusterlab9",
     "noisy_circles",
     "noisy_moons",
+    "blobs",
     "varied",
     "aniso",
-    "blobs",
     "clusterlab10",
 ]
 
@@ -75,6 +111,21 @@ COMPLEX_DATASETS = [
     "blobs2_16",
     "blobs2_32",
     "blobs2_64",
+    "densired8",
+    "densired16",
+    "densired32",
+    "densired64",
+    "densired_soft_8",
+    "densired_soft_16",
+    "densired_soft_32",
+    "densired_soft_64",
+    "mnist8",
+    "mnist16",
+    "mnist32",
+    "mnist64",
+]
+
+CORE_HD_DATASETS = [
     "densired8",
     "densired16",
     "densired32",
@@ -109,7 +160,7 @@ class our_datasets:
             "preference": -200,
             "n_neighbors": 3,
             "n_clusters": 3,
-            "n_components": 15,
+            "n_components": 25,
             "min_samples": 7,
             "xi": 0.05,
             "min_cluster_size": 0.1,
@@ -250,6 +301,7 @@ class our_datasets:
                     "gwg_n_components": 15,
                     "gwg_n_neighbors": 3,
                     "gwg_covariance": "diag",
+                    "n_components": 15,
                 },
             ),
             (
@@ -266,6 +318,7 @@ class our_datasets:
                     "gwg_n_components": 10,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "diag",
+                    "n_components": 15,
                 },
             ),
             (
@@ -282,6 +335,7 @@ class our_datasets:
                     "gwg_n_components": 25,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "full",
+                    "n_components": 15,
                 },
             ),
             (
@@ -298,6 +352,7 @@ class our_datasets:
                     "gwg_n_components": 5,
                     "gwg_n_neighbors": 5,
                     "gwg_covariance": "full",
+                    "n_components": 15,
                 },
             ),
             (
@@ -312,6 +367,7 @@ class our_datasets:
                     "gwg_n_components": 5,
                     "gwg_n_neighbors": 3,
                     "gwg_covariance": "spherical",
+                    "n_components": 15,
                 },
             ),
             (
@@ -376,6 +432,7 @@ class our_datasets:
                     "n_clusters": 6,
                     "resolution": 1.0,
                     "resolution_leiden": 0.01,
+                    "n_components": 15,
                 },
             ),
             (
