@@ -16,38 +16,6 @@ import corc.utils
 Example call: python scripts/create_clustering_figure.py --algorithms  "MiniBatch\nKMeans, Agglomerative\nClustering" --datasets "blobs1_8, mnist64"
 """
 
-dataset_displaynames = {
-    "noisy_moons": "noisy\nmoons",
-    "noisy_circles": "noisy\ncircles",
-    "varied": "varied\ndensity",
-    "aniso": "anisotropic\nblobs",
-    "blobs": "Gaussian\nblobs",
-    "clusterlab10": "clusterlab10",
-    ###########################
-    ##### fig 2 datasets ######
-    ###########################
-    "blobs1_8": "Gaussian\nblobs 8D",
-    "blobs1_16": "Gaussian\nblobs 16D",
-    "blobs1_32": "Gaussian\nblobs 32D",
-    "blobs1_64": "Gaussian\nblobs 64D",
-    "blobs2_8": "Gaussian\nblobs 8D",
-    "blobs2_16": "Gaussian\nblobs 16D",
-    "blobs2_32": "Gaussian\nblobs 32D",
-    "blobs2_64": "Gaussian\nblobs 64D",
-    "densired8": "Densired\n'circles' 8D",
-    "densired16": "Densired\n'circles' 16D",
-    "densired32": "Densired\n'circles' 32D",
-    "densired64": "Densired\n'circles' 64D",
-    "densired_soft_8": "Densired\n'Stud-t' 8D",
-    "densired_soft_16": "Densired\n'Stud-t' 16D",
-    "densired_soft_32": "Densired\n'Stud-t' 32D",
-    "densired_soft_64": "Densired\n'Stud-t' 64D",
-    "mnist8": "MNIST-Nd\n8D",
-    "mnist16": "MNIST-Nd\n16D",
-    "mnist32": "MNIST-Nd\n32D",
-    "mnist64": "MNIST-Nd\n64D",
-}
-
 
 def main():
     p = configargparse.ArgumentParser()
