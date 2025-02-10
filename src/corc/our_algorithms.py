@@ -26,8 +26,8 @@ ALGORITHM_SELECTOR = [
     # "Stavia",
     "GWG-dip",
     # "GWG-pvalue",
-    "TMM-NEB",
     "GMM-NEB",
+    "TMM-NEB",
 ]
 
 CORE_SELECTOR = [
@@ -37,9 +37,15 @@ CORE_SELECTOR = [
     # "t-Student\nMixture",
     "Leiden",
     "GWG-dip",
-    "TMM-NEB",
     "GMM-NEB",
+    "TMM-NEB",
 ]
+
+ALG_DISPLAYNAMES = {
+    "TMM-NEB": "t-NEB (ours)",
+    "GMM-NEB": "g-NEB (ours)",
+    "t-Student\nMixture": "Student-t\nMixture",
+}
 
 
 class Leiden:
@@ -116,13 +122,13 @@ def get_clustering_objects(
         preference=params["preference"],
         random_state=params["random_state"],
     )
-    average_linkage = cluster.AgglomerativeClustering(
-        linkage="average",
-        metric="cityblock",
-        n_clusters=params["n_clusters"],
-        connectivity=connectivity,
-    )
-    birch = cluster.Birch(n_clusters=params["n_clusters"])
+    # average_linkage = cluster.AgglomerativeClustering(
+    #     linkage="average",
+    #     metric="cityblock",
+    #     n_clusters=params["n_clusters"],
+    #     connectivity=connectivity,
+    # )
+    # birch = cluster.Birch(n_clusters=params["n_clusters"])
     gmm = mixture.GaussianMixture(
         n_components=params["n_clusters"],
         covariance_type="full",
@@ -135,6 +141,9 @@ def get_clustering_objects(
         # df=1.0,
         init_type="k++",
         random_state=params["random_state"],
+        reg_covar=1e-4,
+        tol=1e-3,
+        max_iter=5000,
     )
     leiden = Leiden(resolution=params["resolution_leiden"], seed=params["random_state"])
     mgwg = gwg.GWG(

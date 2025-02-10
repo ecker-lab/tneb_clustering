@@ -38,6 +38,7 @@ class NEB(Graph):
         tmm_regularization=1e-4,
         min_cluster_size=10,  # mixture model filtering is only applied to TMM
         max_elongation=None,  # will be set to 500 * dim
+        reduced_tolerance_on_retry=1e-3,
     ):
         """
         Initialize the NEB (nudged elastic band) class.
@@ -89,12 +90,49 @@ class NEB(Graph):
         self.max_elongation = (
             max_elongation if max_elongation is not None else 500 * latent_dim
         )
+        self.reduced_tolerance_on_retry = reduced_tolerance_on_retry
 
-    def fit(self, data, knn=5):
+    def filter_mixture_model(
+        self, old_mixture_model, data_X, min_cluster_size, max_elongation
+    ):
+    '''
+    This function basically creates a copy and disabled filtering in place in order to relax filtering if no components are fixed, in order to be able to "redo the step".
+    '''
+        """
+        Filter a mixture model to select components with at least min_cluster_size elements
+        and an elongation of at most max_elongation.
+        This function is called by fit() with possibly different values for min_cluster_size and max_elongation.
+        Filtering does not happen in-place to be able to redo it.
+        """
+        if isinstance(old_mixture_model, studenttmixture.EMStudentMixture):
+            mixture_model = corc.studentmixture.StudentMixture.from_EMStudentMixture(
+                mixture_model=self.old_mixture_model
+            )
+            model_type = "tmm"
+        elif isinstance(self.old_mixture_model, sklearn.mixture.GaussianMixture):
+            mixture_model = corc.studentmixture.GaussianMixtureModel.from_sklearn(
+                self.old_mixture_model
+            )
+            model_type = "gmm"
+
+        mixture_model.filter_components(
+            data_X=data_X,
+            min_cluster_size=min_cluster_size,
+            max_elongation=max_elongation,
+        )
+
+        return mixture_model, model_type
+
+    def fit(self, data, knn=10):
         """
         data: data to be fitted on.
         """
-        self.mixture_model.fit(data)
+        # fit the mixture model (re-use old model if available)
+        if hasattr(self, "old_mixture_model"):
+            if self.old_mixture_model is not None:
+                self.mixture_model = self.old_mixture_model
+        else:
+            self.mixture_model.fit(data)
 
         # make sure that TMM converged (this is sometimes problematic)
         if isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
@@ -104,30 +142,36 @@ class NEB(Graph):
                     # we have not converged
                     print("retrying tmm fit with more iterations")
                     self.mixture_model.max_iter = self.max_iter_on_retries
-                    self.mixture_model.tol = 1e-4  # default is 1e-5
+                    self.mixture_model.tol = (
+                        self.reduced_tolerance_on_retry
+                    )  # default is 1e-5
+                    self.mixture_model.fit(data)
+        elif isinstance(self.mixture_model, sklearn.mixture.GaussianMixture):
+            for _ in range(10):
+                if not self.mixture_model.converged_:
+                    self.mixture_model.max_iter = self.max_iter_on_retries
                     self.mixture_model.fit(data)
 
         self.old_mixture_model = self.mixture_model
-        if isinstance(self.old_mixture_model, studenttmixture.EMStudentMixture):
-            self.mixture_model = (
-                corc.studentmixture.StudentMixture.from_EMStudentMixture(
-                    mixture_model=self.old_mixture_model
-                )
-            )
-            model_type = "tmm"
-        elif isinstance(self.old_mixture_model, sklearn.mixture.GaussianMixture):
-            self.mixture_model = corc.studentmixture.GaussianMixtureModel.from_sklearn(
-                self.old_mixture_model
-            )
-            model_type = "gmm"
+        original_num_components = self.n_components
 
-        original_num_components = len(self.mixture_model.weights)
-        self.mixture_model.print_elongations_and_counts(data)
-        self.mixture_model.filter_components(
+        # filter mixture model
+        self.mixture_model, model_type = self.filter_mixture_model(
+            old_mixture_model=self.old_mixture_model,
             data_X=data,
             min_cluster_size=self.min_cluster_size,
             max_elongation=self.max_elongation,
         )
+        if len(self.mixture_model.weights) == 0:
+            # no components left, retry with less restrictive filtering.
+            # This happens especially for high-dimensional data where components are typically more elongated.
+            self.mixture_model, model_type = self.filter_mixture_model(
+                old_mixture_model=self.old_mixture_model,
+                data_X=data,
+                min_cluster_size=3 * self.min_cluster_size,
+                max_elongation=50 * self.max_elongation,
+            )
+        self.mixture_model.print_elongations_and_counts(data)
         self.centers_ = self.mixture_model.centers
 
         print(
@@ -264,13 +308,13 @@ class NEB(Graph):
         if return_graph:
             return self.graph_data
 
-    def plot_graph(self, X2D=None, pairs=None, target_num_clusters=None, axis=None):
+    def plot_graph(self, X2D=None, pairs=None, target_num_clusters=None, ax=None):
         """
         Note: automatic "pairs" computation only works if self.labels or self.n_clusters is set.
         """
         cmap = plt.get_cmap("viridis")  # choose a colormap
-        if axis is None:
-            axis = plt.gca()
+        if ax is None:
+            ax = plt.gca()
 
         if pairs is None:
             if target_num_clusters is None:
@@ -292,15 +336,21 @@ class NEB(Graph):
         # drawing the background for NEB in the 2D case
         if self.latent_dim == 2:
 
+            if isinstance(self.mixture_model, corc.studentmixture.GaussianMixtureModel):
+                kwargs = dict(vmax=15)
+            else:
+                kwargs = dict()
+
             our_data = self.data if self.data is not None else self.centers_
             corc.utils.plot_field(
                 data_X=our_data,
                 mixture_model=self.mixture_model,
                 paths=self.paths_,
                 selection=pairs,
-                axis=axis,
+                axis=ax,
                 plot_points=False,
                 plot_ids=False,
+                landscape_kwargs=kwargs,
             )
 
         else:  # more than 2 dims
@@ -316,7 +366,7 @@ class NEB(Graph):
                 data_X=self.data,
                 transformed_X=X2D,
             )
-            axis.scatter(
+            ax.scatter(
                 *cluster_means.T,
                 alpha=1.0,
                 rasterized=True,
@@ -327,8 +377,7 @@ class NEB(Graph):
 
             # plot paths as straight lines
             if pairs is not None and len(pairs) > 0:
-                xs, ys = zip(*pairs)
                 for pair in pairs:
                     start = cluster_means[pair[0]]
                     end = cluster_means[pair[1]]
-                    axis.plot(*zip(start, end), color="black", alpha=0.5, lw=1)
+                    ax.plot(*zip(start, end), color="black", alpha=0.5, lw=1)

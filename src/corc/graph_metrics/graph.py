@@ -99,7 +99,7 @@ class Graph(ABC):
             self.create_graph(save=False, plot=False, return_graph=False)
         return self.graph_data
 
-    def plot_graph(self, X2D=None, target_num_clusters=None):
+    def plot_graph(self, X2D=None, target_num_clusters=None, ax=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(
@@ -111,6 +111,8 @@ class Graph(ABC):
         )
         X2D = tsne.fit(self.data)
         """
+        if ax is None:
+            ax = plt.gca()
 
         self.get_graph()  # populates self.graph_data
 
@@ -122,10 +124,10 @@ class Graph(ABC):
             )
             self.graph_data["nodes"] = cluster_means
 
-        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
+        ax.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=15, c="black")
 
         for (cm, neigh), dip in self.graph_data["edges"].items():
-            plt.plot(
+            ax.plot(
                 [cluster_means[cm][0], cluster_means[neigh][0]],
                 [cluster_means[cm][1], cluster_means[neigh][1]],
                 alpha=dip,
@@ -279,7 +281,7 @@ class GWGGraph(Graph):
         n_neighbors=3,
         covariance="full",
         clustering_method="gmm",
-        filter_edges=True,
+        filter_edges=False,  # currently ignored in predict function
         seed=42,
     ):
         """
@@ -372,13 +374,29 @@ class GWGGraph(Graph):
         return knn_dict
 
     def predict(self, data, target_number_clusters=None):
+
+        # the following line takes the raw labels instead of the filtered ones
+        # this means that the fiter_edges option is ignored.
+        raw_predictions = self.pred_labels
         if target_number_clusters is not None:
             self.n_clusters = target_number_clusters
-        threshold = self._get_threshold()
-        edges = self._get_edges_dict(thresh=threshold)
-        self.graph_data["edges"] = edges
-        self.labels_ = self._get_recoloring(pred_labels=self.pred_labels)
-        return self.labels_
+
+        threshold_dict, cluster_dict = self.get_thresholds_and_cluster_numbers()
+        num_classes = self.get_best_cluster_number(threshold_dict, self.n_clusters)
+
+        # modify graph object for plotting
+        self.graph_data["edges"] = self._get_edges_dict(
+            thresh=threshold_dict[num_classes]
+        )
+
+        # compute predictions
+        strategy = cluster_dict[num_classes]
+        return strategy[raw_predictions]
+        # if target_number_clusters is not None:
+        #     self.n_clusters = target_number_clusters
+        # threshold = self._get_threshold()
+        # self.labels_ = self._get_recoloring(pred_labels=self.pred_labels)
+        # return self.labels_
 
     def _get_threshold(self):
         threshold_dict, cluster_dict = self.get_thresholds_and_cluster_numbers()

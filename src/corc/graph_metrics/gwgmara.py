@@ -22,7 +22,7 @@ class GWGMara(GWGGraph):
         n_neighbors=3,
         covariance="diag",
         clustering_method="gmm",
-        filter_edges=True,
+        filter_edges=False,
         seed=42,
     ):
         """

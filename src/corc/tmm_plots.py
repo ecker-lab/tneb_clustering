@@ -33,75 +33,6 @@ def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
         plt.savefig(path)
 
 
-def computations_for_plot_row(
-    data_X, overclustering_n, iterations=500, mixture_model="tmm"
-):
-    # main computation
-    if mixture_model == "tmm":
-        model = studenttmixture.EMStudentMixture(
-            n_components=overclustering_n,
-            n_init=5,
-            fixed_df=True,
-            df=1.0,
-            init_type="k++",
-            random_state=42,
-        )
-    elif mixture_model == "gmm":
-        model = sklearn.mixture.GaussianMixture(
-            n_components=overclustering_n,
-            n_init=5,
-            random_state=42,
-            init_params="k-means++",
-            covariance_type="spherical",
-        )
-    model.fit(np.array(data_X, dtype=np.float64))
-
-    # compute elastic band paths
-    adjacency, raw_adjacency, paths, temps, logprobs = tmm_gmm_neb.compute_neb_paths(
-        model, iterations=iterations
-    )
-
-    # thresholds for the cluster-number plot
-    thresholds_dict, clusterings_dict = tmm_gmm_neb.get_thresholds_and_cluster_numbers(
-        adjacency
-    )
-
-    # extracting the smallest edges to only draw them in the heatmap
-    mst_edges = corc.utils.compute_mst_edges(raw_adjacency)
-
-    return model, adjacency, paths, thresholds_dict, mst_edges, clusterings_dict
-
-
-def plot_row_with_computation(
-    data_X,
-    data_y,
-    overclustering_n=15,
-    iterations=500,
-    levels=None,
-    mixture_model="tmm",
-):
-    # main computation
-    tmm_model = corc.graph_metrics.neb.NEB(
-        latent_dim=data_X.shape[1],
-        data=data_X,
-        labels=data_y,
-        optimization_iterations=iterations,
-        mixture_model_type=mixture_model,
-    )
-    # this is the time-consuming step
-    tmm_model.fit(data=data_X)
-
-    plot_row(
-        data_X=data_X,
-        data_y=data_y,
-        tmm_model=tmm_model,
-    )
-
-    if levels is None:
-        target_cluster_n = len(np.unique(data_y))
-        levels = [target_cluster_n - 1, target_cluster_n, target_cluster_n + 1]
-    plot_cluster_levels(levels, tmm_model, data_X)
-
 
 def plot_row(data_X, data_y, tmm_model, transformed_points=None):
     """
@@ -290,3 +221,10 @@ def plot_tmm_models(
 
     # return the figure
     return plt.gcf()
+
+
+def remove_border(ax):
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    ax.spines["left"].set_visible(False)

@@ -30,7 +30,7 @@ import corc.utils
 
 
 def train_multiple_tmm_models_seeds(
-    data_X, data_y, num_seeds=10, neb_iterations=25, gmm=False, n_components=15
+    data_X, data_y, num_seeds=10, neb_iterations=100, gmm=False, n_components=15
 ):
     tmm_models = list()
     for i in range(num_seeds):
@@ -179,9 +179,12 @@ def main(args):
                 f"{args.plot_type.capitalize()} Stability of {'GMMs' if args.gmm else 'TMMs'} on {dataset_name} (avg pairwise ari: {avg_pairwise_aris[dataset_name]:.2f})"
             )
             figure.savefig(
-                f"figures/stability_{args.plot_type}_{dataset_filename}{gmm_string}{n_components_string}.pdf"
+                f"figures/stability/stability_{args.plot_type}_{dataset_filename}{gmm_string}{n_components_string}.png",
+                dpi=300,
+                bbox_inches="tight",
+                pad_inches=0,
             )
-            print(f"Stored pdf figure for {dataset_name}")
+            print(f"Stored figure for {dataset_name}")
 
     # output ari overview
     for dataset_name in args.dataset_names:
@@ -212,14 +215,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-n",
         "--num_models",
-        help="Number of models to compute (default:9)",
-        default=9,
+        help="Number of models to compute (default:10)",
+        default=15,
         type=int,
     )
     parser.add_argument(
         "--n_components",
         help="Number of mixture model components. Only used for seed-stability plots",
-        default=15,
+        default=25,
         type=int,
     )
     parser.add_argument("--gmm", help="use GMM instead of TMM", action="store_true")

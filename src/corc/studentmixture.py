@@ -2,6 +2,7 @@ import corc.graph_metrics.tmm_gmm_neb
 import numpy as np
 import jax.numpy as jnp
 from abc import ABC, abstractmethod
+import matplotlib.pyplot as plt
 
 
 class MixtureModel(ABC):
@@ -55,6 +56,44 @@ class MixtureModel(ABC):
         elongations = self.get_elongations()
 
         print(np.array(list(zip(counts, elongations)), dtype=int))
+
+    def plot_energy_landscape(
+            self,
+            data_X,  # for boundary computation
+            levels=20,
+            grid_resolution=128,
+            axis=None,
+            kwargs={},
+    ):
+        if axis == None:
+            axis = plt.gca()
+
+        # grid coordinates
+        margin = 0.5
+        x = np.linspace(
+            data_X[:, 0].min() - margin, data_X[:, 0].max() + margin, grid_resolution
+        )
+        y = np.linspace(
+            data_X[:, 1].min() - margin, data_X[:, 1].max() + margin, grid_resolution
+        )
+        XY = np.stack(np.meshgrid(x, y), -1)
+
+        # get scores for the grid values
+        mm_probs = self.score_samples(XY.reshape(-1, 2)).reshape(
+            grid_resolution, grid_resolution
+        )
+        mm_probs = np.clip(mm_probs, None, 0)
+        # plotting the energy landscape
+        axis.contourf(
+            x,
+            y,
+            mm_probs,
+            levels=levels,
+            cmap="coolwarm",
+            alpha=0.5,
+            zorder=-10,
+            **kwargs,
+        )
 
 
 class GaussianMixtureModel(MixtureModel):

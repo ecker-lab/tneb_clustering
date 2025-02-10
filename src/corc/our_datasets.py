@@ -13,23 +13,23 @@ dataset_displaynames = {
     ###########################
     ##### fig 1 datasets ######
     ###########################
-    "noisy_moons": "noisy\nmoons",
-    "noisy_circles": "noisy\ncircles",
-    "varied": "varied\ndensity",
-    "aniso": "anisotropic\nblobs",
+    "noisy_moons": "Noisy\nmoons",
+    "noisy_circles": "Noisy\ncircles",
+    "varied": "Varied\ndensity",
+    "aniso": "Anisotropic\nblobs",
     "blobs": "Gaussian\nblobs",
-    "clusterlab10": "clusterlab10",
+    "clusterlab10": "Clusterlab10",
     ###########################
     ##### fig 2 datasets ######
     ###########################
-    "blobs1_8": "Gaussian\nblobs 8D",
-    "blobs1_16": "Gaussian\nblobs 16D",
-    "blobs1_32": "Gaussian\nblobs 32D",
-    "blobs1_64": "Gaussian\nblobs 64D",
-    "blobs2_8": "Gaussian\nblobs 8D",
-    "blobs2_16": "Gaussian\nblobs 16D",
-    "blobs2_32": "Gaussian\nblobs 32D",
-    "blobs2_64": "Gaussian\nblobs 64D",
+    "blobs1_8": "Balanced\nGaussians 8D",
+    "blobs1_16": "Balanced\nGaussians 16D",
+    "blobs1_32": "Balanced\nGaussians 32D",
+    "blobs1_64": "Balanced\nGaussians 64D",
+    "blobs2_8": "Inbalanced\nGaussians 8D",
+    "blobs2_16": "Inbalanced\nGaussians 16D",
+    "blobs2_32": "Inbalanced\nGaussians 32D",
+    "blobs2_64": "Inbalanced\nGaussians 64D",
     "densired8": "Densired\n'circles' 8D",
     "densired16": "Densired\n'circles' 16D",
     "densired32": "Densired\n'circles' 32D",
@@ -42,6 +42,11 @@ dataset_displaynames = {
     "mnist16": "MNIST-Nd\n16D",
     "mnist32": "MNIST-Nd\n32D",
     "mnist64": "MNIST-Nd\n64D",
+    "mnist": "MNIST-Nd",
+    "densired": "Densired\n'circles'",
+    "densired_soft": "Densired\n'Stud-t'",
+    "blobs1": "Balanced\nGaussians",
+    "blobs2": "Inbalanced\nGaussians",
 }
 
 # ============
@@ -166,7 +171,7 @@ class our_datasets:
             "min_cluster_size": 0.1,
             "allow_single_cluster": True,
             "hdbscan_min_cluster_size": 15,
-            "hdbscan_min_samples": 3,
+            "hdbscan_min_samples": 5,
             "resolution": 1.0,
             "resolution_leiden": 1.0,
             "random_state": 42,
@@ -348,11 +353,12 @@ class our_datasets:
                     "xi": 0.1,
                     "min_cluster_size": 0.2,
                     "resolution": 0.1,
-                    "resolution_leiden": 0.1,
+                    "resolution_leiden": 0.01,
                     "gwg_n_components": 5,
                     "gwg_n_neighbors": 5,
                     "gwg_covariance": "full",
                     "n_components": 15,
+                    "hdbscan_min_samples": 10,
                 },
             ),
             (
@@ -368,6 +374,7 @@ class our_datasets:
                     "gwg_n_neighbors": 3,
                     "gwg_covariance": "spherical",
                     "n_components": 15,
+                    "hdbscan_min_samples": 15,
                 },
             ),
             (
@@ -448,6 +455,8 @@ class our_datasets:
                     "resolution_leiden": 1.0,
                     "quantile": 0.04,
                     "preference": -200,
+                    "hdbscan_min_samples": 3,
+                    "hdbscan_min_cluster_size": 3,
                 },
             ),
             (
@@ -463,6 +472,8 @@ class our_datasets:
                     "resolution_leiden": 1.0,
                     "quantile": 0.045,
                     "preference": -500,
+                    "hdbscan_min_samples": 3,
+                    "hdbscan_min_cluster_size": 3,
                 },
             ),
             (
@@ -478,6 +489,8 @@ class our_datasets:
                     "resolution_leiden": 1.0,
                     "quantile": 0.033,
                     "preference": -700,
+                    "hdbscan_min_samples": 2,
+                    "hdbscan_min_cluster_size": 3,
                 },
             ),
             (
@@ -493,6 +506,8 @@ class our_datasets:
                     "resolution_leiden": 1.0,
                     "quantile": 0.031,
                     "preference": -1300,
+                    "hdbscan_min_samples": 2,
+                    "hdbscan_min_cluster_size": 3,
                 },
             ),
             (
@@ -508,6 +523,8 @@ class our_datasets:
                     "resolution_leiden": 0.6,
                     "quantile": 0.07,
                     "preference": -200,
+                    "hdbscan_min_samples": 4,
+                    "hdbscan_min_cluster_size": 5,
                 },
             ),
             (
@@ -523,6 +540,8 @@ class our_datasets:
                     "resolution_leiden": 0.7,
                     "quantile": 0.052,  # I did not managed to get the exact same number of clusters, its the closes one above
                     "preference": -500,
+                    "hdbscan_min_samples": 2,
+                    "hdbscan_min_cluster_size": 10,
                 },
             ),
             (
@@ -538,6 +557,8 @@ class our_datasets:
                     "resolution_leiden": 0.85,
                     "quantile": 0.06,
                     "preference": -900,
+                    "hdbscan_min_samples": 3,
+                    "hdbscan_min_cluster_size": 3,
                 },
             ),
             (
@@ -553,6 +574,8 @@ class our_datasets:
                     "resolution_leiden": 0.93,
                     "quantile": 0.045,
                     "preference": -900,
+                    "hdbscan_min_samples": 3,
+                    "hdbscan_min_cluster_size": 3,
                 },
             ),
             (
@@ -673,6 +696,7 @@ class our_datasets:
                     "resolution_leiden": 0.1,
                     "quantile": 0.052,
                     "preference": -14_000,
+                    "hdbscan_min_samples": 10,
                 },
             ),
             (
@@ -721,6 +745,7 @@ class our_datasets:
                     "resolution_leiden": 0.4,
                     "quantile": 0.041,
                     "preference": -5300,
+                    "hdbscan_min_samples": 10,
                 },
             ),
             (

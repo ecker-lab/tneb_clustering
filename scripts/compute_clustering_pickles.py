@@ -94,7 +94,7 @@ def main():
                 continue
 
             t0 = time.time()
-            print(f"algorithm {name}", end="")
+            print(f"algorithm {alg_name}", end="")
 
             # catch warnings related to kneighbors_graph
             with warnings.catch_warnings():
@@ -111,20 +111,24 @@ def main():
                     + " may not work as expected.",
                     category=UserWarning,
                 )
-                algorithm.fit(X)
+                if alg_name in ["GWG-dip", "GaussianMixture", "t-StudentMixture"]:
+                    # train 10 with different seeds
+                    algorithms = list()
+                    base_seed = params["random_state"]
+                    for i in range(10):
+                        params["random_state"] = base_seed + i
+                        _, algorithm = corc.our_algorithms.get_clustering_objects(
+                            params, X, selector=[name]
+                        )[0]
+                        algorithm.fit(X)
+                        algorithms.append(algorithm)
+                    algorithm = algorithms
+
+                else:
+                    algorithm.fit(X)
 
             t1 = time.time()
             print(f" (fit in {t1 - t0:.2f} seconds)")
-
-            if hasattr(algorithm, "labels_"):
-                y_pred = algorithm.labels_.astype(int)
-            else:
-                if hasattr(algorithm, "predict_with_target"):
-                    y_pred = algorithm.predict_with_target(X, len(np.unique(y))).astype(
-                        int
-                    )
-                else:
-                    y_pred = algorithm.predict(X)
 
             # store dataset in NEB algorithm object
             if "NEB" in name:

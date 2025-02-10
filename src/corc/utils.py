@@ -137,6 +137,11 @@ def generate_overview_visplot(log_dir):
 
 
 def reorder_colors(y_pred, y_true):
+    y_pred_orig = y_pred.copy()
+    # filter -1 predictions ("noise" by HDBSCAN)
+    y_true = y_true[y_pred_orig != -1]
+    y_pred = y_pred[y_pred_orig != -1]
+
     cm = confusion_matrix(y_true, y_pred)
     # Use the Hungarian algorithm to find the optimal assignment
     row_ind, col_ind = linear_sum_assignment(
@@ -144,7 +149,8 @@ def reorder_colors(y_pred, y_true):
     )  # col_ind returns how to reorder the columns (colors of y_pred)
 
     mapping = np.argsort(col_ind)  # we need the inverse of the assignment
-    y_pred_permuted = mapping[y_pred]
+    y_pred_permuted = np.array(y_pred_orig, dtype=int)
+    y_pred_permuted[y_pred_orig != -1] = mapping[y_pred]
 
     # equivalent assignment using a for loop
     # y_pred_permuted = np.zeros_like(y_pred)
@@ -238,6 +244,7 @@ def compute_mst_edges(raw_adjacency):
     return entries
 
 
+
 def plot_field(
     data_X,
     mixture_model,
@@ -250,6 +257,8 @@ def plot_field(
     transformed_points=None,
     grid_resolution=128,
     plot_ids=True,
+    bend_paths=False,
+    landscape_kwargs={},
 ):
     """Plots the TMM/GMM field and the optimized paths (if available).
     selection: selects which paths are included in the plot, by default, all paths are included.
@@ -280,29 +289,12 @@ def plot_field(
 
     # plot the energy landscape if possible
     if data_X.shape[-1] == 2:
-        # grid coordinates
-        margin = 0.5
-        x = np.linspace(
-            data_X[:, 0].min() - margin, data_X[:, 0].max() + margin, grid_resolution
-        )
-        y = np.linspace(
-            data_X[:, 1].min() - margin, data_X[:, 1].max() + margin, grid_resolution
-        )
-        XY = np.stack(np.meshgrid(x, y), -1)
-
-        # get scores for the grid values
-        mm_probs = mixture_model.score_samples(XY.reshape(-1, 2)).reshape(
-            grid_resolution, grid_resolution
-        )
-        # plotting the energy landscape
-        axis.contourf(
-            x,
-            y,
-            mm_probs,
+        mixture_model.plot_energy_landscape(
+            data_X=data_X,
             levels=levels,
-            cmap="coolwarm",
-            alpha=0.5,
-            zorder=-10,
+            grid_resolution=grid_resolution,
+            axis=axis,
+            kwargs=landscape_kwargs,
         )
 
     # plot the raw data
@@ -331,15 +323,17 @@ def plot_field(
         if selection is None:
             selection = list(itertools.combinations(range(n_components), r=2))
         for i, j in selection:
-            # path = paths[(i, j)]
-            # axis.plot(path[:, 0], path[:, 1], lw=2, alpha=0.5, color="black")
-            start = locations[i]
-            end = locations[j]
-            axis.plot(
-                *zip(start, end),
-                color="black",
-                alpha=1,
-            )
+            if bend_paths:
+                path = paths[(i, j)]
+                axis.plot(path[:, 0], path[:, 1], lw=2, alpha=0.5, color="black")
+            else:
+                start = locations[i]
+                end = locations[j]
+                axis.plot(
+                    *zip(start, end),
+                    color="black",
+                    alpha=1,
+                )
 
     if save_path is not None:
         plt.savefig(save_path)
@@ -370,7 +364,13 @@ def best_possible_labels_from_overclustering(y_true, y_pred):
 
 
 def predict_by_joining_closest_clusters(
-    centers, y_pred, num_classes, data, dip_stat=False, debug=False
+    centers,
+    y_pred,
+    num_classes,
+    data,
+    dip_stat=False,
+    recompute_distances=False,
+    debug=False,
 ):
 
     def find_root(mapping, class_index):
@@ -454,23 +454,30 @@ def predict_by_joining_closest_clusters(
     for _ in range(num_classes_to_join):
         i, j = np.unravel_index(np.argmin(distances), distances.shape)
         mapping = merge_classes(mapping, i, j)
-        # Update centers and distances
-        centers = update_centers_after_merge(centers, mapping, i, j)
-        distances = update_distances_after_merge(
-            distances, mapping, i, j, centers, data, y_pred, dip_stat
-        )
-        print(f"joined {i} and {j} (both now in class {find_root(mapping,i)})")
-        if debug:
-            plt.figure(figsize=(8, 8))
-            sns.heatmap(distances.T * (-1), annot=True, fmt=".2g")
-            plt.show()
+        if recompute_distances:
+            # Update centers and distances
+            centers = update_centers_after_merge(centers, mapping, i, j)
+            distances = update_distances_after_merge(
+                distances, mapping, i, j, centers, data, y_pred, dip_stat
+            )
+            # print(f"joined {i} and {j} (both now in class {find_root(mapping,i)})")
+            if debug:
+                plt.figure(figsize=(8, 8))
+                sns.heatmap(distances.T * (-1), annot=True, fmt=".2g")
+                plt.show()
 
     final_mapping = np.zeros(len(centers))
     for i in range(len(centers)):
         final_mapping[i] = find_root(mapping, i)
 
     joined_predictions = final_mapping[y_pred]
-    return joined_predictions
+
+    # Relabel such that the output is in range(num_classes)
+    joined_predictions = np.searchsorted(
+        np.unique(joined_predictions), joined_predictions
+    )
+
+    return np.array(joined_predictions, dtype=int)
 
 
 def load_dataset(dataset_name, cache_path="../cache"):
@@ -489,3 +496,6 @@ def load_dataset(dataset_name, cache_path="../cache"):
     else:
         transformed_points = X
     return X, y, transformed_points
+
+
+

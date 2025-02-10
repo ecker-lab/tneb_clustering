@@ -43,7 +43,9 @@ class PAGA(Graph):
 
     def create_graph(self, save=True):
         self.fit(self.data)
-        embeddings, cluster_means = self._dim_reduction(self.graph_data["nodes_org_space"])
+        embeddings, cluster_means = self._dim_reduction(
+            self.graph_data["nodes_org_space"]
+        )
         self.graph_data["nodes"] = cluster_means
         filename = f"_{self.clustering_method}_{self.resolution}_vae_latent_dim_{self.latent_dim}"
         self._plt_graph_compare(embeddings, self.labels_, save=f"{filename}.png")
@@ -103,8 +105,9 @@ class PAGA(Graph):
                 random_state=self.seed,
             )
         else:
-            raise NotImplementedError('Wrong clustering method. Choose "louvain" or "leiden".')
-
+            raise NotImplementedError(
+                'Wrong clustering method. Choose "louvain" or "leiden".'
+            )
 
         self.labels_ = self.adata.obs[self.clustering_method].astype(int)
         self.n_components = len(np.unique(self.labels_))
@@ -123,7 +126,7 @@ class PAGA(Graph):
         self.graph_data = {"nodes": pos, "edges": edges, "nodes_org_space": pos}
         self.labels_ = self._get_recoloring(pred_labels=list(self.labels_))
 
-    def plot_graph(self, X2D=None, target_num_clusters=None):
+    def plot_graph(self, X2D=None, target_num_clusters=None, ax=None):
         """
         from openTSNE import TSNE
         tsne = TSNE(
@@ -136,6 +139,9 @@ class PAGA(Graph):
         X2D = tsne.fit(self.data)
         """
         cluster_means = self.graph_data["nodes"]
+
+        if ax is None:
+            ax = plt.gca()
 
         # get TSNE(centers) if needed
         if self.latent_dim > 2:
@@ -152,10 +158,10 @@ class PAGA(Graph):
                 else:
                     print("transformation missing!")
 
-        plt.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
+        ax.scatter(*cluster_means.T, alpha=1.0, rasterized=True, s=30, c="black")
 
         for (cm, neigh), weight in self.graph_data["edges"].items():
-            plt.plot(
+            ax.plot(
                 [cluster_means[cm][0], cluster_means[neigh][0]],
                 [cluster_means[cm][1], cluster_means[neigh][1]],
                 alpha=1.0,
