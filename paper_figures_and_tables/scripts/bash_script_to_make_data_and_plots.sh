@@ -89,7 +89,6 @@ mnist32
 mnist64
 """ | xargs -P 6 -I {} nice -6 python stability_plots.py -t overclustering -d {} --gmm
 
-export XLA_PYTHON_CLIENT_MEM_FRACTION=0.01
 echo """
 noisy_circles
 noisy_moons
@@ -100,7 +99,6 @@ uniform_circle
 clusterlab10
 """ | xargs -P 6 -I {} nice -6 python compute_clustering_pickles.py {}
 
-export XLA_PYTHON_CLIENT_MEM_FRACTION=0.01
 echo """
 varied
 aniso
@@ -111,3 +109,8 @@ densired_soft_16
 mnist8
 mnist16
 """ | xargs -P 6 -I {} nice -6 python plot_join_strategies.py -d {}
+
+python 04_05_create_clustering_figure.py -d main1
+
+python 04_05_create_clustering_figure.py -d main2
+
