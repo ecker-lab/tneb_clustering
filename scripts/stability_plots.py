@@ -21,9 +21,6 @@ import time
 # own code
 import corc.datasets2d
 import corc.complex_datasets
-
-
-# import corc.datasets_refactor as datasets2d
 from corc.graph_metrics import tmm_gmm_neb
 import corc.tmm_plots as tmm_plots
 import corc.utils
