@@ -119,7 +119,6 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         axs[0, 1],
         title=f"Best (ARI: {ari_best:.2f})",
     )
-    print("GT done.")
 
     # ours
     y_pred = tmm_model.predict_with_target(X, len(np.unique(y)))
@@ -144,7 +143,6 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         axs[1, 1],
         title=f"Ours (ARI: {ari_neb:.2f})",
     )
-    print("ours done.")
 
     # baseline
     y_pred_full = tmm_model.mixture_model.predict(X)
@@ -173,7 +171,6 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         axs[2, 1],
         title=f"Nearest Neighbor Baseline (ARI: {ari_baseline:.2f})",
     )
-    print("Closest done.")
 
     # kmeans
     kmeans = sklearn.cluster.KMeans(n_clusters=n_components, random_state=seed).fit(X)
@@ -204,7 +201,6 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         axs[3, 1],
         title=f"K-Means Baseline (ARI: {ari_kmeans:.2f})",
     )
-    print("kmeans done.")
 
     # now lets add dip-stats merge
     dip_stat_pred_joined = corc.utils.predict_by_joining_closest_clusters(
@@ -237,7 +233,6 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         axs[4, 1],
         title=f"TMM-dip stats (ARI: {ari_dip_stat:.2f})",
     )
-    print("TMM+dip stats done.")
 
     return plt.gcf()
 

@@ -1,0 +1,2 @@
+To generate the data and plot make the `bash_script_to_make_data_and_plots.sh` file executable like 
+by running `chmod +x bash_script_to_make_data_and_plots.sh` and then run it with `./bash_script_to_make_data_and_plots.sh`.
