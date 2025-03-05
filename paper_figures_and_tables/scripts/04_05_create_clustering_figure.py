@@ -119,9 +119,7 @@ def main(opt):
             # plot graph
             if algorithm_name in [
                 "GWG-dip",
-                "GWG-pvalue",
                 "PAGA",
-                "Stavia",
                 "TMM-NEB",
                 "GMM-NEB",
             ]:
