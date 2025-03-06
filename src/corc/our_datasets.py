@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn import cluster, datasets
 from sklearn.neighbors import kneighbors_graph
-from corc import complex_datasets, datasets2d
+from corc.create_datasets import complex_datasets, datasets2d
 
 
 DENSIRED_PATH = "datasets/densired.npz"

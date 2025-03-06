@@ -4,13 +4,12 @@ os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 
-import corc.complex_datasets
 import corc.graph_metrics.neb
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn
 import corc.graph_metrics.tmm_gmm_neb
-import corc.studentmixture
+import corc.mixture
 import pickle
 import configargparse
 

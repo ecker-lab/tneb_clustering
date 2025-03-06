@@ -2,7 +2,7 @@ from datetime import datetime
 import itertools
 
 import tqdm
-import corc.studentmixture
+import corc.mixture
 import scipy
 import sklearn
 from sklearn.mixture import GaussianMixture
@@ -105,12 +105,12 @@ class NEB(Graph):
         Filtering does not happen in-place to be able to redo it.
         """
         if isinstance(old_mixture_model, studenttmixture.EMStudentMixture):
-            mixture_model = corc.studentmixture.StudentMixture.from_EMStudentMixture(
+            mixture_model = corc.mixture.StudentMixture.from_EMStudentMixture(
                 mixture_model=self.old_mixture_model
             )
             model_type = "tmm"
         elif isinstance(self.old_mixture_model, sklearn.mixture.GaussianMixture):
-            mixture_model = corc.studentmixture.GaussianMixtureModel.from_sklearn(
+            mixture_model = corc.mixture.GaussianMixtureModel.from_sklearn(
                 self.old_mixture_model
             )
             model_type = "gmm"
@@ -336,7 +336,7 @@ class NEB(Graph):
         # drawing the background for NEB in the 2D case
         if self.latent_dim == 2:
 
-            if isinstance(self.mixture_model, corc.studentmixture.GaussianMixtureModel):
+            if isinstance(self.mixture_model, corc.mixture.GaussianMixtureModel):
                 kwargs = dict(vmax=15)
             else:
                 kwargs = dict()

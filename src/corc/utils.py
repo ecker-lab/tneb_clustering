@@ -13,7 +13,7 @@ import sklearn
 import studenttmixture
 import itertools
 import scipy
-import corc.studentmixture
+import corc.mixture
 import diptest
 import random
 
@@ -231,7 +231,17 @@ def compute_mst_edges(raw_adjacency):
     entries = list(zip(rows, cols))
     return entries
 
-
+def mixture_center_locations(mixture_model):
+    # extract cluster centers
+    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
+        locations = mixture_model.means_
+    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
+        locations = mixture_model.location
+    elif isinstance(mixture_model, corc.mixture.MixtureModel):
+        locations = mixture_model.centers
+    else:
+        raise ValueError("Unknown mixture model type")
+    return locations
 
 def plot_field(
     data_X,
@@ -254,12 +264,7 @@ def plot_field(
 
     """
     # extract cluster centers
-    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
-        locations = mixture_model.means_
-    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
-        locations = mixture_model.location
-    elif isinstance(mixture_model, corc.studentmixture.MixtureModel):
-        locations = mixture_model.centers
+    locations = mixture_center_locations(mixture_model)
     n_components = len(locations)
 
     # Compute TSNE if necessary

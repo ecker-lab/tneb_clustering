@@ -15,10 +15,7 @@ GRID_RESOLUTION = 128
 
 def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
     """plotting probabilities between the direct line and the nudged elastic band"""
-    if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
-        locations = mixture_model.means_
-    elif isinstance(mixture_model, studenttmixture.EMStudentMixture):
-        locations = mixture_model.location
+    locations = corc.utils.mixture_center_locations(mixture_model)
     # the direct line
     direct_x = np.linspace(0, 1, num=128)[..., None]
     ms = (1 - direct_x) * locations[i] + direct_x * locations[j]
