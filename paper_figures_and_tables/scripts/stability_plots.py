@@ -19,8 +19,6 @@ import itertools
 import time
 
 # own code
-import corc.datasets2d
-import corc.complex_datasets
 from corc.graph_metrics import tmm_gmm_neb
 import corc.tmm_plots as tmm_plots
 import corc.utils

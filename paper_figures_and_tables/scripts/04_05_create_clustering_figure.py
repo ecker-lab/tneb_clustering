@@ -6,6 +6,7 @@ import corc.our_algorithms
 import corc.our_datasets as our_datasets
 import corc.our_algorithms as our_algorithms
 import corc.tmm_plots
+from corc.visualization import get_color_scheme
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
@@ -81,7 +82,7 @@ def main(opt):
         ax = axs[0, i_dataset]
         if i_dataset == 0:
             ax.set_ylabel("Ground Truth", fontsize=title_fontsize)
-        colors = get_color_scheme_from_preds(y, y)
+        colors = get_color_scheme(int(max(y) + 1))
         ax.scatter(points[:, 0], points[:, 1], s=10, color=colors[y])
         ax.set_xticks([])
         ax.set_yticks([])
@@ -112,8 +113,8 @@ def main(opt):
             )
 
             # plot points
-            colors = get_color_scheme_from_preds(y_pred, y)
-            y_pred_permuted = corc.utils.reorder_colors(y_pred, y)
+            colors = get_color_scheme(int(max(max(y_pred), max(y)) + 1)) 
+            y_pred_permuted = corc.visualization.reorder_colors(y_pred, y)
             ax.scatter(points[:, 0], points[:, 1], s=10, color=colors[y_pred_permuted])
 
             # plot graph
@@ -239,33 +240,6 @@ def compute_missing_files(opt):
                 missing_files.append(alg_filename)
 
     return missing_files
-
-
-def get_color_scheme_from_preds(y_pred, y):  # (n_colors):
-    colors = np.array(
-        list(
-            itertools.islice(
-                itertools.cycle(
-                    [
-                        "#377eb8",
-                        "#ff7f00",
-                        "#4daf4a",
-                        "#f781bf",
-                        "#a65628",
-                        "#984ea3",
-                        "#999999",
-                        "#e41a1c",
-                        "#dede00",
-                        "#00BFFF",  # added by Martin (or 87CEEB)
-                    ]
-                ),
-                int(max(max(y_pred), max(y)) + 1),
-            )
-        )
-    )
-    # add black color for outliers (if any)
-    colors = np.append(colors, ["#000000"])
-    return colors
 
 
 def parse_args():

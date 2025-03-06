@@ -2,7 +2,7 @@ from datetime import datetime
 import itertools
 
 import tqdm
-import corc.studentmixture
+import corc.mixture
 import scipy
 import sklearn
 from sklearn.mixture import GaussianMixture
@@ -105,12 +105,12 @@ class NEB(Graph):
         Filtering does not happen in-place to be able to redo it.
         """
         if isinstance(old_mixture_model, studenttmixture.EMStudentMixture):
-            mixture_model = corc.studentmixture.StudentMixture.from_EMStudentMixture(
+            mixture_model = corc.mixture.StudentMixture.from_EMStudentMixture(
                 mixture_model=self.old_mixture_model
             )
             model_type = "tmm"
         elif isinstance(self.old_mixture_model, sklearn.mixture.GaussianMixture):
-            mixture_model = corc.studentmixture.GaussianMixtureModel.from_sklearn(
+            mixture_model = corc.mixture.GaussianMixtureModel.from_sklearn(
                 self.old_mixture_model
             )
             model_type = "gmm"
@@ -199,6 +199,27 @@ class NEB(Graph):
         # check quality of generated paths
         corc.graph_metrics.tmm_gmm_neb.evaluate_equidistance(self.paths_)
 
+    def compute_mst_edges(self):
+        """
+        Computes the edges of the minimum spanning tree of the given adjacency matrix.
+
+        Parameters
+        ----------
+        raw_adjacency : scipy.sparse.csr_matrix
+            The adjacency matrix of the graph.
+
+        Returns
+        -------
+        entries : list of tuples
+            Each tuple contains the row and column indices of a minimum spanning tree edge.
+        """
+        if self.raw_adjacency_ is None:
+            raise ValueError("Adjacency matrix not computed, you need to fit NEB first.")
+        mst = -scipy.sparse.csgraph.minimum_spanning_tree(-self.raw_adjacency_)
+        rows, cols = mst.nonzero()
+        entries = list(zip(rows, cols))
+        return entries
+
     def predict(self, data_X):
         if self.paths_ is None:  # fitting did not yet take place
             self.fit(data_X)
@@ -262,7 +283,7 @@ class NEB(Graph):
 
         if only_mst_edges:
             # only those that are also part of the MST
-            mst_edges = corc.utils.compute_mst_edges(self.raw_adjacency_)
+            mst_edges = self.compute_mst_edges()
             pairs = [pair for pair in pairs if pair in mst_edges]
 
         return pairs
@@ -308,6 +329,95 @@ class NEB(Graph):
         if return_graph:
             return self.graph_data
 
+
+    def plot_field(
+        self,
+        data_X,
+        levels=20,
+        selection=None,  # selection which paths to plot
+        save_path=None,
+        axis=None,
+        plot_points=True,  # whether data_X is plotted
+        transformed_points=None,
+        grid_resolution=128,
+        plot_ids=True,
+        bend_paths=False,
+        landscape_kwargs={},
+    ):
+        """Plots the TMM/GMM field and the optimized paths (if available).
+        selection: selects which paths are included in the plot, by default, all paths are included.
+        other typical options: MST through selection=zip(mst.row,mst.col) and individuals via e.g. [(0,1), (3,4)]
+
+        """
+        # extract cluster centers
+        locations = corc.utils.mixture_center_locations(self.mixture_model)
+        n_components = len(locations)
+
+        # Compute TSNE if necessary
+        if data_X.shape[-1] > 2:
+            if transformed_points is None:
+                transformed_points = get_TSNE_embedding(data_X)
+            locations = corc.visualization.snap_points_to_TSNE(
+                locations, data_X, transformed_points
+            )
+        else:
+            transformed_points = data_X
+
+        if axis is None:
+            figure, axis = plt.subplots(1, 1)
+
+        # plot the energy landscape if possible
+        if data_X.shape[-1] == 2:
+            self.mixture_model.plot_energy_landscape(
+                data_X=data_X,
+                levels=levels,
+                grid_resolution=grid_resolution,
+                axis=axis,
+                kwargs=landscape_kwargs,
+            )
+
+        # plot the raw data
+        if plot_points:
+            axis.scatter(
+                transformed_points[:, 0], transformed_points[:, 1], s=10, label="raw data"
+            )
+
+        # plot cluster centers and IDs
+        axis.scatter(
+            locations[:, 0],
+            locations[:, 1],
+            color="black",
+            # marker="X",
+            label="mixture centers",
+            s=30,
+        )
+        if plot_ids:
+            for i, location in enumerate(locations):
+                y_min, y_max = axis.get_ylim()
+                scale = y_max - y_min
+                axis.annotate(f"{i}", xy=location - 0.05 * scale, color="black")
+
+        # plot paths between centers (by default: all)
+        if self.paths_ is not None:
+            if selection is None:
+                selection = list(itertools.combinations(range(n_components), r=2))
+            for i, j in selection:
+                if bend_paths:
+                    path = self.paths_[(i, j)]
+                    axis.plot(path[:, 0], path[:, 1], lw=2, alpha=0.5, color="black")
+                else:
+                    start = locations[i]
+                    end = locations[j]
+                    axis.plot(
+                        *zip(start, end),
+                        color="black",
+                        alpha=1,
+                    )
+
+        if save_path is not None:
+            plt.savefig(save_path)
+    # not returning the axis object since it is modified in-place
+
     def plot_graph(self, X2D=None, pairs=None, target_num_clusters=None, ax=None):
         """
         Note: automatic "pairs" computation only works if self.labels or self.n_clusters is set.
@@ -336,16 +446,14 @@ class NEB(Graph):
         # drawing the background for NEB in the 2D case
         if self.latent_dim == 2:
 
-            if isinstance(self.mixture_model, corc.studentmixture.GaussianMixtureModel):
+            if isinstance(self.mixture_model, corc.mixture.GaussianMixtureModel):
                 kwargs = dict(vmax=15)
             else:
                 kwargs = dict()
 
             our_data = self.data if self.data is not None else self.centers_
-            corc.utils.plot_field(
+            self.plot_field(
                 data_X=our_data,
-                mixture_model=self.mixture_model,
-                paths=self.paths_,
                 selection=pairs,
                 axis=ax,
                 plot_points=False,
@@ -361,7 +469,7 @@ class NEB(Graph):
                     "TSNE transform must be given for high-dimensional datasets"
                 )
             # if not hasattr(self, "transformed_centers_"):
-            cluster_means = corc.utils.snap_points_to_TSNE(
+            cluster_means = corc.visualization.snap_points_to_TSNE(
                 points=self.get_centers(),
                 data_X=self.data,
                 transformed_X=X2D,

@@ -13,42 +13,6 @@ import studenttmixture
 import tqdm
 import optax
 
-
-# evaluates multivariate T dist at x, return logpdf - checks input
-# from https://gist.github.com/yuneg11/5b493ab689f2c46fce50f19aec2df5b4
-@jax.jit
-def t_logpdf2(X, mean, cov, df):
-    # TODO: Properly handle df == np.inf
-    # if df == np.inf:
-    #   return multivariate_normal.logpdf(x, loc, shape)
-    # x, loc, shape, df = jnp._promote_dtypes_inexact(x, loc, shape, df)
-    if not mean.shape:
-        return jstats.t.logpdf(X, df, loc=mean, scale=jnp.sqrt(cov))
-    else:
-        n_dims = mean.shape[-1]
-        if not np.shape(cov):
-            y = X - mean
-            # TODO: Implement this
-            raise NotImplementedError(
-                "multivariate_t.logpdf doesn't support scalar shape"
-            )
-        else:
-            if cov.ndim < 2 or cov.shape[-2:] != (n_dims, n_dims):
-                raise ValueError("multivariate_t.logpdf got incompatible shapes")
-
-            # actual computation starts here
-            u = 1 / 2 * (df + n_dims)
-            L = lax.linalg.cholesky(cov)
-            y = lax.linalg.triangular_solve(L, X - mean, lower=True, transpose_a=True)
-            return (
-                -u * jnp.log(1 + 1 / df * jnp.einsum("...i,...i->...", y, y))
-                - n_dims / 2 * jnp.log(df * np.pi)
-                + jax.scipy.special.gammaln(u)
-                - jax.scipy.special.gammaln(1 / 2 * df)
-                - jnp.log(L.diagonal(axis1=-1, axis2=-2)).sum(-1)
-            )
-
-
 # evaluates multivariate T dist at x, return logpdf - this version does not check the input
 # from https://gist.github.com/yuneg11/5b493ab689f2c46fce50f19aec2df5b4
 @jax.jit
