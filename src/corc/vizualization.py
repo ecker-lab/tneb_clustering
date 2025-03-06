@@ -1,5 +1,7 @@
 import numpy as np
 import itertools
+from sklearn.metrics import confusion_matrix
+from scipy.optimize import linear_sum_assignment
 
 COLOR_DICT = {
     "blue": "#00549F",  # RWTH-Blau, die Hausfarbe
@@ -69,6 +71,94 @@ COLOR_DICT = {
     "lila_25": "#DEDAEB",
     "lila_10": "#F2F0F7",
 }
+
+def reorder_colors(y_pred, y_true):
+    y_pred_orig = y_pred.copy()
+    # filter -1 predictions ("noise" by HDBSCAN)
+    y_true = y_true[y_pred_orig != -1]
+    y_pred = y_pred[y_pred_orig != -1]
+
+    cm = confusion_matrix(y_true, y_pred)
+    # Use the Hungarian algorithm to find the optimal assignment
+    row_ind, col_ind = linear_sum_assignment(
+        -cm
+    )  # col_ind returns how to reorder the columns (colors of y_pred)
+
+    mapping = np.argsort(col_ind)  # we need the inverse of the assignment
+    y_pred_permuted = np.array(y_pred_orig, dtype=int)
+    y_pred_permuted[y_pred_orig != -1] = mapping[y_pred]
+
+    # equivalent assignment using a for loop
+    # y_pred_permuted = np.zeros_like(y_pred)
+    # for r, c in zip(row_ind, col_ind):
+    #     y_pred_permuted[y_pred == c] = r
+
+    return y_pred_permuted
+
+
+def check_cuda():
+    """
+    Check if CUDA is available, True if CUDA is available, False otherwise.
+    """
+    return jax.devices()[0].platform == "gpu"
+
+
+def get_TSNE_embedding(data_X, perplexity=30, seed=42):
+    """
+    checks cuda availability and selects the correct TSNE implementation based on that.
+    Both implementations give very similar results.
+    """
+    if check_cuda():
+        import tsnecuda
+
+        tsne = tsnecuda.TSNE(
+            n_components=2,
+            random_seed=seed,
+            perplexity=perplexity,
+            metric="euclidean",
+            init="random",  # nothing else is implemented
+            learning_rate=200.0,
+            early_exaggeration=12.0,
+            pre_momentum=0.8,
+            post_momentum=0.8,
+            n_iter=500,
+        )
+        transformed_X = tsne.fit_transform(data_X)
+    else:
+        import openTSNE
+
+        tsne = openTSNE.TSNE(
+            n_components=2,
+            random_state=seed,
+            perplexity=perplexity,
+            metric="euclidean",
+            initialization="random",  # default: pca
+            learning_rate=200.0,
+            early_exaggeration=12.0,
+            n_iter=500,
+            initial_momentum=0.8,
+            final_momentum=0.8,
+            n_jobs=16,
+        )
+        transformed_X = tsne.fit(data_X)
+    return transformed_X
+
+
+def snap_points_to_TSNE(points, data_X, transformed_X):
+    """
+    pseudo-transforming a set of points by using the embedding of the
+    closest point in the dataset. Used only to transform the cluster centres.
+    It is reasonable  since they are in dense regions.
+    """
+    transformed_points = list()
+    for point in points:
+        # find closest point in data_X
+        dists = np.linalg.norm(data_X - point, axis=1)
+        closest_idx = np.argmin(dists)
+        # select the corresponding embedding
+        transformed_points.append(transformed_X[closest_idx])
+    return np.array(transformed_points)
+    
 
 def get_color_scheme(n_colors):
     colors = np.array(

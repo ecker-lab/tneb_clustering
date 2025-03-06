@@ -5,7 +5,6 @@ import yaml
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 import numpy as np
 import subprocess
@@ -45,192 +44,6 @@ def compute_projection(data, cluster1, cluster2, means, predictions):
     return cluster1_proj, cluster2_proj
 
 
-def cond_mkdir(path):
-    """create a folder if there is none.
-
-    Parameters
-    ----------
-    path : str
-        path or foldername
-    """
-    if not exists(path):
-        os.makedirs(path)
-
-
-def generate_overview_lineplot(log_dir):
-    with open(join(log_dir, "config.yaml")) as f:
-        opt = yaml.safe_load(f)
-
-    df = pd.DataFrame(columns=["std", "value", "metric"])
-
-    for metric in opt["metric"]["type"]:
-        df_metric = pd.read_pickle(join(log_dir, f"{metric}.pkl"))
-        df_metric["metric"] = [metric] * len(opt["metric"]["stds"])
-        df_metric = df_metric.rename(columns={metric: "value"})
-        df = pd.concat([df, df_metric])
-
-    fig = plt.figure()
-    sns.lineplot(data=df[df["metric"] != "CH"], x="std", y="value", hue="metric")
-    filename = "overview_lineplot"
-    fig.savefig(join(log_dir, f"{filename}.png"))
-    fig.clear(True)
-
-    sns.lineplot(data=df[df["metric"] == "CH"], x="std", y="value", hue="metric")
-    filename = "overview_lineplot_CH"
-    fig.savefig(join(log_dir, f"{filename}.png"))
-    fig.clear(True)
-
-
-def generate_overview_visplot(log_dir):
-
-    from mpl_toolkits.axes_grid1 import ImageGrid
-
-    with open(join(log_dir, "config.yaml")) as f:
-        opt = yaml.safe_load(f)
-
-    png_dir = join(log_dir, "png")
-    n_stds = len(opt["metric"]["stds"])
-
-    plot_types = sorted(list(set([t.split("_")[0] for t in os.listdir(png_dir)])))
-    n_plots = len(plot_types)
-
-    imgs, titles = [], []
-
-    for std in opt["metric"]["stds"]:
-        for t in plot_types:
-            imgs.append(plt.imread(join(png_dir, f"{t}_{std:.2f}.png")))
-            titles.append(f"plot {t} with std={std}")
-
-    axes_pad = 0.1
-
-    fig = plt.figure(figsize=(20, 20))
-    grid = ImageGrid(
-        fig,
-        111,  # similar to subplot(111)
-        nrows_ncols=(n_stds, n_plots),  # creates 2x2 grid of axes
-        axes_pad=axes_pad,  # pad between axes in inch.
-    )
-
-    for ax, im, title in zip(grid, imgs, titles):
-        ax.set_title(title, fontdict={"fontsize": 7}, pad=-0.5)
-        ax.imshow(im)
-        ax.axis("off")
-    plt.axis("off")
-    plt.tight_layout()
-
-    filename = "overview_visplot"
-    fig.savefig(join(log_dir, f"{filename}.pdf"))
-    fig.savefig(join(log_dir, f"{filename}.png"))
-    fig.clear(True)
-
-
-def reorder_colors(y_pred, y_true):
-    y_pred_orig = y_pred.copy()
-    # filter -1 predictions ("noise" by HDBSCAN)
-    y_true = y_true[y_pred_orig != -1]
-    y_pred = y_pred[y_pred_orig != -1]
-
-    cm = confusion_matrix(y_true, y_pred)
-    # Use the Hungarian algorithm to find the optimal assignment
-    row_ind, col_ind = linear_sum_assignment(
-        -cm
-    )  # col_ind returns how to reorder the columns (colors of y_pred)
-
-    mapping = np.argsort(col_ind)  # we need the inverse of the assignment
-    y_pred_permuted = np.array(y_pred_orig, dtype=int)
-    y_pred_permuted[y_pred_orig != -1] = mapping[y_pred]
-
-    # equivalent assignment using a for loop
-    # y_pred_permuted = np.zeros_like(y_pred)
-    # for r, c in zip(row_ind, col_ind):
-    #     y_pred_permuted[y_pred == c] = r
-
-    return y_pred_permuted
-
-
-def check_cuda():
-    """
-    Check if CUDA is available, True if CUDA is available, False otherwise.
-    """
-    return jax.devices()[0].platform == "gpu"
-
-
-def get_TSNE_embedding(data_X, perplexity=30, seed=42):
-    """
-    checks cuda availability and selects the correct TSNE implementation based on that.
-    Both implementations give very similar results.
-    """
-    if check_cuda():
-        import tsnecuda
-
-        tsne = tsnecuda.TSNE(
-            n_components=2,
-            random_seed=seed,
-            perplexity=perplexity,
-            metric="euclidean",
-            init="random",  # nothing else is implemented
-            learning_rate=200.0,
-            early_exaggeration=12.0,
-            pre_momentum=0.8,
-            post_momentum=0.8,
-            n_iter=500,
-        )
-        transformed_X = tsne.fit_transform(data_X)
-    else:
-        import openTSNE
-
-        tsne = openTSNE.TSNE(
-            n_components=2,
-            random_state=seed,
-            perplexity=perplexity,
-            metric="euclidean",
-            initialization="random",  # default: pca
-            learning_rate=200.0,
-            early_exaggeration=12.0,
-            n_iter=500,
-            initial_momentum=0.8,
-            final_momentum=0.8,
-            n_jobs=16,
-        )
-        transformed_X = tsne.fit(data_X)
-    return transformed_X
-
-
-def snap_points_to_TSNE(points, data_X, transformed_X):
-    """
-    pseudo-transforming a set of points by using the embedding of the
-    closest point in the dataset. Used only to transform the cluster centres.
-    It is reasonable  since they are in dense regions.
-    """
-    transformed_points = list()
-    for point in points:
-        # find closest point in data_X
-        dists = np.linalg.norm(data_X - point, axis=1)
-        closest_idx = np.argmin(dists)
-        # select the corresponding embedding
-        transformed_points.append(transformed_X[closest_idx])
-    return np.array(transformed_points)
-
-
-def compute_mst_edges(raw_adjacency):
-    """
-    Computes the edges of the minimum spanning tree of the given adjacency matrix.
-
-    Parameters
-    ----------
-    raw_adjacency : scipy.sparse.csr_matrix
-        The adjacency matrix of the graph.
-
-    Returns
-    -------
-    entries : list of tuples
-        Each tuple contains the row and column indices of a minimum spanning tree edge.
-    """
-    mst = -scipy.sparse.csgraph.minimum_spanning_tree(-raw_adjacency)
-    rows, cols = mst.nonzero()
-    entries = list(zip(rows, cols))
-    return entries
-
 def mixture_center_locations(mixture_model):
     # extract cluster centers
     if isinstance(mixture_model, sklearn.mixture.GaussianMixture):
@@ -243,99 +56,9 @@ def mixture_center_locations(mixture_model):
         raise ValueError("Unknown mixture model type")
     return locations
 
-def plot_field(
-    data_X,
-    mixture_model,
-    levels=20,
-    paths=None,  # storage of all paths
-    selection=None,  # selection which paths to plot
-    save_path=None,
-    axis=None,
-    plot_points=True,  # whether data_X is plotted
-    transformed_points=None,
-    grid_resolution=128,
-    plot_ids=True,
-    bend_paths=False,
-    landscape_kwargs={},
-):
-    """Plots the TMM/GMM field and the optimized paths (if available).
-    selection: selects which paths are included in the plot, by default, all paths are included.
-      other typical options: MST through selection=zip(mst.row,mst.col) and individuals via e.g. [(0,1), (3,4)]
-
-    """
-    # extract cluster centers
-    locations = mixture_center_locations(mixture_model)
-    n_components = len(locations)
-
-    # Compute TSNE if necessary
-    if data_X.shape[-1] > 2:
-        if transformed_points is None:
-            transformed_points = get_TSNE_embedding(data_X)
-        locations = snap_points_to_TSNE(
-            locations, data_X, transformed_points
-        )
-    else:
-        transformed_points = data_X
-
-    if axis is None:
-        figure, axis = plt.subplots(1, 1)
-
-    # plot the energy landscape if possible
-    if data_X.shape[-1] == 2:
-        mixture_model.plot_energy_landscape(
-            data_X=data_X,
-            levels=levels,
-            grid_resolution=grid_resolution,
-            axis=axis,
-            kwargs=landscape_kwargs,
-        )
-
-    # plot the raw data
-    if plot_points:
-        axis.scatter(
-            transformed_points[:, 0], transformed_points[:, 1], s=10, label="raw data"
-        )
-
-    # plot cluster centers and IDs
-    axis.scatter(
-        locations[:, 0],
-        locations[:, 1],
-        color="black",
-        # marker="X",
-        label="mixture centers",
-        s=30,
-    )
-    if plot_ids:
-        for i, location in enumerate(locations):
-            y_min, y_max = axis.get_ylim()
-            scale = y_max - y_min
-            axis.annotate(f"{i}", xy=location - 0.05 * scale, color="black")
-
-    # plot paths between centers (by default: all)
-    if paths is not None:
-        if selection is None:
-            selection = list(itertools.combinations(range(n_components), r=2))
-        for i, j in selection:
-            if bend_paths:
-                path = paths[(i, j)]
-                axis.plot(path[:, 0], path[:, 1], lw=2, alpha=0.5, color="black")
-            else:
-                start = locations[i]
-                end = locations[j]
-                axis.plot(
-                    *zip(start, end),
-                    color="black",
-                    alpha=1,
-                )
-
-    if save_path is not None:
-        plt.savefig(save_path)
-
-    # not returning the axis object since it is modified in-place
-
 
 def best_possible_labels_from_overclustering(y_true, y_pred):
-    confusion = sklearn.metrics.confusion_matrix(y_true, y_pred)
+    confusion = confusion_matrix(y_true, y_pred)
 
     # Create a mapping of predicted clusters to the majority true label
     best_labels = np.zeros(confusion.shape[1], dtype=int)
@@ -485,7 +208,7 @@ def load_dataset(dataset_name, cache_path="../cache"):
     if "X2D" in dataset_info.keys():
         transformed_points = dataset_info["X2D"]
     elif dimension > 2:
-        transformed_points = get_TSNE_embedding(X)
+        transformed_points = corc.vizualization.get_TSNE_embedding(X)
     else:
         transformed_points = X
     return X, y, transformed_points

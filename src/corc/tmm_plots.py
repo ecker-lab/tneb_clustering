@@ -45,7 +45,7 @@ def plot_row(data_X, data_y, tmm_model, transformed_points=None):
         if data_X.shape[-1] == 2:
             transformed_points = data_X
         else:
-            transformed_points = corc.utils.get_TSNE_embedding(data_X)
+            transformed_points = corc.vizualization.get_TSNE_embedding(data_X)
 
     axes[0].scatter(
         transformed_points[:, 0], transformed_points[:, 1], c=data_y, cmap="viridis"
@@ -53,11 +53,9 @@ def plot_row(data_X, data_y, tmm_model, transformed_points=None):
     axes[0].set_title("Ground Truth")
 
     # heatmap with arrows
-    mst_edges = corc.utils.compute_mst_edges(tmm_model.raw_adjacency_)
-    corc.utils.plot_field(
+    mst_edges = tmm_model.compute_mst_edges()
+    tmm_model.plot_field(
         data_X,
-        tmm_model.mixture_model,
-        paths=tmm_model.paths_,
         selection=mst_edges,
         axis=axes[1],
         transformed_points=transformed_points,
@@ -105,8 +103,8 @@ def plot_cluster_levels(
         transformed_points = data_X
     else:
         if transformed_points is None:
-            transformed_points = corc.utils.get_TSNE_embedding(data_X)
-        centers = corc.utils.snap_points_to_TSNE(centers, data_X, transformed_points)
+            transformed_points = corc.vizualization.get_TSNE_embedding(data_X)
+        centers = corc.vizualization.snap_points_to_TSNE(centers, data_X, transformed_points)
 
     for index, level in enumerate(levels):
         axis = axes[index]
@@ -149,7 +147,7 @@ def plot_tmm_models(
         else:
             print("computing TSNE...", end="")
             start_tsne = time.time()
-            transformed_X = corc.utils.get_TSNE_embedding(data_X)
+            transformed_X = corc.vizualization.get_TSNE_embedding(data_X)
             print(f"done. ({time.time() - start_tsne:.2f}s)")
     else:  # dimension == 2
         transformed_X = data_X
@@ -198,7 +196,7 @@ def plot_tmm_models(
         )
 
         # draw points
-        y_pred_permuted = corc.utils.reorder_colors(y_pred, data_y)
+        y_pred_permuted = corc.vizualization.reorder_colors(y_pred, data_y)
         plt.scatter(
             transformed_X[:, 0],
             transformed_X[:, 1],

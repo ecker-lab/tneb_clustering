@@ -7,7 +7,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sklearn.neighbors import kneighbors_graph
 from abc import ABC, abstractmethod
-from corc.utils import compute_projection, set_seed, snap_points_to_TSNE
+from corc.utils import compute_projection, set_seed
 
 
 class Graph(ABC):
@@ -115,7 +115,7 @@ class Graph(ABC):
         cluster_means = np.array(self.graph_data["nodes"])
 
         if X2D is not None:
-            cluster_means = snap_points_to_TSNE(
+            cluster_means = corc.vizualization.snap_points_to_TSNE(
                 points=cluster_means, data_X=self.data, transformed_X=X2D
             )
             self.graph_data["nodes"] = cluster_means
