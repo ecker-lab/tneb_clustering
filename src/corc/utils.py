@@ -5,7 +5,6 @@ import yaml
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import corc.utils
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 import numpy as np
@@ -16,10 +15,17 @@ import itertools
 import scipy
 import corc.studentmixture
 import diptest
+import random
 
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 import jax
+
+
+def set_seed(random_state):
+    os.environ['PYTHONHASHSEED']=str(random_state)
+    random.seed(random_state)
+    np.random.seed(random_state)
 
 
 def compute_projection(data, cluster1, cluster2, means, predictions):
@@ -49,24 +55,6 @@ def cond_mkdir(path):
     """
     if not exists(path):
         os.makedirs(path)
-
-
-def save(data, filename, outdir):
-    """save data using pickle in folder under given name
-
-    Parameters
-    ----------
-    data : ndarray
-        data that should be saved
-    filename : str
-        name under which data is saved
-    outdir : str
-        folder name where to save data
-    """
-    with open(join(outdir, f"{filename}.pkl"), "wb") as f:
-        pickle.dump(data, f)
-    with open(join(outdir, f"{filename}.txt"), "w") as f:
-        f.write(f"{data}")
 
 
 def generate_overview_lineplot(log_dir):
@@ -277,8 +265,8 @@ def plot_field(
     # Compute TSNE if necessary
     if data_X.shape[-1] > 2:
         if transformed_points is None:
-            transformed_points = corc.utils.get_TSNE_embedding(data_X)
-        locations = corc.utils.snap_points_to_TSNE(
+            transformed_points = get_TSNE_embedding(data_X)
+        locations = snap_points_to_TSNE(
             locations, data_X, transformed_points
         )
     else:
@@ -492,7 +480,7 @@ def load_dataset(dataset_name, cache_path="../cache"):
     if "X2D" in dataset_info.keys():
         transformed_points = dataset_info["X2D"]
     elif dimension > 2:
-        transformed_points = corc.utils.get_TSNE_embedding(X)
+        transformed_points = get_TSNE_embedding(X)
     else:
         transformed_points = X
     return X, y, transformed_points
