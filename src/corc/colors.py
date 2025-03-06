@@ -86,6 +86,7 @@ def get_color_scheme(n_colors):
                         "#e41a1c",  # red
                         "#dede00",  # yellow
                         "#ADD8E6",  # light blue,added by Martin (or 87CEEB)
+                        # "#00BFFF",  # was in `get_color_scheme_from_preds` instead of the line before
                     ]
                 ),
                 int(n_colors),
