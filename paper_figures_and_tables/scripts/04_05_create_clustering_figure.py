@@ -6,7 +6,7 @@ import corc.our_algorithms
 import corc.our_datasets as our_datasets
 import corc.our_algorithms as our_algorithms
 import corc.tmm_plots
-from corc.vizualization import get_color_scheme
+from corc.visualization import get_color_scheme
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
@@ -114,7 +114,7 @@ def main(opt):
 
             # plot points
             colors = get_color_scheme(int(max(max(y_pred), max(y)) + 1)) 
-            y_pred_permuted = corc.vizualization.reorder_colors(y_pred, y)
+            y_pred_permuted = corc.visualization.reorder_colors(y_pred, y)
             ax.scatter(points[:, 0], points[:, 1], s=10, color=colors[y_pred_permuted])
 
             # plot graph

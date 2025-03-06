@@ -357,7 +357,7 @@ class NEB(Graph):
         if data_X.shape[-1] > 2:
             if transformed_points is None:
                 transformed_points = get_TSNE_embedding(data_X)
-            locations = corc.vizualization.snap_points_to_TSNE(
+            locations = corc.visualization.snap_points_to_TSNE(
                 locations, data_X, transformed_points
             )
         else:
@@ -469,7 +469,7 @@ class NEB(Graph):
                     "TSNE transform must be given for high-dimensional datasets"
                 )
             # if not hasattr(self, "transformed_centers_"):
-            cluster_means = corc.vizualization.snap_points_to_TSNE(
+            cluster_means = corc.visualization.snap_points_to_TSNE(
                 points=self.get_centers(),
                 data_X=self.data,
                 transformed_X=X2D,

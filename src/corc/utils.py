@@ -208,7 +208,7 @@ def load_dataset(dataset_name, cache_path="../cache"):
     if "X2D" in dataset_info.keys():
         transformed_points = dataset_info["X2D"]
     elif dimension > 2:
-        transformed_points = corc.vizualization.get_TSNE_embedding(X)
+        transformed_points = corc.visualization.get_TSNE_embedding(X)
     else:
         transformed_points = X
     return X, y, transformed_points

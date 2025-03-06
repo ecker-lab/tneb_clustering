@@ -121,7 +121,7 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
 
     # ours
     y_pred = tmm_model.predict_with_target(X, len(np.unique(y)))
-    y_pred = corc.vizualization.reorder_colors(y_pred, y)
+    y_pred = corc.visualization.reorder_colors(y_pred, y)
     ari_neb = sklearn.metrics.adjusted_rand_score(y, y_pred)
     axs[1, 0].scatter(
         transformed_points[:, 0],
@@ -130,7 +130,7 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         cmap="viridis",
         s=10,
     )
-    centers = corc.vizualization.snap_points_to_TSNE(
+    centers = corc.visualization.snap_points_to_TSNE(
         tmm_model.mixture_model.centers, X, transformed_points
     )
     axs[1, 0].scatter(centers[:, 0], centers[:, 1], c="red", marker="X", s=marker_size)
@@ -152,7 +152,7 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         dip_stat=False,
         data=X
     )
-    y_baseline = corc.vizualization.reorder_colors(y_baseline, y)
+    y_baseline = corc.visualization.reorder_colors(y_baseline, y)
     ari_baseline = sklearn.metrics.adjusted_rand_score(y, y_baseline)
     axs[2, 0].scatter(
         transformed_points[:, 0],
@@ -178,7 +178,7 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
     kmeans_pred_joined = corc.utils.predict_by_joining_closest_clusters(
         centers=centers, y_pred=kmeans_pred, num_classes=len(np.unique(y)), dip_stat=False, data=X
     )
-    kmeans_pred_joined = corc.vizualization.reorder_colors(kmeans_pred_joined, y)
+    kmeans_pred_joined = corc.visualization.reorder_colors(kmeans_pred_joined, y)
     ari_kmeans = sklearn.metrics.adjusted_rand_score(y, kmeans_pred_joined)
     axs[3, 0].scatter(
         transformed_points[:, 0],
@@ -187,7 +187,7 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         cmap="viridis",
         s=10,
     )
-    centers = corc.vizualization.snap_points_to_TSNE(centers, X, transformed_points)
+    centers = corc.visualization.snap_points_to_TSNE(centers, X, transformed_points)
     axs[3, 0].scatter(centers[:, 0], centers[:, 1], c="red", marker="X", s=marker_size)
     axs[3, 0].set_title("K-Means (Baseline)")
     best_mask_kmeans = y == corc.utils.best_possible_labels_from_overclustering(
@@ -210,7 +210,7 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         data=tmm_model.data
     )
 
-    dip_stat_pred_joined = corc.vizualization.reorder_colors(dip_stat_pred_joined, y)
+    dip_stat_pred_joined = corc.visualization.reorder_colors(dip_stat_pred_joined, y)
     ari_dip_stat = sklearn.metrics.adjusted_rand_score(y, dip_stat_pred_joined)
 
     axs[4, 0].scatter(
@@ -220,7 +220,7 @@ def create_plot(X, transformed_points, y, tmm_model, seed, n_components):
         cmap="viridis",
         s=10,
     )
-    centers = corc.vizualization.snap_points_to_TSNE(
+    centers = corc.visualization.snap_points_to_TSNE(
         tmm_model.mixture_model.centers, X, transformed_points
     )
     axs[4, 0].scatter(centers[:, 0], centers[:, 1], c="red", marker="X", s=marker_size)

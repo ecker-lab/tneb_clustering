@@ -150,7 +150,7 @@ class PAGA(Graph):
             else:
                 if X2D is not None:
                     # cluster_means = X2D.transform(cluster_means)
-                    cluster_means = corc.vizualization.snap_points_to_TSNE(
+                    cluster_means = corc.visualization.snap_points_to_TSNE(
                         points=cluster_means, data_X=self.data, transformed_X=X2D
                     )
                     self.graph_data["nodes"] = cluster_means

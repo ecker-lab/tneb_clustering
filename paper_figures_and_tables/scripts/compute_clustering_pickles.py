@@ -66,7 +66,7 @@ def main():
                 starttime = time.time()
                 perplexity = 100 if dataset in ["Paul15"] else 30
                 print("computing TSNE", end="")
-                X2D = corc.vizualization.get_TSNE_embedding(data_X=X, perplexity=perplexity)
+                X2D = corc.visualization.get_TSNE_embedding(data_X=X, perplexity=perplexity)
                 print(
                     f"finished TSNE fit for {params['name']} in {time.time()-starttime:.2f} seconds"
                 )
