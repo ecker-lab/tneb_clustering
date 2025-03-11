@@ -43,43 +43,43 @@ def make_gaussians(
     if not isinstance(std, np.ndarray):
         assert isinstance(std, list) or isinstance(std, float), f'Std needs to be float or list or np.ndarray'
         std = np.array(std) if isinstance(std, list) else np.array([std] * n_centers)
-    assert len(std) == self.n_centers, f'Number of stds needs to be same as number of cluster centers.'
+    assert len(std) == n_centers, f'Number of stds needs to be same as number of cluster centers.'
 
     # define cluster centers
-    cluster_centers = np.random.uniform(0,1,size=(self.n_centers, self.dim))
+    cluster_centers = np.random.uniform(0,1,size=(n_centers, dim))
 
     # sample data points around cluster centers
     latent_emb = []
     for (cluster_center, samples, std_) in zip(cluster_centers, n_samples_around_c, std):
         samples = np.random.normal(cluster_center, std_, size=(samples, dim))
         latent_emb = np.concatenate((latent_emb, samples), axis=None)
-    latent_emb = np.array(latent_emb).reshape(self.n_samples_around_c.sum(), -1)
+    latent_emb = np.array(latent_emb).reshape(n_samples_around_c.sum(), -1)
 
     # normalize data
     X = StandardScaler().fit_transform(latent_emb)
     return X, labels
 
 
-def make_densired(dim, n_samples, std=1.0, random_state=42):
-    skeleton = densired.datagen.densityDataGen(
-        dim=dim,
-        radius=5,
-        clunum=6,
-        core_num=200,
-        min_dist=0.7,
-        step_spread=0.3,
-        # ratio_noise=0.1,
-        ratio_con=0.01,
-        dens_factors=True,  # list of factors, where factor = round((np.random.rand() * 1.5) + 0.5, 2)
-        # dens_factors=False, # list of [1]s
-        # dens_factors=[std]*6, # set std per cluster
-        seed=random_state,
-    )
-    data = skeleton.generate_data(data_num=n_samples)
-    X = data[:, :-1]
-    y = data[:, -1]
-    X = StandardScaler().fit_transform(X)
-    return X, y
+# def make_densired(dim, n_samples, std=1.0, random_state=42):
+#     skeleton = densired.datagen.densityDataGen(
+#         dim=dim,
+#         radius=5,
+#         clunum=6,
+#         core_num=200,
+#         min_dist=0.7,
+#         step_spread=0.3,
+#         # ratio_noise=0.1,
+#         ratio_con=0.01,
+#         dens_factors=True,  # list of factors, where factor = round((np.random.rand() * 1.5) + 0.5, 2)
+#         # dens_factors=False, # list of [1]s
+#         # dens_factors=[std]*6, # set std per cluster
+#         seed=random_state,
+#     )
+#     data = skeleton.generate_data(data_num=n_samples)
+#     X = data[:, :-1]
+#     y = data[:, -1]
+#     X = StandardScaler().fit_transform(X)
+#     return X, y
 
 
 def load_densired(dim, path="../datasets/densired.npz"):

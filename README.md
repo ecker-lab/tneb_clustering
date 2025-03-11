@@ -4,12 +4,12 @@ To replicate the images please go through the setup and then go to `paper_figure
 
 ## Setup
 Clone the repo, initialize the environment and install the package locally.
-The first line of the yml file sets the new environment's name `corc_env`.
+The first line of the yml file sets the new environment's name `tneb`. This can be overwritten through `-n`.
 ```
 git clone https://github.com/ecker-lab/tneb_clustering
 cd tneb_clustering
 conda env create -f environment.yml 
-conda activate corc_env # The first line of the yml file sets the new environment's name `corc_env`.
+conda activate tneb # The first line of the yml file sets the new environment's name `tneb`.
 pip install -e .
 ```
 Please note that if you want to generate densire or densired soft datasets yourself, this requires a different environment.

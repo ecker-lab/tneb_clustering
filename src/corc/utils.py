@@ -1,24 +1,19 @@
 from os.path import exists, join
 import os
 import pickle
-import yaml
-import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 import numpy as np
-import subprocess
 import sklearn
 import studenttmixture
-import itertools
-import scipy
 import corc.mixture
 import diptest
 import random
 
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
-import jax
+# import jax
 
 
 def set_seed(random_state):

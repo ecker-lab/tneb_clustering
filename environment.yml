@@ -1,4 +1,4 @@
-name: corc_env
+name: tneb
 channels:
   - defaults
   - conda-forge
@@ -21,6 +21,7 @@ dependencies:
   - openblas
   - dask
   - tsnecuda
+  - scikit-learn
   - pip:
     - jax[cuda12]
     - jaxtyping
@@ -28,10 +29,6 @@ dependencies:
     - studenttmixture
     - flarejax
     - diptest
-    - pyslingshot
     - pybind11
     - hnswlib
-    - pyVIA
     - python-igraph
-    - densired
-    - numpy==1.26.4
