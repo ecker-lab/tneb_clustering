@@ -32,3 +32,4 @@ dependencies:
     - pybind11
     - hnswlib
     - python-igraph
+    - -e .

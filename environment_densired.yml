@@ -1,0 +1,17 @@
+name: densired
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python
+  - scipy
+  - opentsne
+  - tsnecuda
+  - ipykernel
+  - scikit-learn
+  - pytorch
+  - matplotlib
+  - numpy>=2
+  - pip:
+    - densired
+    - -e .
