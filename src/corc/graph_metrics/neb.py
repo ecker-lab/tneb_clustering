@@ -5,7 +5,7 @@ import tqdm
 import corc.mixture
 import scipy
 import sklearn
-from sklearn.mixture import GaussianMixture
+import sklearn.mixture
 import studenttmixture
 from pandas.core.common import random_state
 import numpy as np
@@ -71,7 +71,7 @@ class NEB(Graph):
                 random_state=seed,
             )
         elif mixture_model_type == "gmm":
-            self.mixture_model = GaussianMixture(
+            self.mixture_model = sklearn.mixture.GaussianMixture(
                 n_components=n_components,
                 n_init=n_init,
                 random_state=seed,
@@ -95,9 +95,6 @@ class NEB(Graph):
     def filter_mixture_model(
         self, old_mixture_model, data_X, min_cluster_size, max_elongation
     ):
-    '''
-    This function basically creates a copy and disabled filtering in place in order to relax filtering if no components are fixed, in order to be able to "redo the step".
-    '''
         """
         Filter a mixture model to select components with at least min_cluster_size elements
         and an elongation of at most max_elongation.

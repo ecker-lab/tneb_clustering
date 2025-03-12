@@ -76,6 +76,7 @@ def predict_tmm_jax(X, means, covs, weights):
     probs = jnp.nan_to_num(
         probs, nan=0.0
     )  # NaNs might occur in logpdf because jax uses 32bits
+    probs = probs / jnp.sum(probs, axis=0)
     predictions_jax = jnp.argmax(probs, axis=0)
     return predictions_jax, probs
 
@@ -94,6 +95,7 @@ def predict_gmm_jax(X, means, covs, weights):
     # Find the index of the maximum log probability for each sample
     probs = jnp.exp(logprobs_jax)
     probs = jnp.nan_to_num(probs, nan=0.0)
+    probs = probs / jnp.sum(probs, axis=0)
     predictions_jax = jnp.argmax(probs, axis=0)
     return predictions_jax, probs
 

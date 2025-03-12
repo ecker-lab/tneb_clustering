@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tneb"
+version = "0.1"
+description = "Python package to t-NEB clustering"
+readme = "README.md"
+authors = [
+    {name = "Laura Hansel", email = "hansel@cs.uni-goettingen.de"},
+    {name = "Polina Turishcheva", email = "turishcheva@cs.uni-goettingen.de"},
+    {name = "Martin Ritzert", email = "ritzert@informatik.uni-goettingen.de"}
+]
+license = {text = "MIT"} 
+
+dependencies = [
+    # List dependencies if needed
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -2,11 +2,11 @@ import numpy as np
 from sklearn import cluster, datasets
 from sklearn.neighbors import kneighbors_graph
 from corc.create_datasets import complex_datasets, datasets2d
+import os
 
-
-DENSIRED_PATH = "datasets/densired.npz"
-DENSIRED_SOFT_PATH = "datasets/densired_soft.npz"
-MNIST_PATH = "datasets/mvae_mnist_nd_saved.pkl"
+DENSIRED_FILENAME = "densired.npz"
+DENSIRED_SOFT_FILENAME = "densired_soft.npz"
+MNIST_FILENAME = "mvae_mnist_nd_saved.pkl"
 
 
 dataset_displaynames = {
@@ -152,7 +152,9 @@ class our_datasets:
         self,
         n_samples=1000,
         seed=30,
+        dataset_folder="datasets",
     ) -> None:
+        self.dataset_folder = dataset_folder
         # ============
         # Set up cluster parameters
         # ============
@@ -262,30 +264,35 @@ class our_datasets:
             equal_sized_clusters=False,
         )
 
-        # funky shapes with 6 clusters in 8D, 16D, 32D, 64D
-        densired0 = complex_datasets.load_densired(dim=dims[0], path=DENSIRED_PATH)
-        densired1 = complex_datasets.load_densired(dim=dims[1], path=DENSIRED_PATH)
-        densired2 = complex_datasets.load_densired(dim=dims[2], path=DENSIRED_PATH)
-        densired3 = complex_datasets.load_densired(dim=dims[3], path=DENSIRED_PATH)
 
+
+        # funky shapes with 6 clusters in 8D, 16D, 32D, 64D
+        densired_path = os.path.join(self.dataset_folder, DENSIRED_FILENAME)
+        densired0 = complex_datasets.load_densired(dim=dims[0], path=densired_path)
+        densired1 = complex_datasets.load_densired(dim=dims[1], path=densired_path)
+        densired2 = complex_datasets.load_densired(dim=dims[2], path=densired_path)
+        densired3 = complex_datasets.load_densired(dim=dims[3], path=densired_path)
+
+        densired_soft_path = os.path.join(self.dataset_folder, DENSIRED_SOFT_FILENAME)
         densired_soft_0 = complex_datasets.load_densired(
-            dim=dims[0], path=DENSIRED_SOFT_PATH
+            dim=dims[0], path=densired_soft_path
         )
         densired_soft_1 = complex_datasets.load_densired(
-            dim=dims[1], path=DENSIRED_SOFT_PATH
+            dim=dims[1], path=densired_soft_path
         )
         densired_soft_2 = complex_datasets.load_densired(
-            dim=dims[2], path=DENSIRED_SOFT_PATH
+            dim=dims[2], path=densired_soft_path
         )
         densired_soft_3 = complex_datasets.load_densired(
-            dim=dims[3], path=DENSIRED_SOFT_PATH
+            dim=dims[3], path=densired_soft_path
         )
 
         # MNIST-Nd
-        mnist0 = complex_datasets.make_mnist_nd(dim=dims[0], path=MNIST_PATH)
-        mnist1 = complex_datasets.make_mnist_nd(dim=dims[1], path=MNIST_PATH)
-        mnist2 = complex_datasets.make_mnist_nd(dim=dims[2], path=MNIST_PATH)
-        mnist3 = complex_datasets.make_mnist_nd(dim=dims[3], path=MNIST_PATH)
+        mnist_path = os.path.join(self.dataset_folder, MNIST_FILENAME)
+        mnist0 = complex_datasets.make_mnist_nd(dim=dims[0], path=mnist_path)
+        mnist1 = complex_datasets.make_mnist_nd(dim=dims[1], path=mnist_path)
+        mnist2 = complex_datasets.make_mnist_nd(dim=dims[2], path=mnist_path)
+        mnist3 = complex_datasets.make_mnist_nd(dim=dims[3], path=mnist_path)
 
         ############
         # store dataset together with default parameters
@@ -779,3 +786,19 @@ class our_datasets:
             if params["name"] in dataset_selector
         ]
         return datasets
+
+    def get_single_dataset(self, dataset_name):
+        """
+        This function returns a dataset without requiring a generated the "cache" folder.
+        dataset_name: str
+            The name of the dataset to be returned.
+
+        Returns
+        -------
+        (X,y) or None if the dataset is not found.
+        """
+        the_dataset = self.select_datasets([dataset_name])
+        if len(the_dataset) == 0:
+            return None
+        else: 
+            return the_dataset[0][0]

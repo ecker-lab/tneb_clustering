@@ -4,15 +4,17 @@ To replicate the images please go through the setup and then go to `paper_figure
 
 ## Setup
 Clone the repo, initialize the environment and install the package locally.
-The first line of the yml file sets the new environment's name `corc_env`.
+The first line of the yml file sets the new environment's name `tneb`. This can be overwritten through `-n`.
 ```
 git clone https://github.com/ecker-lab/tneb_clustering
 cd tneb_clustering
 conda env create -f environment.yml 
-conda activate corc_env # The first line of the yml file sets the new environment's name `corc_env`.
-pip install -e .
+conda activate tneb 
 ```
-Please note that if you want to generate densire or densired soft datasets yourself, this requires a different environment.
 
 ## tsnecude installation
 If tsne-cuda installation causes problem, it is likely that your cuda drivers have different version. For more details and installation, see [here](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).
+
+## Recreating the densired datasets
+
+Since densired relies on modern packages while some baselines necessitate `numpy<2`, an additional environment is needed for running the code in the `densired.ipynb` notebook. It can be installed using `conda env create -f environment_densired.yml` which creates the environment `densired`. This step is _not_ necessary to reproduce our results as we provide an precompiled `.npz` version of the densired datasets.
