@@ -789,6 +789,7 @@ class our_datasets:
 
     def get_single_dataset(self, dataset_name):
         """
+        This function returns a dataset without requiring a generated the "cache" folder.
         dataset_name: str
             The name of the dataset to be returned.
 
