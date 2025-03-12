@@ -72,6 +72,7 @@ COLOR_DICT = {
     "lila_10": "#F2F0F7",
 }
 
+
 def reorder_colors(y_pred, y_true):
     y_pred_orig = y_pred.copy()
     # filter -1 predictions ("noise" by HDBSCAN)
@@ -98,9 +99,20 @@ def reorder_colors(y_pred, y_true):
 
 def check_cuda():
     """
-    Check if CUDA is available, True if CUDA is available, False otherwise.
+    Check if CUDA is available using JAX or PyTorch.
+    Returns True if CUDA is available, False otherwise.
     """
-    return jax.devices()[0].platform == "gpu"
+    try:
+        import jax
+
+        return jax.devices()[0].platform == "gpu"
+    except ImportError:
+        try:
+            import torch
+
+            return torch.cuda.is_available()
+        except ImportError:
+            return False
 
 
 def get_TSNE_embedding(data_X, perplexity=30, seed=42):
@@ -158,7 +170,7 @@ def snap_points_to_TSNE(points, data_X, transformed_X):
         # select the corresponding embedding
         transformed_points.append(transformed_X[closest_idx])
     return np.array(transformed_points)
-    
+
 
 def get_color_scheme(n_colors):
     colors = np.array(
