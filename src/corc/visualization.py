@@ -99,20 +99,12 @@ def reorder_colors(y_pred, y_true):
 
 def check_cuda():
     """
-    Check if CUDA is available using JAX or PyTorch.
+    Check if CUDA is available using JAX.
     Returns True if CUDA is available, False otherwise.
     """
-    try:
-        import jax
+    import jax
 
-        return jax.devices()[0].platform == "gpu"
-    except ImportError:
-        try:
-            import torch
-
-            return torch.cuda.is_available()
-        except ImportError:
-            return False
+    return jax.devices()[0].platform == "gpu"
 
 
 def get_TSNE_embedding(data_X, perplexity=30, seed=42):
