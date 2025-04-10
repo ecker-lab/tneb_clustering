@@ -30,7 +30,6 @@ def plot_logprob_lines(mixture_model, i, j, temps, logprobs, path=None):
         plt.savefig(path)
 
 
-
 def plot_row(data_X, data_y, tmm_model, transformed_points=None):
     """
     Creates a plot consisting of
@@ -104,7 +103,9 @@ def plot_cluster_levels(
     else:
         if transformed_points is None:
             transformed_points = corc.visualization.get_TSNE_embedding(data_X)
-        centers = corc.visualization.snap_points_to_TSNE(centers, data_X, transformed_points)
+        centers = corc.visualization.snap_points_to_TSNE(
+            centers, data_X, transformed_points
+        )
 
     for index, level in enumerate(levels):
         axis = axes[index]
@@ -216,10 +217,3 @@ def plot_tmm_models(
 
     # return the figure
     return plt.gcf()
-
-
-def remove_border(ax):
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["bottom"].set_visible(False)
-    ax.spines["left"].set_visible(False)

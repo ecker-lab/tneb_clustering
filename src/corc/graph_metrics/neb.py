@@ -16,41 +16,35 @@ from corc.graph_metrics.graph import Graph
 import corc.graph_metrics.tmm_gmm_neb
 import corc.utils
 import corc
+import corc.visualization
 
 
 class NEB(Graph):
     def __init__(
         self,
-        latent_dim=2,
+        n_components=25,
+        mixture_model_type="tmm",
+        n_neighbors=10,  # number of neighbors for the NEB path computation
+        dataset_name=None,
+        n_clusters=None,  # target number of clusters (filled with GT if labels is given)
+        optimization_iterations=500,  # for NEB (huge impact on time consumption)
+        seed=42,
         data=None,
+        latent_dim=2,  # automatically derived from data if provided. One of both is needed.
         labels=None,
         path=None,
-        n_components=15,
-        n_neighbors=3,
-        thresh=0.01,
-        seed=42,
-        mixture_model_type="tmm",
-        n_init=5,
-        optimization_iterations=300,  # for NEB
-        max_iter_on_retries=10000,  # for TMM fitting, 10x the default
-        dataset_name=None,
-        n_clusters=None,
+        num_NEB_points=10,
         tmm_regularization=1e-4,
-        min_cluster_size=10,  # mixture model filtering is only applied to TMM
+        n_init=5,  # for fitting TMM/GMM
+        thresh=0.01,  # for fitting TMM/GMM
+        reduced_tolerance_on_retry=1e-3,  # for fitting TMM/GMM
+        max_iter_on_retries=10000,  # for TMM fitting, 10x the default
         max_elongation=None,  # will be set to 500 * dim
-        reduced_tolerance_on_retry=1e-3,
+        min_cluster_size=10,  # mixture model filtering is only applied to TMM
+        batch_size=1024,  # for NEB computation (how many paths in parallel)
     ):
         """
-        Initialize the NEB (nudged elastic band) class.
-        GMM/TMM
-
-        Args:
-            data (np.array): Input data.
-            labels (np.array): Labels.
-            latent_dim (int): Dimension of the data.
-            n_components (int): Number of components for GMM/TMM clustering.
-            n_init (int): Number of repetitions during GMM/TMM fitting.
-            mixture_model_type (str): GMM or TMM
+        Initialize the NEB (nudged elastic band) based on TMM/GMM.
         """
         # make sure that latent_dim does match the data if provided
         if data is not None:
@@ -78,6 +72,7 @@ class NEB(Graph):
                 init_params="kmeans",
                 covariance_type="full",  # `full` to make it consistent with the TMM covariance
             )
+
         self.n_components = n_components
         self.n_neighbors = (
             n_neighbors if n_neighbors < n_components else n_components - 1
@@ -91,6 +86,25 @@ class NEB(Graph):
             max_elongation if max_elongation is not None else 500 * latent_dim
         )
         self.reduced_tolerance_on_retry = reduced_tolerance_on_retry
+        self.num_NEB_points = num_NEB_points
+        self.dataset_name = dataset_name
+        self.n_clusters = n_clusters
+        if labels is not None and n_clusters is None:
+            self.n_clusters = len(np.unique(labels))
+        self.batch_size = batch_size
+
+    def convert_mixture_model(self, old_mixture_model):
+        if isinstance(old_mixture_model, studenttmixture.EMStudentMixture):
+            mixture_model = corc.mixture.StudentMixture.from_EMStudentMixture(
+                mixture_model=self.old_mixture_model
+            )
+            model_type = "tmm"
+        elif isinstance(old_mixture_model, sklearn.mixture.GaussianMixture):
+            mixture_model = corc.mixture.GaussianMixtureModel.from_sklearn(
+                self.old_mixture_model
+            )
+            model_type = "gmm"
+        return mixture_model, model_type
 
     def filter_mixture_model(
         self, old_mixture_model, data_X, min_cluster_size, max_elongation
@@ -101,17 +115,7 @@ class NEB(Graph):
         This function is called by fit() with possibly different values for min_cluster_size and max_elongation.
         Filtering does not happen in-place to be able to redo it.
         """
-        if isinstance(old_mixture_model, studenttmixture.EMStudentMixture):
-            mixture_model = corc.mixture.StudentMixture.from_EMStudentMixture(
-                mixture_model=self.old_mixture_model
-            )
-            model_type = "tmm"
-        elif isinstance(self.old_mixture_model, sklearn.mixture.GaussianMixture):
-            mixture_model = corc.mixture.GaussianMixtureModel.from_sklearn(
-                self.old_mixture_model
-            )
-            model_type = "gmm"
-
+        mixture_model, model_type = self.convert_mixture_model(old_mixture_model)
         mixture_model.filter_components(
             data_X=data_X,
             min_cluster_size=min_cluster_size,
@@ -120,9 +124,9 @@ class NEB(Graph):
 
         return mixture_model, model_type
 
-    def fit(self, data, knn=10):
+    def fit(self, data, knn=None):
         """
-        data: data to be fitted on.
+        fit the mixture model (overcluster), compute distances between clusters (based on NEB paths).
         """
         # fit the mixture model (re-use old model if available)
         if hasattr(self, "old_mixture_model"):
@@ -151,6 +155,8 @@ class NEB(Graph):
 
         self.old_mixture_model = self.mixture_model
         original_num_components = self.n_components
+        self.mixture_model, _ = self.convert_mixture_model(self.old_mixture_model)
+        self.mixture_model.print_elongations_and_counts(data)
 
         # filter mixture model
         self.mixture_model, model_type = self.filter_mixture_model(
@@ -168,50 +174,42 @@ class NEB(Graph):
                 min_cluster_size=3 * self.min_cluster_size,
                 max_elongation=50 * self.max_elongation,
             )
-        self.mixture_model.print_elongations_and_counts(data)
         self.centers_ = self.mixture_model.centers
 
         print(
             f"After filtering {original_num_components} components, we are left with {len(self.mixture_model.weights)} components"
         )
-        ## TODO - remove later or add debug flag
         if original_num_components != len(self.mixture_model.weights):
             self.mixture_model.print_elongations_and_counts(data)
+        if knn is None:
+            knn = self.n_neighbors
 
-        # compute NEB paths. This is a very time-consuming step
+        # compute NEB paths.
         (
             self.adjacency_,
             self.raw_adjacency_,
             self.paths_,
-            self.temps_,
-            self.logprobs_,
-        ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths(
+        ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths_batch(
             means=self.mixture_model.centers,
             covs=self.mixture_model.covs,
             weights=self.mixture_model.weights,
-            model_type=model_type,
+            df=self.mixture_model.df,
+            gmm=(model_type == "gmm"),
             iterations=self.iterations,
             knn=knn,
+            num_NEB_points=self.num_NEB_points,
+            batch_size=self.batch_size,
         )
-        # check quality of generated paths
-        corc.graph_metrics.tmm_gmm_neb.evaluate_equidistance(self.paths_)
 
     def compute_mst_edges(self):
         """
-        Computes the edges of the minimum spanning tree of the given adjacency matrix.
-
-        Parameters
-        ----------
-        raw_adjacency : scipy.sparse.csr_matrix
-            The adjacency matrix of the graph.
-
-        Returns
-        -------
-        entries : list of tuples
-            Each tuple contains the row and column indices of a minimum spanning tree edge.
+        Compute the edges of the minimum spanning tree (MST) from the adjacency matrix.
+        Those will be used to merge clusters.
         """
         if self.raw_adjacency_ is None:
-            raise ValueError("Adjacency matrix not computed, you need to fit NEB first.")
+            raise ValueError(
+                "Adjacency matrix not computed, you need to fit NEB first."
+            )
         mst = -scipy.sparse.csgraph.minimum_spanning_tree(-self.raw_adjacency_)
         rows, cols = mst.nonzero()
         entries = list(zip(rows, cols))
@@ -311,21 +309,18 @@ class NEB(Graph):
 
         self.graph_data = {
             "nodes": self.get_centers(),
-            # "nodes_org_space": self.centers_,
             "edges": normalized_edges,
             "raw_edges": edges,
         }
 
         if plot:
             self.plot_graph()
-        #     self._plt_graph_compare(embeddings, self.labels_, save=f"{filename}.png")
 
         if save:
             raise NotImplementedError
 
         if return_graph:
             return self.graph_data
-
 
     def plot_field(
         self,
@@ -353,7 +348,7 @@ class NEB(Graph):
         # Compute TSNE if necessary
         if data_X.shape[-1] > 2:
             if transformed_points is None:
-                transformed_points = get_TSNE_embedding(data_X)
+                transformed_points = corc.visualization.get_TSNE_embedding(data_X)
             locations = corc.visualization.snap_points_to_TSNE(
                 locations, data_X, transformed_points
             )
@@ -376,7 +371,10 @@ class NEB(Graph):
         # plot the raw data
         if plot_points:
             axis.scatter(
-                transformed_points[:, 0], transformed_points[:, 1], s=10, label="raw data"
+                transformed_points[:, 0],
+                transformed_points[:, 1],
+                s=10,
+                label="raw data",
             )
 
         # plot cluster centers and IDs
@@ -413,13 +411,12 @@ class NEB(Graph):
 
         if save_path is not None:
             plt.savefig(save_path)
-    # not returning the axis object since it is modified in-place
+        # not returning the axis object since it is modified in-place
 
     def plot_graph(self, X2D=None, pairs=None, target_num_clusters=None, ax=None):
         """
         Note: automatic "pairs" computation only works if self.labels or self.n_clusters is set.
         """
-        cmap = plt.get_cmap("viridis")  # choose a colormap
         if ax is None:
             ax = plt.gca()
 

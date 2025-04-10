@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 
 class MixtureModel(ABC):
     def __init__(self, centers, covs, weights):
-        self.weights = weights
-        self.centers = centers
-        self.covs = covs
+        self.weights = jnp.array(weights)
+        self.centers = jnp.array(centers)
+        self.covs = jnp.array(covs)
 
     @abstractmethod
     def predict(self, data_X, return_probs=False): ...
@@ -56,27 +56,28 @@ class MixtureModel(ABC):
         elongations = self.get_elongations()
 
         print(np.array(list(zip(counts, elongations)), dtype=int))
+        return counts, elongations
 
     def plot_energy_landscape(
-            self,
-            data_X,  # for boundary computation
-            levels=20,
-            grid_resolution=128,
-            axis=None,
-            kwargs={},
+        self,
+        data_X,  # for boundary computation
+        levels=20,
+        grid_resolution=128,
+        axis=None,
+        kwargs={},
     ):
         if axis == None:
             axis = plt.gca()
 
         # grid coordinates
         margin = 0.5
-        x = np.linspace(
+        x_grid = np.linspace(
             data_X[:, 0].min() - margin, data_X[:, 0].max() + margin, grid_resolution
         )
-        y = np.linspace(
+        y_grid = np.linspace(
             data_X[:, 1].min() - margin, data_X[:, 1].max() + margin, grid_resolution
         )
-        XY = np.stack(np.meshgrid(x, y), -1)
+        XY = np.stack(np.meshgrid(x_grid, y_grid), -1)
 
         # get scores for the grid values
         mm_probs = self.score_samples(XY.reshape(-1, 2)).reshape(
@@ -85,8 +86,8 @@ class MixtureModel(ABC):
         mm_probs = np.clip(mm_probs, None, 0)
         # plotting the energy landscape
         axis.contourf(
-            x,
-            y,
+            x_grid,
+            y_grid,
             mm_probs,
             levels=levels,
             cmap="coolwarm",
@@ -127,15 +128,16 @@ class GaussianMixtureModel(MixtureModel):
 
 class StudentMixture(MixtureModel):
 
-    def __init__(self, centers, covs, weights):
+    def __init__(self, centers, covs, weights, df=1):
         super().__init__(centers, covs, weights)
+        self.df = jnp.array(df)
 
     @classmethod
     def from_EMStudentMixture(cls, mixture_model):
         centers = mixture_model.location
         covs = np.transpose(mixture_model.scale, axes=(2, 0, 1))
         weights = mixture_model.mix_weights
-        return cls(centers, covs, weights)
+        return cls(centers, covs, weights, df=mixture_model.df_)
 
     def predict(self, data_X, return_probs=False):
         predictions, probs = corc.graph_metrics.tmm_gmm_neb.predict_tmm_jax(
@@ -143,6 +145,7 @@ class StudentMixture(MixtureModel):
             means=self.centers,
             covs=self.covs,
             weights=self.weights,
+            df=self.df,
         )
         if return_probs:
             return predictions, probs
@@ -151,5 +154,9 @@ class StudentMixture(MixtureModel):
 
     def score_samples(self, data_X):
         return corc.graph_metrics.tmm_gmm_neb.tmm_jax(
-            X=data_X, means=self.centers, covs=self.covs, weights=self.weights
+            X=data_X,
+            means=self.centers,
+            covs=self.covs,
+            weights=self.weights,
+            df=self.df,
         )
