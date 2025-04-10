@@ -192,10 +192,10 @@ def predict_by_joining_closest_clusters(
     return np.array(joined_predictions, dtype=int)
 
 
-def load_dataset(dataset_name, cache_path="../cache"):
+def load_dataset(dataset_name, cache_path="../cache", return_params=False):
 
     dataset_name = dataset_name.replace(" ", "_")
-    dataset_filename = f"{cache_path}/{dataset_name}.pickle"
+    dataset_filename = os.path.join(cache_path, "datasets", f"{dataset_name}.pickle")
     # Check if the dataset file exists
     if os.path.exists(dataset_filename):
         with open(dataset_filename, "rb") as f:
@@ -218,7 +218,11 @@ def load_dataset(dataset_name, cache_path="../cache"):
         transformed_points = corc.visualization.get_TSNE_embedding(X)
     else:
         transformed_points = X
-    return X, y, transformed_points
+
+    if return_params:
+        return X, y, transformed_points, dataset["dataset_info"]
+    else:
+        return X, y, transformed_points
 
 
 def create_dataset_pickle(dataset_name, dataset_filename=None, cache_path="../cache"):
@@ -243,3 +247,16 @@ def create_dataset_pickle(dataset_name, dataset_filename=None, cache_path="../ca
     with open(dataset_filename, "wb") as f:
         pickle.dump(dataset, f)
     return dataset
+
+
+def create_folder(folder_path):
+    # ask the user if they want to create the directory
+    if not exists(folder_path):
+        create_dir = input(
+            f"Directory {folder_path} does not exist. Do you want to create it? (Y/n): "
+        )
+        if create_dir.lower() == "y" or create_dir == "":
+            os.makedirs(folder_path)
+        else:
+            print("Exiting...")
+            exit(-1)

@@ -45,6 +45,13 @@ ALG_DISPLAYNAMES = {
     "t-Student\nMixture": "Student-t\nMixture",
 }
 
+DETERMINISTIC_ALGORITHMS = [
+    "Agglomerative\nClustering",
+    "HDBSCAN",
+    "Spectral\nClustering",
+    "Leiden",
+]
+
 
 class Leiden:
     def __init__(self, resolution=1.0, seed=42):

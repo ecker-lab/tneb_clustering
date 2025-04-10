@@ -16,79 +16,50 @@ import re
 import pickle
 import sys
 import corc.utils
+import argparse
 
 """
-This file performs the clustering computation and TSNE conversion of all selected datasets and clustering algorithms. The results will be stored in the cache/*.pickle files.
-Those files can then be used by the "partner" script "create_clustering_figure.py" to create the plots.
+This file performs the clustering computation of all selected datasets and clustering algorithms. The results will be stored in the cache/*.pickle files.
+Those files can then be used by the "partner" script "create_clustering_figure.py" to create the overview plots.
 Note that for NEB also TSNE embeddings of the paths between all pairs of nodes are generated, even though this takes a lot of time.
 
 one can call the script with the list of datasets that should be used.
 """
 
 
-def main():
+def main(args):
     # get the datasets and default parameters for them
-    my_datasets = our_datasets.our_datasets()
-    default_base = my_datasets.default_base
+    # if no datasets are given, all datasets will be used
     dataset_selector = (
-        sys.argv[1:] if len(sys.argv[1:]) > 0 else our_datasets.DATASET_SELECTOR
+        args.datasets if len(args.datasets) > 0 else our_datasets.DATASET_SELECTOR
     )
-    datasets = my_datasets.select_datasets(dataset_selector)
+    print(f"Datasets: {dataset_selector}")
 
-    path = "cache"
-    os.makedirs(path, exist_ok=True)
+    cache_path = "cache"
+    corc.utils.create_folder(cache_path)
+    if args.algorithms == "all":
+        clustering_algorithm_selector = our_algorithms.ALGORITHM_SELECTOR
+    elif args.algorithms == "core":
+        clustering_algorithm_selector = our_algorithms.CORE_SELECTOR
+    elif args.algorithms == "tneb":
+        clustering_algorithm_selector = ["TMM-NEB"]
+    elif args.algorithms == "ours":
+        clustering_algorithm_selector = ["GMM-NEB", "TMM-NEB"]
+    print(f"Algorithms: {clustering_algorithm_selector}")
 
-    print(f"Datasets: {[algo_params['name'] for _, algo_params in datasets]}")
+    for i_dataset, dataset_name in enumerate(dataset_selector):
+        X, y, tsne, params = corc.utils.load_dataset(
+            dataset_name, cache_path=cache_path, return_params=True
+        )
 
-    for i_dataset, (dataset, params) in enumerate(datasets):
-
-        print(f"Dataset: {i_dataset+1} of {len(datasets)}: {params['name']}")
-
-        # try to load the dataset from disk
-        dataset_name = re.sub(" ", "_", params["name"])
-        dataset_filename = f"{path}/{dataset_name}.pickle"
-        if os.path.exists(dataset_filename):
-            with open(dataset_filename, "rb") as f:
-                dataset_info = pickle.load(f)
-                X, y = dataset_info["dataset"]
-                X2D = dataset_info["X2D"]
-                # not loading algo_params such that we can make changes there
-        else:
-            # We have to actually do something
-            X, y = dataset
-            y = [0] * len(X) if y is None else np.array(y, dtype="int")
-
-            # normalize dataset for easier parameter selection
-            X = StandardScaler().fit_transform(X)
-
-            # dimensionality reduction for plotting results in 2D
-            if params["dim"] > 2:
-                starttime = time.time()
-                perplexity = 100 if dataset in ["Paul15"] else 30
-                print("computing TSNE", end="")
-                X2D = corc.visualization.get_TSNE_embedding(data_X=X, perplexity=perplexity)
-                print(
-                    f"finished TSNE fit for {params['name']} in {time.time()-starttime:.2f} seconds"
-                )
-            else:
-                X2D = None
-
-            # write dataset with TSNE to disk
-            dataset_info = dict()
-            dataset_info["dataset"] = (X, y)
-            dataset_info["X2D"] = X2D
-            dataset_info["algo_params"] = params
-            with open(dataset_filename, "wb") as f:
-                pickle.dump(dataset_info, f)
-
-        clustering_algorithms = our_algorithms.get_clustering_objects(params, X)
-
-        print(f"Algorithms: {[name for name,_ in clustering_algorithms]}")
+        clustering_algorithms = our_algorithms.get_clustering_objects(
+            params, X, selector=clustering_algorithm_selector
+        )
 
         for name, algorithm in clustering_algorithms:
             # check whether this was already computed
             alg_name = re.sub("\n", "", name)
-            filename = f"{path}/{dataset_name}_{alg_name}.pickle"
+            filename = os.path.join(cache_path, f"{dataset_name}_{alg_name}.pickle")
             if os.path.exists(filename):
                 print(f"{filename} already exists. Skipping.")
                 continue
@@ -111,7 +82,7 @@ def main():
                     + " may not work as expected.",
                     category=UserWarning,
                 )
-                if alg_name in ["GWG-dip", "GaussianMixture", "t-StudentMixture"]:
+                if alg_name not in our_algorithms.DETERMINISTIC_ALGORITHMS:
                     # train 10 with different seeds
                     algorithms = list()
                     base_seed = params["random_state"]
@@ -130,18 +101,25 @@ def main():
             t1 = time.time()
             print(f" (fit in {t1 - t0:.2f} seconds)")
 
-            # store dataset in NEB algorithm object
-            if "NEB" in name:
-                algorithm.data = X
-                algorithm.labels = y
-
             # saving algorithm object (containing everything we computed)
-            alg_name = re.sub("\n", "", name)
-            filename = f"{path}/{dataset_name}_{alg_name}.pickle"
             print(f"saving to {filename}")
             with open(filename, "wb") as f:
                 pickle.dump(algorithm, f)
 
 
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        help="List of datasets to be used. If not provided, all datasets in our_datasets.DATASET_SELECTOR will be used.",
+    )
+    parser.add_argument(
+        "--algorithms",
+        choices=["all", "core", "tneb", "ours"],
+        help="algorithms to be used.",
+    )
+    args = parser.parse_args()
+
+    main(args)
