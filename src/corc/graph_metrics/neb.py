@@ -33,7 +33,6 @@ class NEB(Graph):
         latent_dim=2,  # automatically derived from data if provided. One of both is needed.
         labels=None,
         path=None,
-        num_NEB_points=10,
         tmm_regularization=1e-4,
         n_init=5,  # for fitting TMM/GMM
         thresh=0.01,  # for fitting TMM/GMM
