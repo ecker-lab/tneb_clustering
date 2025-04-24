@@ -10,6 +10,7 @@ import studenttmixture
 import corc.mixture
 import diptest
 import random
+import time
 
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
@@ -17,7 +18,7 @@ os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 
 def set_seed(random_state):
-    os.environ['PYTHONHASHSEED']=str(random_state)
+    os.environ["PYTHONHASHSEED"] = str(random_state)
     random.seed(random_state)
     np.random.seed(random_state)
 
@@ -191,22 +192,71 @@ def predict_by_joining_closest_clusters(
     return np.array(joined_predictions, dtype=int)
 
 
-def load_dataset(dataset_name, cache_path="../cache"):
+def load_dataset(dataset_name, cache_path="../cache", return_params=False):
 
     dataset_name = dataset_name.replace(" ", "_")
-    dataset_filename = f"{cache_path}/{dataset_name}.pickle"
-    with open(dataset_filename, "rb") as f:
-        dataset_info = pickle.load(f)
+    dataset_filename = os.path.join(cache_path, "datasets", f"{dataset_name}.pickle")
+    # Check if the dataset file exists
+    if os.path.exists(dataset_filename):
+        with open(dataset_filename, "rb") as f:
+            dataset = pickle.load(f)
+    else:
+        print(f"Dataset {dataset_name} not found. Creating it...", end="")
+        starttime = time.time()
+        dataset = create_dataset_pickle(
+            dataset_name=dataset_name,
+            dataset_filename=dataset_filename,
+            cache_path=cache_path,
+        )
+        print(f" done. {time.time()-starttime:.2f}s")
 
-    X, y = dataset_info["dataset"]
+    X, y = dataset["dataset"]
     dimension = X.shape[-1]
-    if "X2D" in dataset_info.keys():
-        transformed_points = dataset_info["X2D"]
+    if "X2D" in dataset.keys():
+        transformed_points = dataset["X2D"]
     elif dimension > 2:
         transformed_points = corc.visualization.get_TSNE_embedding(X)
     else:
         transformed_points = X
-    return X, y, transformed_points
+
+    if return_params:
+        return X, y, transformed_points, dataset["dataset_info"]
+    else:
+        return X, y, transformed_points
 
 
+def create_dataset_pickle(dataset_name, dataset_filename=None, cache_path="../cache"):
+    import corc.our_datasets
+    import corc.visualization
 
+    # obtain dataset
+    X, y = corc.our_datasets.our_datasets(
+        dataset_folder=cache_path + "/../datasets"
+    ).get_single_dataset(dataset_name)
+    tsne = corc.visualization.get_TSNE_embedding(X)
+
+    dataset = {
+        "dataset": (X, y),
+        "X2D": tsne,
+        "dataset_name": dataset_name,
+    }
+
+    # Save the dataset to a pickle file
+    if dataset_filename is None:
+        dataset_filename = f"{cache_path}/{dataset_name}.pickle"
+    with open(dataset_filename, "wb") as f:
+        pickle.dump(dataset, f)
+    return dataset
+
+
+def create_folder(folder_path):
+    # ask the user if they want to create the directory
+    if not exists(folder_path):
+        create_dir = input(
+            f"Directory {folder_path} does not exist. Do you want to create it? (Y/n): "
+        )
+        if create_dir.lower() == "y" or create_dir == "":
+            os.makedirs(folder_path)
+        else:
+            print("Exiting...")
+            exit(-1)

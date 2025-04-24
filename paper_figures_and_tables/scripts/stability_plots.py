@@ -25,7 +25,7 @@ import corc.utils
 
 
 def train_multiple_tmm_models_seeds(
-    data_X, data_y, num_seeds=10, neb_iterations=100, gmm=False, n_components=15
+    data_X, data_y, num_seeds=10, neb_iterations=500, gmm=False, n_components=15
 ):
     tmm_models = list()
     for i in range(num_seeds):
@@ -47,7 +47,7 @@ def train_multiple_tmm_models_seeds(
 
 
 def train_multiple_tmm_models_overclustering(
-    data_X, data_y, num_models=3, neb_iterations=25, gmm=False
+    data_X, data_y, num_models=3, neb_iterations=500, gmm=False
 ):
     num_classes = len(np.unique(data_y))
     tmm_models = list()
@@ -138,7 +138,7 @@ def main(args):
 
         # compute tmm models
         if tmm_models is None:
-            print("computing MEP models...")
+            print("computing NEB models...")
             tmm_model_starttime = time.time()
             if args.plot_type == "seeds":
                 tmm_models = train_multiple_tmm_models_seeds(
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-n",
         "--num_models",
-        help="Number of models to compute (default:10)",
+        help="Number of models to compute (default:15)",
         default=15,
         type=int,
     )

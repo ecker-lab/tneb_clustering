@@ -27,14 +27,6 @@ def main(opt):
     # set fontsize
     title_fontsize = 21
     ari_fontsize = 19
-    # the following does not works as opt.datasets has been modified...
-    # if isinstance(opt.datasets, str):
-    #     if opt.datasets.lower() == "main1":
-    #         title_fontsize = 32
-    #         ari_fontsize = 20
-    #     elif opt.datasets.lower() == "main2":
-    #         title_fontsize = 36
-    #         ari_fontsize = 32
 
     print(f"{opt.algorithms}")
 
@@ -62,20 +54,8 @@ def main(opt):
     for i_dataset, dataset_name in enumerate(tqdm.tqdm(opt.datasets)):
 
         # load dataset
-        dataset_filename = f"{opt.cache_path}/{dataset_name}.pickle"
-        if dataset_filename in missing_files:
-            print(f"Skipping dataset {dataset_name}. (file does not exist)")
-            continue
-        with open(dataset_filename, "rb") as f:
-            dataset_info = pickle.load(f)
-
-        X, y = dataset_info["dataset"]
-        if "X2D" in dataset_info.keys():
-            X2D = dataset_info["X2D"]
-        else:
-            X2D = None
-
-        points = X2D if X2D is not None else X
+        X, y, tsne = corc.utils.load_dataset(dataset_name, opt.cache_path)
+        points = tsne if tsne is not None else X
 
         # first column ist GT
 
@@ -113,7 +93,7 @@ def main(opt):
             )
 
             # plot points
-            colors = get_color_scheme(int(max(max(y_pred), max(y)) + 1)) 
+            colors = get_color_scheme(int(max(max(y_pred), max(y)) + 1))
             y_pred_permuted = corc.visualization.reorder_colors(y_pred, y)
             ax.scatter(points[:, 0], points[:, 1], s=10, color=colors[y_pred_permuted])
 
@@ -125,7 +105,7 @@ def main(opt):
                 "GMM-NEB",
             ]:
                 algorithm.plot_graph(
-                    X2D=X2D, target_num_clusters=len(np.unique(y)), ax=ax
+                    X2D=tsne, target_num_clusters=len(np.unique(y)), ax=ax
                 )
 
             # add ARI scores to the plot
@@ -153,72 +133,44 @@ def get_algorithm_and_predictions(opt, dataset_name, algorithm_name, X, y):
     num_classes = len(np.unique(y))
     alg_name = algorithm_name.replace("\\n", "\n").replace("\n", "")
 
-    if alg_name in ["TMM-NEB", "GMM-NEB"]:
-        # select the best NEB model out of 10
-        n_components = 25 if X.shape[-1] > 2 else 15
-        if "TMM" in alg_name:  # TMM-NEB
-            alg_filename = (
-                f"{opt.cache_path}/stability/seeds_{dataset_name}_{n_components}.pkl"
-            )
-        else:  # GMM-NEB
-            alg_filename = f"{opt.cache_path}/stability/seeds_{dataset_name}_gmm_{n_components}.pkl"
-        with open(alg_filename, "rb") as f:
-            neb_models = pickle.load(f)
+    # load algorithm object
+    alg_filename = os.path.join(opt.cache_path, f"{dataset_name}_{alg_name}.pickle")
 
-        # select the best model
-        best_pair = (None, None, -1)
-        for model in neb_models:
-            y_pred = model.predict_with_target(X, num_classes).astype(int)
-            ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
-            if ari > best_pair[2]:
-                best_pair = (model, y_pred, ari)
-        algorithm, y_pred, ari = best_pair
-
-        # Warn if the predictions are surprisingly bad
-        _, counts = np.unique(y_pred, return_counts=True)
-        if max(counts) > 0.7 * len(X) and "NEB" in algorithm_name:
-            print(
-                f"WARNING: {max(counts)/len(X)*100:.2f}% of predictions are in one class. ({algorithm_name} on {dataset_name})"
-            )
-
-    else:  # baseline methods
-        # load algorithm object
-        alg_name = algorithm_name.replace("\\n", "\n").replace("\n", "")
-        alg_filename = f"{opt.cache_path}/{dataset_name}_{alg_name}.pickle"
-
-        # skip if the file is not there
-        if not os.path.exists(alg_filename):
-            return None, None
-
-        with open(alg_filename, "rb") as f:
-            algorithm = pickle.load(f)
-
-        if alg_name in ["GWG-dip", "GaussianMixture", "t-StudentMixture"]:
-            # then there are 10 random seeds
-            best_pair = (None, None, -1)
-            for model in algorithm:  # algorithm is a list of models in this case
-                if alg_name == "GWG-dip":
-                    y_pred = model.predict(
-                        X, target_number_clusters=num_classes
-                    ).astype(int)
-                else:
-                    y_pred = model.predict(X).astype(int)
-                ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
-                if ari > best_pair[2]:
-                    best_pair = (model, y_pred, ari)
-            algorithm, y_pred, ari = best_pair
-
+    def get_prediction(algorithm, X, num_classes):
+        if isinstance(algorithm, corc.graph_metrics.gwgmara.GWGMara):
+            y_pred = algorithm.predict(X, target_number_clusters=num_classes)
+        elif hasattr(algorithm, "labels_"):
+            y_pred = algorithm.labels_.astype(int)
+        elif hasattr(algorithm, "predict_with_target"):
+            y_pred = algorithm.predict_with_target(X, num_classes).astype(int)
         else:
-            # extracting the predictions
-            if isinstance(algorithm, corc.graph_metrics.gwgmara.GWGMara):
-                y_pred = algorithm.predict(X, target_number_clusters=num_classes)
-            elif hasattr(algorithm, "labels_"):
-                y_pred = algorithm.labels_.astype(int)
-            elif hasattr(algorithm, "predict_with_target"):
-                y_pred = algorithm.predict_with_target(X, num_classes).astype(int)
-            else:
-                y_pred = algorithm.predict(X)
+            y_pred = algorithm.predict(X)
+        return y_pred
+
+    # load algorithm object
+    alg_name = algorithm_name.replace("\\n", "\n").replace("\n", "")
+    alg_filename = f"{opt.cache_path}/{dataset_name}_{alg_name}.pickle"
+
+    # skip if the file is not there
+    if not os.path.exists(alg_filename):
+        return None, None
+
+    with open(alg_filename, "rb") as f:
+        algorithm = pickle.load(f)
+
+    if alg_name in ["GWG-dip", "GaussianMixture", "t-StudentMixture"]:
+        # then there are 10 random seeds
+        best_one = (None, None, -1)
+        for model in algorithm:  # algorithm is a list of models in this case
+            y_pred = get_prediction(model, X, num_classes)
             ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+            if ari > best_one[2]:
+                best_one = (model, y_pred, ari)
+        algorithm, y_pred, ari = best_one
+
+    else:
+        y_pred = get_prediction(algorithm, X, num_classes)
+        ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
 
     algorithm.data = X  # for tmm plot_graph function later
 
@@ -278,7 +230,7 @@ def parse_args():
         "--datasets",
         type=str,
         default=our_datasets.DATASET_SELECTOR,
-        help="List of datasets to include in figure. Default is our_datasets.DATASET_SELECTOR.",
+        help="List of datasets to include in figure. Default is our_datasets.DATASET_SELECTOR. Predefined sets include 'fig1', 'fig2', 'main1', and 'main2'.",
     )
 
     opt = p.parse_args()
@@ -286,11 +238,11 @@ def parse_args():
     if isinstance(opt.algorithms, str):
         opt.algorithms = opt.algorithms.replace(" ", "").split(",")
     if isinstance(opt.datasets, str):
-        if opt.datasets.lower() == "2d":
+        if opt.datasets.lower() == "2d" or opt.datasets.lower() == "fig1":
             opt.datasets = our_datasets.DATASETS2D
             if opt.figure_name == "my_figure":  # the default
                 opt.figure_name = "figure1"
-        elif opt.datasets.lower() == "complex":
+        elif opt.datasets.lower() == "complex" or opt.datasets.lower() == "fig2":
             opt.datasets = our_datasets.COMPLEX_DATASETS
             if opt.figure_name == "my_figure":  # the default
                 opt.figure_name = "figure2"

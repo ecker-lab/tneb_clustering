@@ -264,8 +264,6 @@ class our_datasets:
             equal_sized_clusters=False,
         )
 
-
-
         # funky shapes with 6 clusters in 8D, 16D, 32D, 64D
         densired_path = os.path.join(self.dataset_folder, DENSIRED_FILENAME)
         densired0 = complex_datasets.load_densired(dim=dims[0], path=densired_path)
@@ -782,7 +780,7 @@ class our_datasets:
                 dataset,
                 {**self.default_base, **params},
             )  # return the full set of parameters
-            for dataset, params in self.dataset_store  # global variable
+            for dataset, params in self.dataset_store
             if params["name"] in dataset_selector
         ]
         return datasets
@@ -800,5 +798,5 @@ class our_datasets:
         the_dataset = self.select_datasets([dataset_name])
         if len(the_dataset) == 0:
             return None
-        else: 
+        else:
             return the_dataset[0][0]
