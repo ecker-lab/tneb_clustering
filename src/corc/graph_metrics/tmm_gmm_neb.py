@@ -42,9 +42,9 @@ def tmm_jax_batched(paths, means, covs, weights, df=1.0):
 
     Args:
         paths: Batched paths. Shape: (batch_size, num_points, dim)
-        means: GMM means. Shape: (n_components, dim)
-        covs: GMM covariances. Shape: (n_components, dim, dim)
-        weights: GMM weights. Shape: (n_components,)
+        means: TMM means. Shape: (n_components, dim)
+        covs: TMM covariances. Shape: (n_components, dim, dim)
+        weights: TMM weights. Shape: (n_components,)
 
     Returns:
         Log probabilities. Shape: (batch_size, num_points)
@@ -134,8 +134,7 @@ def predict_gmm_jax(X, means, covs, weights):
 # the loss of the interpolation
 def loss(paths, means, covs, weights, gmm=False, df=1.0):
     # maximize the negative log likelihood
-    if not gmm:
-        # tmm
+    if not gmm: # tmm (the default case)
         nll = -jnp.sum(tmm_jax_batched(paths, means, covs, weights, df=df))
     else:
         nll = -jnp.sum(gmm_jax_batched(paths, means, covs, weights))
@@ -199,7 +198,7 @@ def compute_interpolation_batch(
     covs: jnp.ndarray,
     weights: jnp.ndarray,
     df: float = 1.0,
-    iterations: int = 400,
+    iterations: int = 500,
     num_points: int = 1024,
     gmm: bool = False,
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
@@ -213,7 +212,7 @@ def compute_interpolation_batch(
         weights: Array of mixture weights.
         iterations: Number of optimization iterations.
         num_points: Number of points in NEB path.
-        mixture_model: Type of mixture model ('tmm' or 'gmm').
+        gmm: Whether to use TMM (default) or GMM.
 
     Returns:
         paths: Batched array of interpolated paths.
@@ -294,8 +293,8 @@ def compute_neb_paths_batch(
     paths = dict()
 
     # Batch processing
-    model_type = "gmm" if gmm else "tmm"
-    for start in tqdm.tqdm(range(0, total_pairs, batch_size), desc=model_type):
+    description_tqdm = "g-NEB" if gmm else "t-NEB"
+    for start in tqdm.tqdm(range(0, total_pairs, batch_size), desc=description_tqdm):
         end = start + batch_size
         batch_pairs = (pairs[0][start:end], pairs[1][start:end])
 
