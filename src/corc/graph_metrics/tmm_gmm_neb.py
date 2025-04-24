@@ -134,10 +134,10 @@ def predict_gmm_jax(X, means, covs, weights):
 # the loss of the interpolation
 def loss(paths, means, covs, weights, gmm=False, df=1.0):
     # maximize the negative log likelihood
-    if not gmm: # tmm (the default case)
-        nll = -jnp.sum(tmm_jax_batched(paths, means, covs, weights, df=df))
-    else:
+    if gmm: 
         nll = -jnp.sum(gmm_jax_batched(paths, means, covs, weights))
+    else: # tmm (the default case)
+        nll = -jnp.sum(tmm_jax_batched(paths, means, covs, weights, df=df))
 
     # the loss is just the tmm/gmm value
     return nll
@@ -251,10 +251,10 @@ def compute_interpolation_batch(
 
     # Compute log probabilities
     interpolated_paths = interpolate_paths_batched(paths)
-    if not gmm:
-        logprobs = tmm_jax_batched(interpolated_paths, means, covs, weights)
-    else:
+    if gmm:
         logprobs = gmm_jax_batched(interpolated_paths, means, covs, weights)
+    else: # tmm (the default case)
+        logprobs = tmm_jax_batched(interpolated_paths, means, covs, weights)
     distances = jnp.min(logprobs, axis=1)
 
     # return paths, distances
