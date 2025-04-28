@@ -219,8 +219,12 @@ def compute_interpolation_batch(
         probabilities: Batched array of log probabilities along paths.
     """
     i_indices, j_indices = pairs  # Each of shape: (batch_size,)
+    assert i_indices.shape == j_indices.shape, f"i and j indices must have the same shape"
 
     batch_size, dim = means.shape
+
+    if not gmm:
+        assert df is not None, "df must be provided for TMM"
 
     # Reshape for broadcasting
     temperatures = jnp.linspace(0, 1, num_points).reshape(1, num_points, 1)
@@ -235,7 +239,7 @@ def compute_interpolation_batch(
     opt_state = optimizer.init(initial_paths)
 
     def optimization_step(paths, opt_state):
-        grads = jax.grad(loss)(paths, means, covs, weights, df=df, gmm=False)
+        grads = jax.grad(loss)(paths, means, covs, weights, df=df, gmm=gmm)
         updates, opt_state = optimizer.update(grads, opt_state)
         paths = optax.apply_updates(paths, updates)
         paths = batch_interpolate(paths)
@@ -279,7 +283,7 @@ def compute_neb_paths_batch(
         distances = jnp.linalg.norm(means[:, None, :] - means[None, :, :], axis=-1)
         indices = jnp.argsort(distances, axis=-1)[:, 1 : (knn + 1)]
         pair_i, pair_j = jnp.meshgrid(
-            jnp.arange(n_components), jnp.arange(knn), indexing="ij"
+            jnp.arange(n_components), jnp.arange(indices.shape[1]), indexing="ij"
         )
         pairs = (pair_i.flatten(), indices.flatten())
     else:

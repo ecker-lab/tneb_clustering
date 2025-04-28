@@ -28,6 +28,7 @@ class NEB(Graph):
         dataset_name=None,
         n_clusters=None,  # target number of clusters (filled with GT if labels is given)
         optimization_iterations=500,  # for NEB (huge impact on time consumption)
+        num_NEB_points=50,  # number of points in the NEB path
         seed=42,
         data=None,
         latent_dim=2,  # automatically derived from data if provided. One of both is needed.
@@ -132,7 +133,9 @@ class NEB(Graph):
             if self.old_mixture_model is not None:
                 self.mixture_model = self.old_mixture_model
         else:
+            start_mixture = time.time()
             self.mixture_model.fit(data)
+            print(f"Mixture model fit took {time.time() - start_mixture:.2f} seconds.")
 
         # make sure that TMM converged (this is sometimes problematic)
         if isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
@@ -192,7 +195,7 @@ class NEB(Graph):
             means=self.mixture_model.centers,
             covs=self.mixture_model.covs,
             weights=self.mixture_model.weights,
-            df=self.mixture_model.df,
+            df=self.mixture_model.df if (model_type == "tmm") else None,
             gmm=(model_type == "gmm"),
             iterations=self.iterations,
             knn=knn,
@@ -452,6 +455,7 @@ class NEB(Graph):
                 plot_points=False,
                 plot_ids=False,
                 landscape_kwargs=kwargs,
+                bend_paths=True,
             )
 
         else:  # more than 2 dims
