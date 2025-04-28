@@ -7,6 +7,7 @@ import corc.our_datasets as our_datasets
 import corc.our_algorithms as our_algorithms
 import corc.tmm_plots
 from corc.visualization import get_color_scheme
+import corc.visualization
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
@@ -39,12 +40,19 @@ def main(opt):
         if response != "" and response.lower() != "y":
             sys.exit(1)
 
-    fig, axs = plt.subplots(
-        len(opt.algorithms) + 1,
-        len(opt.datasets),
-        figsize=(len(opt.datasets) * 2, len(opt.algorithms) * 2 + 3),
-        # figsize=(len(opt.algorithms) * 2 + 3, len(opt.datasets) * 2),
-    )
+    if opt.datasets_horizontal:
+        fig, axs = plt.subplots(
+            len(opt.datasets),
+            len(opt.algorithms) + 1,
+            figsize=(len(opt.algorithms) * 2 + 3, len(opt.datasets) * 2),
+        )
+    else:
+        fig, axs = plt.subplots(
+            len(opt.algorithms) + 1,
+            len(opt.datasets),
+            figsize=(len(opt.datasets) * 2, len(opt.algorithms) * 2 + 3),
+            # figsize=(len(opt.algorithms) * 2 + 3, len(opt.datasets) * 2),
+        )
 
     plt.subplots_adjust(
         left=0.02, right=0.98, bottom=0.001, top=0.95, wspace=0.02, hspace=0.02
@@ -55,26 +63,45 @@ def main(opt):
 
         # load dataset
         X, y, tsne = corc.utils.load_dataset(dataset_name, opt.cache_path)
-        points = tsne if tsne is not None else X
+        y = np.array(y, dtype=int)
+        if X.shape[1] > 2:
+            points = tsne
+        else:
+            points = X
 
-        # first column ist GT
+        # first column/row ist GT
 
-        ax = axs[0, i_dataset]
-        if i_dataset == 0:
-            ax.set_ylabel("Ground Truth", fontsize=title_fontsize)
+        if opt.datasets_horizontal:
+            ax = axs[i_dataset, 0]
+            ax.set_ylabel(
+                our_datasets.dataset_displaynames[dataset_name], fontsize=title_fontsize
+            )
+            if i_dataset == 0:
+                ax.set_title("Ground Truth", fontsize=title_fontsize)
+        else:
+            ax = axs[0, i_dataset]
+            ax.set_title(
+              our_datasets.dataset_displaynames[dataset_name], fontsize=title_fontsize
+            )
+            if i_dataset == 0:
+                ax.set_ylabel("Ground Truth", fontsize=title_fontsize)
+
+                    
         colors = get_color_scheme(int(max(y) + 1))
         ax.scatter(points[:, 0], points[:, 1], s=10, color=colors[y])
+        # ax.scatter(X[:, 0], X[:, 1], s=10, color=colors[y])
         ax.set_xticks([])
         ax.set_yticks([])
 
-        ax.set_title(
-            our_datasets.dataset_displaynames[dataset_name], fontsize=title_fontsize
-        )
-        corc.tmm_plots.remove_border(ax)
+
+        corc.visualization.remove_border(ax)
 
         # plotting the other algorithms
         for i_algorithm, algorithm_name in enumerate(opt.algorithms):
-            ax = axs[i_algorithm + 1, i_dataset]
+            if opt.datasets_horizontal:
+                ax = axs[i_dataset, i_algorithm + 1]
+            else:
+                ax = axs[i_algorithm + 1, i_dataset]
             if i_dataset == 0:
                 alg_displayname = algorithm_name.replace("\\n", "\n")
                 # rename TMM-NEB and GMM-NEB
@@ -82,15 +109,23 @@ def main(opt):
                     alg_displayname = corc.our_algorithms.ALG_DISPLAYNAMES[
                         alg_displayname
                     ]
-                ax.set_ylabel(
-                    alg_displayname,
-                    size=title_fontsize,
-                )
+                if opt.datasets_horizontal:
+                    ax.set_title(
+                        alg_displayname,
+                        size=title_fontsize,
+                    )
+                else:
+                    ax.set_ylabel(
+                        alg_displayname,
+                        size=title_fontsize,
+                    )
 
             # load algorithm
             algorithm, y_pred, ari_score = get_algorithm_and_predictions(
                 opt, dataset_name, algorithm_name, X, y
             )
+            if algorithm is None: # and the others as well
+                continue
 
             # plot points
             colors = get_color_scheme(int(max(max(y_pred), max(y)) + 1))
@@ -105,8 +140,9 @@ def main(opt):
                 "GMM-NEB",
             ]:
                 algorithm.plot_graph(
-                    X2D=tsne, target_num_clusters=len(np.unique(y)), ax=ax
+                    X2D=tsne, target_num_clusters=len(np.unique(y)), ax=ax,
                 )
+
 
             # add ARI scores to the plot
             ax.text(
@@ -119,7 +155,7 @@ def main(opt):
                 bbox=dict(facecolor="white", alpha=0.5, lw=0),
             )
 
-            corc.tmm_plots.remove_border(ax)
+            corc.visualization.remove_border(ax)
             ax.set_xticks(())
             ax.set_yticks(())
 
@@ -153,12 +189,12 @@ def get_algorithm_and_predictions(opt, dataset_name, algorithm_name, X, y):
 
     # skip if the file is not there
     if not os.path.exists(alg_filename):
-        return None, None
+        return None, None, None
 
     with open(alg_filename, "rb") as f:
         algorithm = pickle.load(f)
 
-    if alg_name in ["GWG-dip", "GaussianMixture", "t-StudentMixture"]:
+    if alg_name not in our_algorithms.DETERMINISTIC_ALGORITHMS:
         # then there are 10 random seeds
         best_one = (None, None, -1)
         for model in algorithm:  # algorithm is a list of models in this case
@@ -232,6 +268,16 @@ def parse_args():
         default=our_datasets.DATASET_SELECTOR,
         help="List of datasets to include in figure. Default is our_datasets.DATASET_SELECTOR. Predefined sets include 'fig1', 'fig2', 'main1', and 'main2'.",
     )
+    p.add_argument(
+        "--datasets_horizontal",
+        action="store_true",
+        help="If set, datasets are shown in horizontal direction.",
+    )
+    p.add_argument(
+        "--bend_paths",
+        action="store_true",
+        help="If set, bend paths for TMM-NEB and GMM-NEB on 2d datasets.",
+    )
 
     opt = p.parse_args()
 
@@ -260,6 +306,14 @@ def parse_args():
             ari_fontsize = 18
             if opt.figure_name == "my_figure":  # the default
                 opt.figure_name = "figure2_main"
+        elif opt.datasets.lower() == "ours":
+            opt.datasets = our_datasets.DATASETS2D
+            opt.algorithms = ["TMM-NEB"]
+            if opt.figure_name == "my_figure":
+                opt.figure_name = "ours_2d"
+            opt.datasets_horizontal = False
+            opt.bend_paths = True
+
 
         else:  # otherwise, handle it as a list of datasets
             opt.datasets = opt.datasets.replace(" ", "").split(",")

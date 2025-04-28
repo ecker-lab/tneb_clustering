@@ -30,9 +30,12 @@ one can call the script with the list of datasets that should be used.
 def main(args):
     # get the datasets and default parameters for them
     # if no datasets are given, all datasets will be used
-    dataset_selector = (
-        args.datasets if len(args.datasets) > 0 else our_datasets.DATASET_SELECTOR
-    )
+    if args.datasets is None or len(args.datasets) == 0:
+        dataset_selector = our_datasets.DATASET_SELECTOR
+    elif args.datasets[0] == "2d":
+        dataset_selector = our_datasets.DATASETS2D
+    else:
+        dataset_selector = args.datasets
     print(f"Datasets: {dataset_selector}")
 
     cache_path = "cache"
@@ -111,14 +114,17 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-d",
         "--datasets",
         nargs="+",
         help="List of datasets to be used. If not provided, all datasets in our_datasets.DATASET_SELECTOR will be used.",
     )
     parser.add_argument(
+        "-a",
         "--algorithms",
         choices=["all", "core", "tneb", "ours"],
         help="algorithms to be used.",
+        default="all",
     )
     args = parser.parse_args()
 
