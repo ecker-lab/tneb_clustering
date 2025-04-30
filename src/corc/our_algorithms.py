@@ -1,6 +1,6 @@
 from sklearn import cluster, mixture
 import studenttmixture
-from corc.graph_metrics import paga, gwgmara, neb
+from corc.graph_metrics import paga, gwgmara, neb, uniforce
 from scipy.sparse import csr_matrix
 import scanpy
 import anndata
@@ -22,7 +22,8 @@ ALGORITHM_SELECTOR = [
     "MeanShift",
     "Leiden",
     "PAGA",
-    # "Ward",
+    "UniForCE",
+    # "SMMP",
     "GWG-dip",
     "GMM-NEB",
     "TMM-NEB",
@@ -127,12 +128,6 @@ def get_clustering_objects(
         preference=params["preference"],
         random_state=params["random_state"],
     )
-    # average_linkage = cluster.AgglomerativeClustering(
-    #     linkage="average",
-    #     metric="cityblock",
-    #     n_clusters=params["n_clusters"],
-    #     connectivity=connectivity,
-    # )
     # birch = cluster.Birch(n_clusters=params["n_clusters"])
     gmm = mixture.GaussianMixture(
         n_components=params["n_clusters"],
@@ -181,13 +176,16 @@ def get_clustering_objects(
         n_init=5,
         optimization_iterations=100,
     )
+    uniforce_algo = uniforce.Uniforce_Wrapper(
+        alpha=0.0, num_clusters=params["n_clusters"]
+    )
+    # smmp_algo = smmp.SMMP(
+    #     n_clusters=params["n_clusters"],
+    # )
 
     clustering_algorithms = [
         ("MiniBatch\nKMeans", two_means),
-        (
-            "Agglomerative\nClustering",
-            ward,
-        ),  # dropped average_linkage clustering as it does not work well
+        ("Agglomerative\nClustering", ward),
         # ("BIRCH", birch), # very old method that people don't really use
         ("HDBSCAN", hdbscan),
         # ("DBSCAN", dbscan), # HDBSCAN is always better than DBSCAN
@@ -197,10 +195,11 @@ def get_clustering_objects(
         ("Affinity\nPropagation", affinity_propagation),
         ("Spectral\nClustering", spectral),
         ("MeanShift", ms),
-        # ("Ward", ward),
         ("Leiden", leiden),
         ("PAGA", mpaga),
         ("GWG-dip", mgwgmara),
+        ("UniForCE", uniforce_algo),
+        # ("SMMP", smmp_algo),
         ("GMM-NEB", gmm_neb),
         ("TMM-NEB", tmm_neb),
     ]
