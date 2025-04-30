@@ -10,11 +10,15 @@ Algorithm_Over_Clustering.KmeansPp  # This is just so that auto import clean up 
 
 
 class Uniforce_Wrapper:
-    def __init__(self, alpha):
+    def __init__(self, alpha, num_clusters=None):
         self.alpha = alpha
+        self.target_num_clusters = num_clusters
         self.uniforce = Uniforce(
             UniforceOptions(
-                spanning_tree_options=SpanningTreeOptions(alpha=self.alpha),
+                spanning_tree_options=SpanningTreeOptions(
+                    alpha=self.alpha,
+                    specific_number_of_clusters=self.target_num_clusters,
+                ),
                 algorithm_over_clustering=Algorithm_Over_Clustering.GlobalKMeansPpParallel,
             )
         )
