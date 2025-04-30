@@ -6,7 +6,7 @@ To replicate the images please go through the setup and then go to `paper_figure
 Clone the repo, initialize the environment and install the package locally.
 The first line of the yml file sets the new environment's name `tneb`. This can be overwritten through `-n`.
 ```
-git clone https://github.com/ecker-lab/tneb_clustering
+git clone --recurse-submodules https://github.com/ecker-lab/tneb_clustering
 cd tneb_clustering
 conda env create -f environment.yml 
 conda activate tneb 
@@ -26,6 +26,7 @@ and install repo with
 find . -type f -name "*.py" -print0 | while IFS= read -r -d '' file; do   sed -i 's/from code\./from /g; s/import code\./import /g' "$file";  done
 pip install -e code
 ```
+If the folder external/UniForCE does not exist (for example when clonding without the `--recurse-submodules` option), try calling `git submodule init` and `git submodule update --checkout`.
 
 ## Recreating the densired datasets
 
