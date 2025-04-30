@@ -12,8 +12,20 @@ conda env create -f environment.yml
 conda activate tneb 
 ```
 
-## tsnecude installation
+## tsne-cuda installation
 If tsne-cuda installation causes problem, it is likely that your cuda drivers have different version. For more details and installation, see [here](https://github.com/CannyLab/tsne-cuda/blob/main/INSTALL.md).
+
+## UniForCE
+
+To install external method UniForCE, go to the folder
+```
+cd external/UniForCE
+```
+and install repo with
+```
+find . -type f -name "*.py" -print0 | while IFS= read -r -d '' file; do   sed -i 's/from code\./from /g; s/import code\./import /g' "$file";  done
+pip install -e code
+```
 
 ## Recreating the densired datasets
 
