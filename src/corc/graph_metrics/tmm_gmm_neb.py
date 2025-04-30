@@ -134,9 +134,9 @@ def predict_gmm_jax(X, means, covs, weights):
 # the loss of the interpolation
 def loss(paths, means, covs, weights, gmm=False, df=1.0):
     # maximize the negative log likelihood
-    if gmm: 
+    if gmm:
         nll = -jnp.sum(gmm_jax_batched(paths, means, covs, weights))
-    else: # tmm (the default case)
+    else:  # tmm (the default case)
         nll = -jnp.sum(tmm_jax_batched(paths, means, covs, weights, df=df))
 
     # the loss is just the tmm/gmm value
@@ -188,7 +188,9 @@ def equidistant_interpolate(path, target_num_points=None):
 
 
 interpolate_paths_batched = jax.vmap(
-    functools.partial(equidistant_interpolate, target_num_points=1024)
+    equidistant_interpolate,
+    in_axes=(0, None),
+    out_axes=0,
 )
 
 
@@ -199,7 +201,8 @@ def compute_interpolation_batch(
     weights: jnp.ndarray,
     df: float = 1.0,
     iterations: int = 500,
-    num_points: int = 1024,
+    num_points: int = 100,
+    num_eval_points: int = 1024,
     gmm: bool = False,
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
@@ -219,7 +222,9 @@ def compute_interpolation_batch(
         probabilities: Batched array of log probabilities along paths.
     """
     i_indices, j_indices = pairs  # Each of shape: (batch_size,)
-    assert i_indices.shape == j_indices.shape, f"i and j indices must have the same shape"
+    assert (
+        i_indices.shape == j_indices.shape
+    ), f"i and j indices must have the same shape"
 
     batch_size, dim = means.shape
 
@@ -254,11 +259,11 @@ def compute_interpolation_batch(
     )
 
     # Compute log probabilities
-    interpolated_paths = interpolate_paths_batched(paths)
+    interpolated_paths = interpolate_paths_batched(paths, num_eval_points)
     if gmm:
         logprobs = gmm_jax_batched(interpolated_paths, means, covs, weights)
-    else: # tmm (the default case)
-        logprobs = tmm_jax_batched(interpolated_paths, means, covs, weights)
+    else:  # tmm (the default case)
+        logprobs = tmm_jax_batched(interpolated_paths, means, covs, weights, df=df)
     distances = jnp.min(logprobs, axis=1)
 
     # return paths, distances

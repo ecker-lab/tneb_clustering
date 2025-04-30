@@ -22,17 +22,17 @@ import corc.visualization
 class NEB(Graph):
     def __init__(
         self,
+        data=None,
+        labels=None,
         n_components=25,
         mixture_model_type="tmm",
         n_neighbors=10,  # number of neighbors for the NEB path computation
         dataset_name=None,
         n_clusters=None,  # target number of clusters (filled with GT if labels is given)
-        optimization_iterations=500,  # for NEB (huge impact on time consumption)
-        num_NEB_points=50,  # number of points in the NEB path
+        optimization_iterations=200,  # for NEB (huge impact on time consumption)
+        num_NEB_points=100,  # number of points in the NEB path
         seed=42,
-        data=None,
         latent_dim=2,  # automatically derived from data if provided. One of both is needed.
-        labels=None,
         path=None,
         tmm_regularization=1e-4,
         n_init=5,  # for fitting TMM/GMM

@@ -165,7 +165,8 @@ def get_clustering_objects(
         seed=params["random_state"],
         mixture_model_type="tmm",
         n_init=20,
-        optimization_iterations=100,
+        optimization_iterations=200,
+        tmm_regularization=params["tmm_regularization"],
     )
     gmm_neb = neb.NEB(
         latent_dim=params["dim"],
@@ -174,7 +175,7 @@ def get_clustering_objects(
         seed=params["random_state"],
         mixture_model_type="gmm",
         n_init=5,
-        optimization_iterations=100,
+        optimization_iterations=200,
     )
     uniforce_algo = uniforce.Uniforce_Wrapper(
         alpha=0.0, num_clusters=params["n_clusters"]
