@@ -135,7 +135,8 @@ class NEB(Graph):
         else:
             start_mixture = time.time()
             self.mixture_model.fit(data)
-            print(f"Mixture model fit took {time.time() - start_mixture:.2f} seconds.")
+            self.time_mixture = time.time() - start_mixture
+            print(f"Mixture model fit took {self.time_mixture:.2f} seconds.")
 
         # make sure that TMM converged (this is sometimes problematic)
         if isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
@@ -186,6 +187,7 @@ class NEB(Graph):
         if knn is None:
             knn = self.n_neighbors
 
+        start_NEB = time.time()
         # compute NEB paths.
         (
             self.adjacency_,
@@ -202,6 +204,7 @@ class NEB(Graph):
             num_NEB_points=self.num_NEB_points,
             batch_size=self.batch_size,
         )
+        self.time_NEB = time.time() - start_NEB
 
     def compute_mst_edges(self):
         """
