@@ -17,6 +17,7 @@ import sys
 import sklearn
 
 import corc.utils
+import corc.metrics
 
 """
 Example call: python scripts/create_clustering_figure.py --algorithms  "MiniBatch\nKMeans, Agglomerative\nClustering" --datasets "blobs1_8, mnist64"
@@ -58,9 +59,10 @@ def main(opt):
         left=0.02, right=0.98, bottom=0.001, top=0.95, wspace=0.02, hspace=0.02
     )
 
+    metrics = dict()
+
     # now start the computation
     for i_dataset, dataset_name in enumerate(tqdm.tqdm(opt.datasets)):
-
         # load dataset
         X, y, tsne = corc.utils.load_dataset(dataset_name, opt.cache_path)
         y = np.array(y, dtype=int)
@@ -81,20 +83,19 @@ def main(opt):
         else:
             ax = axs[0, i_dataset]
             ax.set_title(
-              our_datasets.dataset_displaynames[dataset_name], fontsize=title_fontsize
+                our_datasets.dataset_displaynames[dataset_name], fontsize=title_fontsize
             )
             if i_dataset == 0:
                 ax.set_ylabel("Ground Truth", fontsize=title_fontsize)
 
-                    
         colors = get_color_scheme(int(max(y) + 1))
         ax.scatter(points[:, 0], points[:, 1], s=10, color=colors[y])
         # ax.scatter(X[:, 0], X[:, 1], s=10, color=colors[y])
         ax.set_xticks([])
         ax.set_yticks([])
 
-
         corc.visualization.remove_border(ax)
+        dataset_metrics = dict()
 
         # plotting the other algorithms
         for i_algorithm, algorithm_name in enumerate(opt.algorithms):
@@ -124,8 +125,11 @@ def main(opt):
             algorithm, y_pred, ari_score = get_algorithm_and_predictions(
                 opt, dataset_name, algorithm_name, X, y
             )
-            if algorithm is None: # and the others as well
+            if algorithm is None:  # and the others as well
                 continue
+
+            # store success metrics
+            dataset_metrics[algorithm_name] = get_scores(y_pred, y)
 
             # plot points
             colors = get_color_scheme(int(max(max(y_pred), max(y)) + 1))
@@ -140,9 +144,10 @@ def main(opt):
                 "GMM-NEB",
             ]:
                 algorithm.plot_graph(
-                    X2D=tsne, target_num_clusters=len(np.unique(y)), ax=ax,
+                    X2D=tsne,
+                    target_num_clusters=len(np.unique(y)),
+                    ax=ax,
                 )
-
 
             # add ARI scores to the plot
             ax.text(
@@ -159,10 +164,15 @@ def main(opt):
             ax.set_xticks(())
             ax.set_yticks(())
 
+        metrics[dataset_name] = dataset_metrics
+
     # plt.savefig(f"{opt.figure_path}/{opt.figure_name}.pdf", bbox_inches="tight")
     plt.savefig(
         f"{opt.figure_path}/{opt.figure_name}.png", bbox_inches="tight", dpi=200
     )
+
+    with open(f"{opt.cache_path}/metrics/{opt.figure_name}.pkl", "wb") as f:
+        pickle.dump(metrics, f)
 
 
 def get_algorithm_and_predictions(opt, dataset_name, algorithm_name, X, y):
@@ -217,7 +227,7 @@ def compute_missing_files(opt):
     # check for missing files before starting the computation
     missing_files = []
     for dataset_name in opt.datasets:
-        dataset_filename = f"{opt.cache_path}/{dataset_name}.pickle"
+        dataset_filename = f"{opt.cache_path}/datasets/{dataset_name}.pickle"
         if not os.path.exists(dataset_filename):
             missing_files.append(dataset_filename)
 
@@ -228,6 +238,15 @@ def compute_missing_files(opt):
                 missing_files.append(alg_filename)
 
     return missing_files
+
+
+def get_scores(y_pred, y):
+    ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+    nmi = sklearn.metrics.normalized_mutual_info_score(y, y_pred)
+    fowlkes_mallows = sklearn.metrics.fowlkes_mallows_score(y, y_pred)
+    vi, _, _ = corc.metrics.variation_of_information(y, y_pred)
+
+    return ari, nmi, fowlkes_mallows, vi
 
 
 def parse_args():
@@ -297,6 +316,7 @@ def parse_args():
             opt.algorithms = our_algorithms.CORE_SELECTOR
             title_fontsize = 22
             ari_fontsize = 18
+            opt.datasets_horizontal = True
             if opt.figure_name == "my_figure":  # the default
                 opt.figure_name = "figure1_main"
         elif opt.datasets.lower() == "main2":
@@ -313,7 +333,6 @@ def parse_args():
                 opt.figure_name = "ours_2d"
             opt.datasets_horizontal = False
             opt.bend_paths = True
-
 
         else:  # otherwise, handle it as a list of datasets
             opt.datasets = opt.datasets.replace(" ", "").split(",")
