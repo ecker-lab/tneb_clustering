@@ -7,7 +7,7 @@ import pickle
 import time
 
 cache_folder = "cache"
-datasets = corc.our_datasets.CORE_HD_DATASETS
+datasets = corc.our_datasets.CORE_HD_DATASETS + corc.our_datasets.DATASETS2D
 
 
 def get_tNEB(dataset_name, cache_path):
@@ -18,9 +18,8 @@ def get_tNEB(dataset_name, cache_path):
     else:
         X, y, tsne = corc.utils.load_dataset(dataset_name, cache_path=cache_folder)
         tmm = corc.graph_metrics.neb.NEB(
-            data=X, labels=y, n_components=15, optimization_iterations=1
+            data=X, labels=y, n_components=15, optimization_iterations=500
         )
-        tmm.fit(X)  # the fitting essentially initializes the mixture model
     return tmm
 
 
@@ -30,6 +29,7 @@ for dataset in datasets:
     starttime = time.time()
     X, y, tsne = corc.utils.load_dataset(dataset, cache_path=cache_folder)
     tmm = get_tNEB(dataset, cache_folder)
+    tmm.n_neighbors = None
     tmm.fit(X, knn=None)
     all_tmms[dataset] = tmm
     print(f"finished {dataset} in {time.time()-starttime:.2f}s")

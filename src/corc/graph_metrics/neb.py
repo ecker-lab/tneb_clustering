@@ -129,9 +129,8 @@ class NEB(Graph):
         fit the mixture model (overcluster), compute distances between clusters (based on NEB paths).
         """
         # fit the mixture model (re-use old model if available)
-        if hasattr(self, "old_mixture_model"):
-            if self.old_mixture_model is not None:
-                self.mixture_model = self.old_mixture_model
+        if hasattr(self, "old_mixture_model") and self.old_mixture_model is not None:
+            self.mixture_model = self.old_mixture_model
         else:
             start_mixture = time.time()
             self.mixture_model.fit(data)

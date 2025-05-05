@@ -292,10 +292,7 @@ def compute_neb_paths_batch(
         )
         pairs = (pair_i.flatten(), indices.flatten())
     else:
-        pairs = list(itertools.combinations(range(n_components), r=2))
-        pair_i = jnp.array([i for i, _ in pairs])
-        pair_j = jnp.array([j for _, j in pairs])
-        pairs = (pair_i, pair_j)
+        pairs = jnp.triu_indices(n_components, k=1)
 
     total_pairs = len(pairs[0])
     adjacency = jnp.zeros((n_components, n_components))
