@@ -1,6 +1,7 @@
 from datetime import datetime
 import itertools
 
+import sklearn.metrics
 import tqdm
 import corc.mixture
 import scipy
@@ -488,3 +489,8 @@ class NEB(Graph):
                     start = cluster_means[pair[0]]
                     end = cluster_means[pair[1]]
                     ax.plot(*zip(start, end), color="black", alpha=0.5, lw=1)
+
+    def get_ari(self, X, y):
+        y_pred = self.predict_with_target(X, target_number_classes=len(np.unique(y)))
+        ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+        return ari
