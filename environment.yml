@@ -20,7 +20,8 @@ dependencies:
   - scanpy
   - openblas
   - dask
-  - tsnecuda
+  - plotly
+    #  - tsnecuda
   - scikit-learn
   - pip:
     - jax[cuda12]
@@ -32,4 +33,5 @@ dependencies:
     - pybind11
     - hnswlib
     - python-igraph
+    - kaleido
     - -e .

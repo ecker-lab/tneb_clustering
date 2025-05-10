@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.neighbors import kneighbors_graph
 from abc import ABC, abstractmethod
 from corc.utils import compute_projection, set_seed
+import corc.visualization
 
 
 class Graph(ABC):

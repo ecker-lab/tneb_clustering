@@ -1,6 +1,7 @@
 from datetime import datetime
 import itertools
 
+import sklearn.metrics
 import tqdm
 import corc.mixture
 import scipy
@@ -22,18 +23,18 @@ import corc.visualization
 class NEB(Graph):
     def __init__(
         self,
+        data=None,
+        labels=None,
         n_components=25,
         mixture_model_type="tmm",
         n_neighbors=10,  # number of neighbors for the NEB path computation
         dataset_name=None,
         n_clusters=None,  # target number of clusters (filled with GT if labels is given)
-        optimization_iterations=500,  # for NEB (huge impact on time consumption)
+        optimization_iterations=200,  # for NEB (huge impact on time consumption)
+        num_NEB_points=100,  # number of points in the NEB path
         seed=42,
-        data=None,
         latent_dim=2,  # automatically derived from data if provided. One of both is needed.
-        labels=None,
         path=None,
-        num_NEB_points=10,
         tmm_regularization=1e-4,
         n_init=5,  # for fitting TMM/GMM
         thresh=0.01,  # for fitting TMM/GMM
@@ -129,11 +130,13 @@ class NEB(Graph):
         fit the mixture model (overcluster), compute distances between clusters (based on NEB paths).
         """
         # fit the mixture model (re-use old model if available)
-        if hasattr(self, "old_mixture_model"):
-            if self.old_mixture_model is not None:
-                self.mixture_model = self.old_mixture_model
+        if hasattr(self, "old_mixture_model") and self.old_mixture_model is not None:
+            self.mixture_model = self.old_mixture_model
         else:
+            start_mixture = time.time()
             self.mixture_model.fit(data)
+            self.time_mixture = time.time() - start_mixture
+            print(f"Mixture model fit took {self.time_mixture:.2f} seconds.")
 
         # make sure that TMM converged (this is sometimes problematic)
         if isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
@@ -184,6 +187,7 @@ class NEB(Graph):
         if knn is None:
             knn = self.n_neighbors
 
+        start_NEB = time.time()
         # compute NEB paths.
         (
             self.adjacency_,
@@ -193,13 +197,14 @@ class NEB(Graph):
             means=self.mixture_model.centers,
             covs=self.mixture_model.covs,
             weights=self.mixture_model.weights,
-            df=self.mixture_model.df,
+            df=self.mixture_model.df if (model_type == "tmm") else None,
             gmm=(model_type == "gmm"),
             iterations=self.iterations,
             knn=knn,
             num_NEB_points=self.num_NEB_points,
             batch_size=self.batch_size,
         )
+        self.time_NEB = time.time() - start_NEB
 
     def compute_mst_edges(self):
         """
@@ -453,6 +458,7 @@ class NEB(Graph):
                 plot_points=False,
                 plot_ids=False,
                 landscape_kwargs=kwargs,
+                bend_paths=True,
             )
 
         else:  # more than 2 dims
@@ -483,3 +489,8 @@ class NEB(Graph):
                     start = cluster_means[pair[0]]
                     end = cluster_means[pair[1]]
                     ax.plot(*zip(start, end), color="black", alpha=0.5, lw=1)
+
+    def get_ari(self, X, y):
+        y_pred = self.predict_with_target(X, target_number_classes=len(np.unique(y)))
+        ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+        return ari
