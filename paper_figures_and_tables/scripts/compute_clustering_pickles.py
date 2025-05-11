@@ -92,7 +92,7 @@ def main(args):
                     algorithms = list()
                     base_seed = params["random_state"]
                     for i in range(args.num_seeds):
-                        params["random_state"] = base_seed + i
+                        params["random_state"] = base_seed + i * 100
                         _, algorithm = corc.our_algorithms.get_clustering_objects(
                             params, X, selector=[name]
                         )[0]

@@ -15,6 +15,8 @@ import tqdm
 import os
 import sys
 import sklearn
+from scipy.stats import rankdata
+from matplotlib.colors import to_rgba
 
 import corc.utils
 import corc.metrics
@@ -165,6 +167,27 @@ def main(opt):
             ax.set_yticks(())
 
         metrics[dataset_name] = dataset_metrics
+
+    # Now, color the axes/subplots based on the ARI scores
+    for i_dataset, dataset_name in enumerate(tqdm.tqdm(opt.datasets)):
+        ari_scores = [metrics[dataset_name][alg][0] for alg in opt.algorithms]
+        ari_scores = np.round(np.array(ari_scores), 2)
+        ranks = rankdata(
+            -ari_scores, method="min"
+        )  # Assign the smallest rank to tied values
+        # print(f"Dataset: {dataset_name}, ranks: {ranks}, scores: {ari_scores}")
+        for i_algorithm, algorithm_name in enumerate(opt.algorithms):
+            if opt.datasets_horizontal:
+                ax = axs[i_dataset, i_algorithm + 1]
+            else:
+                ax = axs[i_algorithm + 1, i_dataset]
+            if ranks[i_algorithm] <= 3:
+                ax.set_facecolor(
+                    to_rgba(
+                        ["gold", "silver", "brown"][int(ranks[i_algorithm]) - 1],
+                        0.4,
+                    )
+                )
 
     # plt.savefig(f"{opt.figure_path}/{opt.figure_name}.pdf", bbox_inches="tight")
     plt.savefig(

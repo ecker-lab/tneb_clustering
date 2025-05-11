@@ -73,8 +73,13 @@ python paper_figures_and_tables/scripts/04_05_create_clustering_figure.py -d fig
 python paper_figures_and_tables/scripts/04_05_create_clustering_figure.py -d fig2
 
 
-
+# arranged the 64d datasets to be in front because they take longest (by far)
 echo """
+densired_soft_64
+mnist64
+densired64
+blobs1_64
+blobs2_64
 noisy_circles
 noisy_moons
 varied
@@ -84,24 +89,21 @@ clusterlab10
 blobs1_8
 blobs1_16
 blobs1_32
-blobs1_64
 blobs2_8
 blobs2_16
 blobs2_32
-blobs2_64
 densired8
 densired16
 densired32
-densired64
 densired_soft_8
 densired_soft_16
 densired_soft_32
-densired_soft_64
 mnist8
 mnist16
 mnist32
-mnist64
-""" | xargs -P 6 -I {} nice -6 python paper_figures_and_tables/scripts/stability_plots.py -t overclustering -d {}
+""" | xargs -P 16 -I {} nice -6 python paper_figures_and_tables/scripts/stability_plots.py -t overclustering -d {}
+
+python paper_figures_and_tables/scripts/stability_plots.py -t seeds -d core
 
 echo """
 noisy_circles

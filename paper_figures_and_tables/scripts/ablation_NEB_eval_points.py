@@ -8,11 +8,13 @@ import numpy as np
 import pickle
 import os
 import matplotlib.pyplot as plt
-import argparse
+import matplotlib.cm as cm
+
+# import argparse
 import jax.numpy as jnp
 import tqdm
 
-cache_path = "../../cache"
+cache_path = "cache"
 
 
 def get_tNEB(dataset_name, cache_path):
@@ -83,9 +85,11 @@ def load_or_compute_distances_per_dataset(datasets, cache_path, desired_values):
 
 def plot_convergence(distances, datasets=None):
     # Create a figure and axis
+    plt.rcParams.update({"font.size": 12})
     fig, ax = plt.subplots()
+    colors = cm.tab20(np.linspace(0, 1, len(distances)))
 
-    for dataset, eval_steps in distances.items():
+    for i, (dataset, eval_steps) in enumerate(distances.items()):
         if datasets is not None and dataset not in datasets:
             continue
         max_eval_steps = max(eval_steps.keys())
@@ -100,11 +104,12 @@ def plot_convergence(distances, datasets=None):
             diff_list.append(diff)
 
         # Plot the average differences with markers
-        ax.plot(values_list, diff_list, label=dataset, marker="o")
+        label = corc.our_datasets.dataset_displaynames[dataset].replace("\n", " ")
+        ax.plot(values_list, diff_list, label=label, marker="o", color=colors[i])
 
     # Set the title and labels
     ax.set_xlabel("Number of Evaluation Points")
-    ax.set_ylabel("Average Difference")
+    ax.set_ylabel("$\Delta$ NEB Distance")
     ax.legend()
     # ax.set_yscale("log")
     ax.set_ylim(0, 1)
