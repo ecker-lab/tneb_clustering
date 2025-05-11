@@ -36,7 +36,7 @@ class NEB(Graph):
         latent_dim=2,  # automatically derived from data if provided. One of both is needed.
         path=None,
         tmm_regularization=1e-4,
-        n_init=5,  # for fitting TMM/GMM
+        n_init=20,  # for fitting TMM/GMM
         thresh=0.01,  # for fitting TMM/GMM
         reduced_tolerance_on_retry=1e-3,  # for fitting TMM/GMM
         max_iter_on_retries=10000,  # for TMM fitting, 10x the default
@@ -57,11 +57,12 @@ class NEB(Graph):
             self.mixture_model = studenttmixture.EMStudentMixture(
                 n_components=n_components,
                 reg_covar=tmm_regularization,  # this makes the TMM favor ball-like shapes (and avoid extreme elongations)
-                n_init=(
-                    1 if latent_dim > 10 else n_init
-                ),  # convergence is slow in high dimension so we give the model more tries in the fit function if it does not converge immediately.
-                fixed_df=True,
+                n_init=n_init,
+                tol=10e-3,  # matching the default of sklearn for GMM
+                max_iter=100,  # matching the default of sklearn for GMM
+                # fixed_df=True,
                 df=1.0,  # the minimum value, for df=infty we get gmm
+                fixed_df=False,
                 init_type="kmeans",
                 random_state=seed,
             )
@@ -462,7 +463,7 @@ class NEB(Graph):
             )
 
         else:  # more than 2 dims
-
+            assert self.data is not None, "self.data is needed for tsne matching"
             # get (pseudo) TSNE embedding
             if X2D is None:
                 raise Exception(

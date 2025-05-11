@@ -225,6 +225,21 @@ def load_dataset(dataset_name, cache_path="../cache", return_params=False):
         return X, y, transformed_points
 
 
+def load_tmms(dataset_name, cache_path="../cache"):
+    return load_algorithms(dataset_name, algorithm="TMM-NEB", cache_path=cache_path)
+
+
+def load_algorithms(dataset_name, algorithm="TMM-NEB", cache_path="../cache"):
+    dataset_filename = os.path.join(cache_path, f"{dataset_name}_{algorithm}.pickle")
+    # Check if the dataset file exists
+    if os.path.exists(dataset_filename):
+        with open(dataset_filename, "rb") as f:
+            tmms = pickle.load(f)
+        return tmms
+    else:
+        return None
+
+
 def create_dataset_pickle(dataset_name, dataset_filename=None, cache_path="../cache"):
     import corc.our_datasets
     import corc.visualization

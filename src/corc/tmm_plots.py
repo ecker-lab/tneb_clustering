@@ -1,3 +1,5 @@
+import corc.our_datasets
+import corc.visualization
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
@@ -9,6 +11,7 @@ import time
 import math
 import corc.graph_metrics.neb
 from corc.graph_metrics import tmm_gmm_neb
+import matplotlib.colors as mcolors
 
 GRID_RESOLUTION = 128
 
@@ -129,13 +132,21 @@ def plot_cluster_levels(
 
 
 def plot_tmm_models(
-    tmm_models, data_X, data_y, dataset_name, tsne_transform=None, ground_truth=True
+    tmm_models,
+    data_X,
+    data_y,
+    dataset_name,
+    tsne_transform=None,
+    ground_truth=True,
+    legend=False,
 ):
     # general setup for plotting
     plt.figure(figsize=(20, 10))
     num_tiles = len(tmm_models) + int(ground_truth)
     num_rows = 1 + (num_tiles // 5)
     num_cols = min(num_tiles, 5)
+    # if legend:
+    #     num_rows += 1
 
     # fig, axes = plt.subplots(num_rows, num_cols, figsize=(20, 10), sharex=True, sharey=True)
     # axes = axes.flatten()
@@ -153,16 +164,24 @@ def plot_tmm_models(
     else:  # dimension == 2
         transformed_X = data_X
 
+    num_classes = len(np.unique(data_y))
+    norm = mcolors.BoundaryNorm(boundaries=np.arange(num_classes + 1), ncolors=20)
+    cm = corc.visualization.get_color_scheme(num_classes)
+
     if ground_truth:
         plt.subplot(num_rows, num_cols, 1)
         plt.scatter(
             transformed_X[:, 0],
             transformed_X[:, 1],
             s=10,
-            c=data_y,
-            cmap="tab20",
+            color=cm[data_y],
         )
-        plt.title(f"{dataset_name}: Ground truth")
+        plt.title(f"Ground truth")
+        dataset_displayname = corc.our_datasets.dataset_displaynames[
+            dataset_name
+        ].replace("\n", " ")
+        # plt.title(f"{dataset_displayname}: Ground truth")
+        plt.axis("off")
 
     for i, tmm_model in enumerate(tmm_models):
 
@@ -170,24 +189,12 @@ def plot_tmm_models(
 
         # draw background for MEP/NEB plots (if dim=2)
         if dimension == 2:
-            image_resolution = 128
-            linspace_x = np.linspace(
-                data_X[:, 0].min() - 0.1, data_X[:, 0].max() + 0.1, image_resolution
-            )
-            linspace_y = np.linspace(
-                data_X[:, 1].min() - 0.1, data_X[:, 1].max() + 0.1, image_resolution
-            )
-            XY = np.stack(np.meshgrid(linspace_x, linspace_y), -1)
-            tmm_probs = tmm_model.mixture_model.score_samples(
-                XY.reshape(-1, 2)
-            ).reshape(image_resolution, image_resolution)
-            plt.contourf(
-                linspace_x,
-                linspace_y,
-                tmm_probs,
+            tmm_model.mixture_model.plot_energy_landscape(
+                data_X,
                 levels=20,
-                cmap="coolwarm",
-                alpha=0.5,
+                grid_resolution=GRID_RESOLUTION,
+                axis=plt.gca(),
+                # kwargs={"alpha": 0.5},
             )
 
         # extracting the predictions
@@ -201,18 +208,48 @@ def plot_tmm_models(
         plt.scatter(
             transformed_X[:, 0],
             transformed_X[:, 1],
-            s=10,
-            c=y_pred_permuted,
-            cmap="tab20",
+            s=2,
+            c=cm[y_pred_permuted],
+            # cmap="tab20",
+            cmap=plt.cm.tab20,
+            norm=norm,
         )
 
         tmm_model.labels = data_y
+        tmm_model.data = data_X
         tmm_model.plot_graph(X2D=transformed_X, target_num_clusters=num_classes)
 
+        # corc.visualization.remove_border(plt.gca())
+        plt.axis("off")
         # Compute ARI score
         ari_score = sklearn.metrics.adjusted_rand_score(data_y, y_pred)
         plt.title(
-            f"{dataset_name}: {tmm_model.n_components} clusters, ARI: {ari_score:.2f}"
+            f"{tmm_model.n_components} clusters, ARI: {ari_score:.2f}"
+            # f"{dataset_name}: {tmm_model.n_components} clusters, ARI: {ari_score:.2f}"
+        )
+
+    if legend:
+        print(np.unique(data_y))
+        print(np.unique(y_pred_permuted))
+        num_classes = len(np.unique(data_y))
+        plt.subplot(num_rows, 1, num_rows)
+        plt.axis("off")
+        plt.legend(
+            handles=[
+                plt.Line2D(
+                    [0],
+                    [0],
+                    marker="o",
+                    color="w",
+                    label=f"{i}",
+                    markerfacecolor=cm[i],
+                    markersize=10,
+                )
+                for i in range(num_classes)
+            ],
+            loc="center",
+            bbox_to_anchor=(0.5, 1),
+            ncol=10,
         )
 
     # return the figure
