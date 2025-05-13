@@ -159,15 +159,16 @@ class our_datasets:
         # Set up cluster parameters
         # ============
         self.default_base = {
-            "name": "unknown",
-            "dim": 2,
+            "name": "unknown",  # dataset name
+            "dim": 2,  # dimensionality of the data
             "quantile": 0.3,
             "eps": 0.3,
             "damping": 0.9,
             "preference": -200,
-            "n_neighbors": 3,
-            "n_clusters": 3,
-            "n_components": 25,
+            "n_neighbors": 3,  # restrict to close euclidean neighbors
+            "n_clusters": 3,  # GT num clusters
+            "n_components": 25,  # TMM/GMM overclustering
+            "tmm_regularization": 1e-4,
             "min_samples": 7,
             "xi": 0.05,
             "min_cluster_size": 0.1,
@@ -176,11 +177,11 @@ class our_datasets:
             "hdbscan_min_samples": 5,
             "resolution": 1.0,
             "resolution_leiden": 1.0,
-            "random_state": 42,
             "use_rep": "X",
             "gwg_n_components": 15,
             "gwg_n_neighbors": 3,
             "gwg_covariance": "diag",
+            "random_state": 42,  # fixed default seed
         }
 
         # ============

@@ -118,6 +118,7 @@ class PAGA(Graph):
             .sort_index()
         ).to_numpy()
 
+        # this is the actual call to compute PAGA (on top of the clustering)
         sc.tl.paga(self.adata, groups=self.clustering_method)
 
         edges = self._adj_matrix_to_edges_list(

@@ -7,6 +7,7 @@ import corc.visualization
 import os
 import pickle
 import time
+import numpy as np
 
 
 def main(args):
@@ -28,6 +29,7 @@ def main(args):
         starttime = time.time()
         print(f"Computing TSNE for {dataset_name} ({i+1}/{len(all_datasets)})", end="")
         X, y = dataset[0]
+        y = np.array(y, dtype=int)
         tsne = corc.visualization.get_TSNE_embedding(X)
         dataset = {
             "dataset": (X, y),

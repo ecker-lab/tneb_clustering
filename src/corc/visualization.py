@@ -112,7 +112,8 @@ def get_TSNE_embedding(data_X, perplexity=30, seed=42):
     checks cuda availability and selects the correct TSNE implementation based on that.
     Both implementations give very similar results.
     """
-    if check_cuda():
+    # if check_cuda():
+    if False:
         import tsnecuda
 
         tsne = tsnecuda.TSNE(

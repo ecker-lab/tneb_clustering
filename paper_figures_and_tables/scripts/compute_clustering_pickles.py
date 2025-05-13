@@ -30,13 +30,15 @@ one can call the script with the list of datasets that should be used.
 def main(args):
     # get the datasets and default parameters for them
     # if no datasets are given, all datasets will be used
-    dataset_selector = (
-        args.datasets if len(args.datasets) > 0 else our_datasets.DATASET_SELECTOR
-    )
+    if args.datasets is None or len(args.datasets) == 0:
+        dataset_selector = our_datasets.DATASET_SELECTOR
+    elif args.datasets[0] == "2d":
+        dataset_selector = our_datasets.DATASETS2D
+    else:
+        dataset_selector = args.datasets
     print(f"Datasets: {dataset_selector}")
 
-    cache_path = "cache"
-    corc.utils.create_folder(cache_path)
+    corc.utils.create_folder(args.cache_path)
     if args.algorithms == "all":
         clustering_algorithm_selector = our_algorithms.ALGORITHM_SELECTOR
     elif args.algorithms == "core":
@@ -48,8 +50,9 @@ def main(args):
     print(f"Algorithms: {clustering_algorithm_selector}")
 
     for i_dataset, dataset_name in enumerate(dataset_selector):
+        print(f"Dataset {i_dataset + 1}/{len(dataset_selector)}: {dataset_name}")
         X, y, tsne, params = corc.utils.load_dataset(
-            dataset_name, cache_path=cache_path, return_params=True
+            dataset_name, cache_path=args.cache_path, return_params=True
         )
 
         clustering_algorithms = our_algorithms.get_clustering_objects(
@@ -59,7 +62,9 @@ def main(args):
         for name, algorithm in clustering_algorithms:
             # check whether this was already computed
             alg_name = re.sub("\n", "", name)
-            filename = os.path.join(cache_path, f"{dataset_name}_{alg_name}.pickle")
+            filename = os.path.join(
+                args.cache_path, f"{dataset_name}_{alg_name}.pickle"
+            )
             if os.path.exists(filename):
                 print(f"{filename} already exists. Skipping.")
                 continue
@@ -86,8 +91,8 @@ def main(args):
                     # train 10 with different seeds
                     algorithms = list()
                     base_seed = params["random_state"]
-                    for i in range(10):
-                        params["random_state"] = base_seed + i
+                    for i in range(args.num_seeds):
+                        params["random_state"] = base_seed + i * 100
                         _, algorithm = corc.our_algorithms.get_clustering_objects(
                             params, X, selector=[name]
                         )[0]
@@ -111,14 +116,30 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-d",
         "--datasets",
         nargs="+",
         help="List of datasets to be used. If not provided, all datasets in our_datasets.DATASET_SELECTOR will be used.",
     )
     parser.add_argument(
+        "-a",
         "--algorithms",
         choices=["all", "core", "tneb", "ours"],
         help="algorithms to be used.",
+        default="all",
+    )
+    parser.add_argument(
+        "-c",
+        "--cache_path",
+        help="Path to the cache directory.",
+        default="cache",
+    )
+    parser.add_argument(
+        "-n",
+        "--num_seeds",
+        type=int,
+        help="Number of seeds to be used for non-deterministic algorithms.",
+        default=10,
     )
     args = parser.parse_args()
 

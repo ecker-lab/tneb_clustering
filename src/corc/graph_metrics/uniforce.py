@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import corc.utils
 
 from Uniforce import Uniforce
 from data.enums.Algorithm_Over_Clustering import Algorithm_Over_Clustering
@@ -10,19 +11,31 @@ Algorithm_Over_Clustering.KmeansPp  # This is just so that auto import clean up 
 
 
 class Uniforce_Wrapper:
-    def __init__(self, alpha):
+    def __init__(self, alpha, num_clusters=None, seed=42):
         self.alpha = alpha
+        self.target_num_clusters = num_clusters
         self.uniforce = Uniforce(
             UniforceOptions(
-                spanning_tree_options=SpanningTreeOptions(alpha=self.alpha),
+                spanning_tree_options=SpanningTreeOptions(
+                    alpha=self.alpha,
+                    specific_number_of_clusters=self.target_num_clusters,
+                ),
                 algorithm_over_clustering=Algorithm_Over_Clustering.GlobalKMeansPpParallel,
             )
         )
+        self.seed = seed
         self.result = None
         self.graph_data = {"nodes": None, "edges": None, "nodes_org_space": None}
 
     def fit(self, data):
-        self.result = self.uniforce.fit(data)
+        while True:
+            try:
+                corc.utils.set_seed(self.seed)
+                self.result = self.uniforce.fit(data)
+                break
+            except Exception as e:
+                print(f"Uniforce fitting failed: {e}. Retrying...")
+                self.seed += 100
 
     def predict(self, data):
         return self.result.labels

@@ -1,6 +1,6 @@
 from sklearn import cluster, mixture
 import studenttmixture
-from corc.graph_metrics import paga, gwgmara, neb, uniforce
+from corc.graph_metrics import paga, gwgmara, neb, uniforce, smmp
 from scipy.sparse import csr_matrix
 import scanpy
 import anndata
@@ -23,7 +23,7 @@ ALGORITHM_SELECTOR = [
     "Leiden",
     "PAGA",
     "UniForCE",
-    # "SMMP",
+    "SMMP",
     "GWG-dip",
     "GMM-NEB",
     "TMM-NEB",
@@ -36,6 +36,8 @@ CORE_SELECTOR = [
     # "t-Student\nMixture",
     "Leiden",
     "GWG-dip",
+    "UniForCE",
+    "SMMP",
     "GMM-NEB",
     "TMM-NEB",
 ]
@@ -136,7 +138,7 @@ def get_clustering_objects(
     )
     tmm = studenttmixture.EMStudentMixture(
         n_components=params["n_clusters"],
-        n_init=5,
+        n_init=10,
         fixed_df=False,  # True,
         # df=1.0,
         init_type="k++",
@@ -165,7 +167,8 @@ def get_clustering_objects(
         seed=params["random_state"],
         mixture_model_type="tmm",
         n_init=20,
-        optimization_iterations=100,
+        optimization_iterations=200,
+        tmm_regularization=params["tmm_regularization"],
     )
     gmm_neb = neb.NEB(
         latent_dim=params["dim"],
@@ -173,15 +176,15 @@ def get_clustering_objects(
         n_clusters=params["n_clusters"],
         seed=params["random_state"],
         mixture_model_type="gmm",
-        n_init=5,
-        optimization_iterations=100,
+        n_init=20,
+        optimization_iterations=200,
     )
     uniforce_algo = uniforce.Uniforce_Wrapper(
         alpha=0.0, num_clusters=params["n_clusters"]
     )
-    # smmp_algo = smmp.SMMP(
-    #     n_clusters=params["n_clusters"],
-    # )
+    smmp_algo = smmp.SMMP(
+        n_clusters=params["n_clusters"],
+    )
 
     clustering_algorithms = [
         ("MiniBatch\nKMeans", two_means),
@@ -199,7 +202,7 @@ def get_clustering_objects(
         ("PAGA", mpaga),
         ("GWG-dip", mgwgmara),
         ("UniForCE", uniforce_algo),
-        # ("SMMP", smmp_algo),
+        ("SMMP", smmp_algo),
         ("GMM-NEB", gmm_neb),
         ("TMM-NEB", tmm_neb),
     ]
