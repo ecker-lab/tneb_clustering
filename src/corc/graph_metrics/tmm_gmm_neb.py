@@ -279,7 +279,7 @@ def compute_neb_paths_batch(
     num_NEB_points: int = 100,
     knn: int = None,
     gmm: bool = False,
-    batch_size: int = 1000,
+    batch_size: int = 50,
 ):
     n_components = len(means)
 

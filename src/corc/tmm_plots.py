@@ -165,7 +165,6 @@ def plot_tmm_models(
         transformed_X = data_X
 
     num_classes = len(np.unique(data_y))
-    norm = mcolors.BoundaryNorm(boundaries=np.arange(num_classes + 1), ncolors=20)
     cm = corc.visualization.get_color_scheme(num_classes)
 
     if ground_truth:
@@ -211,8 +210,6 @@ def plot_tmm_models(
             s=2,
             c=cm[y_pred_permuted],
             # cmap="tab20",
-            cmap=plt.cm.tab20,
-            norm=norm,
         )
 
         tmm_model.labels = data_y
@@ -229,8 +226,6 @@ def plot_tmm_models(
         )
 
     if legend:
-        print(np.unique(data_y))
-        print(np.unique(y_pred_permuted))
         num_classes = len(np.unique(data_y))
         plt.subplot(num_rows, 1, num_rows)
         plt.axis("off")

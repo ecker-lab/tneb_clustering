@@ -42,7 +42,7 @@ class NEB(Graph):
         max_iter_on_retries=10000,  # for TMM fitting, 10x the default
         max_elongation=None,  # will be set to 500 * dim
         min_cluster_size=10,  # mixture model filtering is only applied to TMM
-        batch_size=1024,  # for NEB computation (how many paths in parallel)
+        batch_size=150,  # for NEB computation (150 <8GB on GPU for d=64, more for lower dimensions)
     ):
         """
         Initialize the NEB (nudged elastic band) based on TMM/GMM.
@@ -60,9 +60,9 @@ class NEB(Graph):
                 n_init=n_init,
                 tol=10e-3,  # matching the default of sklearn for GMM
                 max_iter=100,  # matching the default of sklearn for GMM
-                # fixed_df=True,
+                fixed_df=True,
                 df=1.0,  # the minimum value, for df=infty we get gmm
-                fixed_df=False,
+                # fixed_df=False,
                 init_type="kmeans",
                 random_state=seed,
             )
