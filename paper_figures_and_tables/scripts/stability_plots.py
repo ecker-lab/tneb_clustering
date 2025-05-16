@@ -4,8 +4,6 @@ import os
 os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = "platform"
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
-import corc.our_datasets
-import jax
 import argparse
 import jax.random as jrandom
 import numpy as np
@@ -20,6 +18,7 @@ import itertools
 import time
 
 # own code
+import corc.our_datasets
 from corc.graph_metrics import tmm_gmm_neb
 import corc.tmm_plots
 import corc.utils
@@ -149,7 +148,7 @@ def main(args):
                         tmm_models = None
                     else:
                         print(
-                            f"successfully loaded precomputed TMM models for {dataset_displayname} from disk"
+                            f"successfully loaded precomputed TMM models for {dataset_displayname} (for {args.plot_type}) from disk"
                         )
 
             # compute tmm models
@@ -196,7 +195,9 @@ def main(args):
                 bbox_inches="tight",
                 pad_inches=0,
             )
-            print(f"Stored figure for {dataset_displayname} in figures/stability")
+            print(
+                f"Stored figure for {args.plot_type} on {dataset_displayname} in figures/stability"
+            )
 
     # output ari overview
     for dataset_name in args.dataset_names:

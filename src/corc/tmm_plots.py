@@ -141,10 +141,10 @@ def plot_tmm_models(
     legend=False,
 ):
     # general setup for plotting
-    plt.figure(figsize=(20, 10))
     num_tiles = len(tmm_models) + int(ground_truth)
     num_rows = 1 + (num_tiles // 5)
     num_cols = min(num_tiles, 5)
+    plt.figure(figsize=(20, num_rows * 5))
     # if legend:
     #     num_rows += 1
 
@@ -172,13 +172,13 @@ def plot_tmm_models(
         plt.scatter(
             transformed_X[:, 0],
             transformed_X[:, 1],
-            s=10,
+            s=5,
             color=cm[data_y],
         )
         plt.title(f"Ground truth")
-        dataset_displayname = corc.our_datasets.dataset_displaynames[
-            dataset_name
-        ].replace("\n", " ")
+        # dataset_displayname = corc.our_datasets.dataset_displaynames[
+        #     dataset_name
+        # ].replace("\n", " ")
         # plt.title(f"{dataset_displayname}: Ground truth")
         plt.axis("off")
 
@@ -207,7 +207,7 @@ def plot_tmm_models(
         plt.scatter(
             transformed_X[:, 0],
             transformed_X[:, 1],
-            s=2,
+            s=5,
             c=cm[y_pred_permuted],
             # cmap="tab20",
         )

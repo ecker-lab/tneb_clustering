@@ -107,7 +107,7 @@ DATASETS2D = [
     "clusterlab10",
 ]
 
-COMPLEX_DATASETS = [
+OLD_COMPLEX_DATASETS = [
     "blobs1_8",
     "blobs1_16",
     "blobs1_32",
@@ -144,6 +144,7 @@ CORE_HD_DATASETS = [
     "mnist32",
     "mnist64",
 ]
+COMPLEX_DATASETS = CORE_HD_DATASETS
 
 
 class our_datasets:

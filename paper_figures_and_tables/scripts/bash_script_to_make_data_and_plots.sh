@@ -64,6 +64,7 @@ mnist32
 mnist64
 """ | xargs -P 6 -I {} nice -6 python paper_figures_and_tables/scripts/compute_clustering_pickles.py --datasets {} 
 
+
 python paper_figures_and_tables/scripts/04_05_create_clustering_figure.py -d main1
 
 python paper_figures_and_tables/scripts/04_05_create_clustering_figure.py -d main2
@@ -145,3 +146,6 @@ densired_soft_16
 mnist8
 mnist16
 """ | xargs -P 6 -I {} nice -6 python paper_figures_and_tables/scripts/plot_join_strategies.py -d {}
+
+# num_components (calling all 9 datasets in parallel)
+for dataset in densired8 densired16 densired32 densired_soft_8 densired_soft_16 densired_soft_32 mnist8 mnist16 mnist32; do python paper_figures_and_tables/scripts/ablation_num_components.py --datasets "$dataset" & done; wait
