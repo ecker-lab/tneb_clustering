@@ -62,6 +62,7 @@ def main(opt):
     )
 
     metrics = dict()
+    collected_aris = dict()
 
     # now start the computation
     for i_dataset, dataset_name in enumerate(tqdm.tqdm(opt.datasets)):
@@ -98,6 +99,7 @@ def main(opt):
 
         corc.visualization.remove_border(ax)
         dataset_metrics = dict()
+        dataset_aris = dict()
 
         # plotting the other algorithms
         for i_algorithm, algorithm_name in enumerate(opt.algorithms):
@@ -124,14 +126,21 @@ def main(opt):
                     )
 
             # load algorithm
-            algorithm, y_pred, ari_score = get_algorithm_and_predictions(
+            algorithms, y_preds, ari_scores = get_algorithm_and_predictions(
                 opt, dataset_name, algorithm_name, X, y
             )
-            if algorithm is None:  # and the others as well
+            if algorithms is None:  # and the others as well
                 continue
+            if isinstance(algorithms, list):
+                algorithm, y_pred, ari_score = extract_best_one(
+                    algorithms, y_preds, ari_scores
+                )
+            else:
+                algorithm, y_pred, ari_score = algorithms, y_preds, ari_scores
 
             # store success metrics
             dataset_metrics[algorithm_name] = get_scores(y_pred, y)
+            dataset_aris[algorithm_name] = ari_scores
 
             # plot points
             colors = get_color_scheme(int(max(max(y_pred), max(y)) + 1))
@@ -167,6 +176,7 @@ def main(opt):
             ax.set_yticks(())
 
         metrics[dataset_name] = dataset_metrics
+        collected_aris[dataset_name] = dataset_aris
 
     if not opt.no_ranking:
         # Now, color the axes/subplots based on the ARI scores
@@ -197,6 +207,8 @@ def main(opt):
 
     with open(f"{opt.cache_path}/metrics/{opt.figure_name}.pkl", "wb") as f:
         pickle.dump(metrics, f)
+    with open(f"{opt.cache_path}/metrics/{opt.figure_name}-full.pkl", "wb") as f:
+        pickle.dump(collected_aris, f)
 
 
 def get_algorithm_and_predictions(opt, dataset_name, algorithm_name, X, y):
@@ -230,21 +242,24 @@ def get_algorithm_and_predictions(opt, dataset_name, algorithm_name, X, y):
 
     if alg_name not in our_algorithms.DETERMINISTIC_ALGORITHMS:
         # then there are 10 random seeds
-        best_one = (None, None, -1)
+        y_pred = []
+        ari = []
         for model in algorithm:  # algorithm is a list of models in this case
-            y_pred = get_prediction(model, X, num_classes)
-            ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
-            if ari > best_one[2]:
-                best_one = (model, y_pred, ari)
-        algorithm, y_pred, ari = best_one
-
+            prediction = get_prediction(model, X, num_classes)
+            y_pred.append(prediction)
+            ari.append(sklearn.metrics.adjusted_rand_score(y, prediction))
+            model.data = X  # for tmm plot_graph function later
     else:
         y_pred = get_prediction(algorithm, X, num_classes)
         ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
-
-    algorithm.data = X  # for tmm plot_graph function later
+        algorithm.data = X  # for tmm plot_graph function later
 
     return algorithm, y_pred, ari
+
+
+def extract_best_one(algorithms, predictions, aris):
+    index = np.argmax(aris)
+    return algorithms[index], predictions[index], aris[index]
 
 
 def compute_missing_files(opt):

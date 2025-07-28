@@ -125,20 +125,20 @@ if __name__ == "__main__":
         "-a",
         "--algorithms",
         choices=["all", "core", "tneb", "ours"],
-        help="algorithms to be used.",
+        help="algorithms to be used. (Default: all)",
         default="all",
     )
     parser.add_argument(
         "-c",
         "--cache_path",
-        help="Path to the cache directory.",
+        help="Path to the cache directory. (Default: cache)",
         default="cache",
     )
     parser.add_argument(
         "-n",
         "--num_seeds",
         type=int,
-        help="Number of seeds to be used for non-deterministic algorithms.",
+        help="Number of seeds to be used for non-deterministic algorithms. (Default: 10)",
         default=10,
     )
     args = parser.parse_args()

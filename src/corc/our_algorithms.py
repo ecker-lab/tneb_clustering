@@ -11,6 +11,9 @@ from sklearn.neighbors import kneighbors_graph
 ALGORITHM_SELECTOR = [
     "MiniBatch\nKMeans",
     "Agglomerative\nClustering",
+    "Single\nLinkage",
+    "Average\nLinkage",
+    "Complete\nLinkage",
     "HDBSCAN",
     "Gaussian\nMixture",
     "t-Student\nMixture",
@@ -53,6 +56,9 @@ DETERMINISTIC_ALGORITHMS = [
     "HDBSCAN",
     "Spectral\nClustering",
     "Leiden",
+    "Single\nLinkage",
+    "Average\nLinkage",
+    "Complete\nLinkage",
 ]
 
 
@@ -107,6 +113,15 @@ def get_clustering_objects(
     )
     ward = cluster.AgglomerativeClustering(
         n_clusters=params["n_clusters"], linkage="ward", connectivity=connectivity
+    )
+    agglomerative_min = cluster.AgglomerativeClustering(
+        n_clusters=params["n_clusters"], linkage="single", connectivity=connectivity
+    )
+    agglomerative_mean = cluster.AgglomerativeClustering(
+        n_clusters=params["n_clusters"], linkage="average", connectivity=connectivity
+    )
+    agglomerative_max = cluster.AgglomerativeClustering(
+        n_clusters=params["n_clusters"], linkage="complete", connectivity=connectivity
     )
     spectral = cluster.SpectralClustering(
         n_clusters=params["n_clusters"],
@@ -189,6 +204,9 @@ def get_clustering_objects(
     clustering_algorithms = [
         ("MiniBatch\nKMeans", two_means),
         ("Agglomerative\nClustering", ward),
+        ("Single\nLinkage", agglomerative_min),
+        ("Average\nLinkage", agglomerative_mean),
+        ("Complete\nLinkage", agglomerative_max),
         # ("BIRCH", birch), # very old method that people don't really use
         ("HDBSCAN", hdbscan),
         # ("DBSCAN", dbscan), # HDBSCAN is always better than DBSCAN

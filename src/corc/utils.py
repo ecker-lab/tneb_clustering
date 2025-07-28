@@ -164,8 +164,14 @@ def predict_by_joining_closest_clusters(
         plt.show()
     num_classes_to_join = len(centers) - num_classes
     for _ in range(num_classes_to_join):
-        i, j = np.unravel_index(np.argmin(distances), distances.shape)
+        while True:
+            i, j = np.unravel_index(np.argmin(distances), distances.shape)
+            distances[i, j] = np.inf
+            if find_root(mapping, i) != find_root(mapping, j):
+                # we found two classes that are not yet merged anyway
+                break
         mapping = merge_classes(mapping, i, j)
+        # print(f"merging classes {i} and {j} (mapping: {mapping})")
         if recompute_distances:
             # Update centers and distances
             centers = update_centers_after_merge(centers, mapping, i, j)
