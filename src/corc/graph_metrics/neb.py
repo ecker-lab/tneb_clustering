@@ -126,6 +126,30 @@ class NEB(Graph):
 
         return mixture_model, model_type
 
+    def _fit_NEB_paths(self, model_type, knn):
+
+        if knn is None:
+            knn = self.n_neighbors
+
+        start_NEB = time.time()
+        # compute NEB paths.
+        (
+            self.adjacency_,
+            self.raw_adjacency_,
+            self.paths_,
+        ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths_batch(
+            means=self.mixture_model.centers,
+            covs=self.mixture_model.covs,
+            weights=self.mixture_model.weights,
+            df=self.mixture_model.df if (model_type == "tmm") else None,
+            gmm=(model_type == "gmm"),
+            iterations=self.iterations,
+            knn=knn,
+            num_NEB_points=self.num_NEB_points,
+            batch_size=self.batch_size,
+        )
+        self.time_NEB = time.time() - start_NEB
+
     def fit(self, data, knn=None):
         """
         fit the mixture model (overcluster), compute distances between clusters (based on NEB paths).
@@ -185,27 +209,8 @@ class NEB(Graph):
         )
         if original_num_components != len(self.mixture_model.weights):
             self.mixture_model.print_elongations_and_counts(data)
-        if knn is None:
-            knn = self.n_neighbors
 
-        start_NEB = time.time()
-        # compute NEB paths.
-        (
-            self.adjacency_,
-            self.raw_adjacency_,
-            self.paths_,
-        ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths_batch(
-            means=self.mixture_model.centers,
-            covs=self.mixture_model.covs,
-            weights=self.mixture_model.weights,
-            df=self.mixture_model.df if (model_type == "tmm") else None,
-            gmm=(model_type == "gmm"),
-            iterations=self.iterations,
-            knn=knn,
-            num_NEB_points=self.num_NEB_points,
-            batch_size=self.batch_size,
-        )
-        self.time_NEB = time.time() - start_NEB
+        self._fit_NEB_paths(model_type, knn)
 
     def compute_mst_edges(self):
         """

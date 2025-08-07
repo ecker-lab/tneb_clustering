@@ -231,7 +231,7 @@ def get_clustering_objects(
     selected_algorithms = [
         (name, algo)  # return the full set of parameters
         for name, algo in clustering_algorithms  # global variable
-        if name in selector
+        if name in selector or name.replace("\n", "") in selector
     ]
 
     return selected_algorithms

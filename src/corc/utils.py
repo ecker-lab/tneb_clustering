@@ -281,3 +281,15 @@ def create_folder(folder_path):
         else:
             print("Exiting...")
             exit(-1)
+
+
+def get_prediction(algorithm, X, num_classes):
+    if isinstance(algorithm, corc.graph_metrics.gwgmara.GWGMara):
+        y_pred = algorithm.predict(X, target_number_clusters=num_classes)
+    elif hasattr(algorithm, "labels_"):
+        y_pred = algorithm.labels_.astype(int)
+    elif hasattr(algorithm, "predict_with_target"):
+        y_pred = algorithm.predict_with_target(X, num_classes).astype(int)
+    else:
+        y_pred = algorithm.predict(X)
+    return y_pred
