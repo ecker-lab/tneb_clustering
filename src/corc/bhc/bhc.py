@@ -4,6 +4,8 @@
 
 import numpy as np
 from scipy.special import gammaln
+import time
+import tqdm
 
 import corc.bhc.api as api
 
@@ -17,8 +19,13 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                http://mlg.eng.cam.ac.uk/zoubin/papers/icml05heller.pdf
     """
 
-    def __init__(self, data, model, alpha, cut_allowed):
+    def __init__(self, data, model, alpha, cut_allowed, verbose=False):
         super().__init__(data, model, alpha, cut_allowed)
+        self.verbose = verbose
+
+    def _print(self, string):
+        if self.verbose:
+            print(string)
 
     def build(self):
         n_objects = self.data.shape[0]
@@ -47,8 +54,22 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
 
         ij = n_objects - 1
 
+        # starttime = time.time()
+        # log_p_k_table = np.array(
+        #     self.model.pairwise_niw_log_mlh_numpy(self.data), dtype=np.float32
+        # )
+        # self._print(log_p_k_table.shape)
+        # self._print(
+        #     f"Time taken pairwise log_p numpy calculations: {time.time() - starttime:.2f} seconds"
+        # )
+
+        starttime = time.time()
+        pair_count = n_objects * (n_objects - 1) // 2
+        tmp_merge = np.empty((pair_count, 5), dtype=float)
+        row = 0
         # for every pair of data points
         for i in range(n_objects):
+            log_p_k_row = self.model.row_of_log_likelihood_for_pairs(self.data, i)
             for j in range(i + 1, n_objects):
                 # compute log(d_k)
                 n_ch = n[i] + n[j]
@@ -59,99 +80,139 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                 # compute log(pi_k)
                 log_pik = np.log(self.alpha) + gammaln(n_ch) - log_dk
                 # compute log(p_k)
-                data_merged = np.vstack((self.data[i], self.data[j]))
-                log_p_k = self.model.calc_log_mlh(data_merged)
+                log_p_k = log_p_k_row[j - i - 1]  # since j starts at i + 1
+                # log_p_k = self.model.calc_log_mlh_two(self.data[i], self.data[j])
+                # assert np.allclose(
+                # log_p_k_table[i, j], log_p_k
+                # ), f"Mismatch in log_p_k_table: {log_p_k_table[i, j]} != {log_p_k}"
+                # compute log(r_k)
+                # data_merged = np.vstack((self.data[i], self.data[j]))
+                # log_p_k = self.model.calc_log_mlh(data_merged)
                 # compute log(r_k)
                 log_p_ch = log_p[i] + log_p[j]
                 r1 = log_pik + log_p_k
                 r2 = log_d_ch - log_dk + log_p_ch
                 log_r = r1 - r2
                 # store results
-                merge_info = [i, j, log_r, r1, r2]
-                tmp_merge = (
-                    merge_info
-                    if tmp_merge is None
-                    else np.vstack((tmp_merge, merge_info))
-                )
+                tmp_merge[row] = [i, j, log_r, r1, r2]
+                row += 1
+        self._print(
+            f"Time taken for initial pairwise calculations: {time.time() - starttime:.2f} seconds"
+        )
+        log_p_k_table = None  # free memory
 
+        starttime = time.time()
+        new_comparison_time = 0
         # find clusters to merge
         arc_list = np.empty(0, dtype=api.Arc)
-        while active_nodes.size > 1:
-            # find i, j with the highest probability of the merged hypothesis
-            max_log_rk = np.max(tmp_merge[:, 2])
-            ids_matched = np.argwhere(tmp_merge[:, 2] == max_log_rk)
-            position = np.min(ids_matched)
-            i, j, log_r, r1, r2 = tmp_merge[position]
-            i = int(i)
-            j = int(j)
-            weights.append(log_r)
 
-            # cut if required and stop
-            if self.cut_allowed and log_r < 0:
-                hierarchy_cut = True
-                break
+        data_per_cluster = [np.array([self.data[i]]) for i in range(n_objects)]
 
-            # turn nodes i,j off
-            tmp_merge[np.argwhere(tmp_merge[:, 0] == i).flatten(), 2] = -np.inf
-            tmp_merge[np.argwhere(tmp_merge[:, 1] == i).flatten(), 2] = -np.inf
-            tmp_merge[np.argwhere(tmp_merge[:, 0] == j).flatten(), 2] = -np.inf
-            tmp_merge[np.argwhere(tmp_merge[:, 1] == j).flatten(), 2] = -np.inf
+        with tqdm.tqdm(
+            total=active_nodes.size - 1,
+            desc="Merging clusters",
+            disable=not self.verbose,
+        ) as pbar:
+            while active_nodes.size > 1:
+                # find i, j with the highest probability of the merged hypothesis
+                position = np.argmax(tmp_merge[:, 2])
+                # max_log_rk = np.max(tmp_merge[:, 2])
+                # ids_matched = np.argwhere(tmp_merge[:, 2] == max_log_rk)
+                # position = np.min(ids_matched)
+                i, j, log_r, r1, r2 = tmp_merge[position]
+                i = int(i)
+                j = int(j)
+                weights.append(log_r)
 
-            # new node ij
-            ij = n.size
-            n_ch = n[i] + n[j]
-            n = np.append(n, n_ch)
-            # compute log(d_ij)
-            log_d_ch = log_d[i] + log_d[j]
-            log_d_ij = BayesianHierarchicalClustering.__calc_log_d(
-                self.alpha, n[ij], log_d_ch
-            )
-            log_d = np.append(log_d, log_d_ij)
-            # update assignments
-            assignments[np.argwhere(assignments == i)] = ij
-            assignments[np.argwhere(assignments == j)] = ij
+                # cut if required and stop
+                # if self.cut_allowed and log_r < 0:
+                #     hierarchy_cut = True
+                #     break
 
-            # create arcs from ij to i,j
-            arc_i = api.Arc(ij, i)
-            arc_j = api.Arc(ij, j)
-            arc_list = np.append(arc_list, [arc_i, arc_j])
+                # tmp_merge[np.argwhere(tmp_merge[:, 0] == i).flatten(), 2] = -np.inf
+                # tmp_merge[np.argwhere(tmp_merge[:, 1] == i).flatten(), 2] = -np.inf
+                # tmp_merge[np.argwhere(tmp_merge[:, 0] == j).flatten(), 2] = -np.inf
+                # tmp_merge[np.argwhere(tmp_merge[:, 1] == j).flatten(), 2] = -np.inf
 
-            # delete i,j from active list and add ij
-            i_idx = np.argwhere(active_nodes == i).flatten()
-            j_idx = np.argwhere(active_nodes == j).flatten()
-            active_nodes = np.delete(active_nodes, [i_idx, j_idx])
-            active_nodes = np.append(active_nodes, ij)
-            # compute log(p_ij)
-            t1 = np.maximum(r1, r2)
-            t2 = np.minimum(r1, r2)
-            log_p_ij = t1 + np.log(1 + np.exp(t2 - t1))
-            log_p = np.append(log_p, log_p_ij)
-
-            # for every pair ij x active
-            x_mat_ij = self.data[np.argwhere(assignments == ij).flatten()]
-            for k in range(active_nodes.size - 1):
-                # compute log(d_k)
-                n_ch = n[k] + n[ij]
-                log_d_ch = log_d[k] + log_d[ij]
-                log_dij = BayesianHierarchicalClustering.__calc_log_d(
-                    self.alpha, n_ch, log_d_ch
+                # new node ij
+                ij = n.size
+                n_ch = n[i] + n[j]
+                n = np.append(n, n_ch)
+                # compute log(d_ij)
+                log_d_ch = log_d[i] + log_d[j]
+                log_d_ij = BayesianHierarchicalClustering.__calc_log_d(
+                    self.alpha, n[ij], log_d_ch
                 )
-                # compute log(pi_k)
-                log_pik = np.log(self.alpha) + gammaln(n_ch) - log_dij
-                # compute log(p_k)
-                data_merged = self.data[
-                    np.argwhere(assignments == active_nodes[k]).flatten()
-                ]
-                log_p_ij = self.model.calc_log_mlh(np.vstack((x_mat_ij, data_merged)))
-                # compute log(r_k)
-                log_p_ch = log_p[ij] + log_p[active_nodes[k]]
-                r1 = log_pik + log_p_ij
-                r2 = log_d_ch - log_dij + log_p_ch
-                log_r = r1 - r2
-                # store results
-                merge_info = [ij, active_nodes[k], log_r, r1, r2]
-                tmp_merge = np.vstack((tmp_merge, merge_info))
+                log_d = np.append(log_d, log_d_ij)
+                # update assignments
+                data_per_cluster.append(
+                    np.vstack((data_per_cluster[i], data_per_cluster[j]))
+                )
+                data_per_cluster[i] = None
+                data_per_cluster[j] = None
+                assignments[np.argwhere(assignments == i)] = ij
+                assignments[np.argwhere(assignments == j)] = ij
 
+                # create arcs from ij to i,j
+                arc_i = api.Arc(ij, i)
+                arc_j = api.Arc(ij, j)
+                arc_list = np.append(arc_list, [arc_i, arc_j])
+
+                # delete i,j from active list and add ij
+                i_idx = np.argwhere(active_nodes == i).flatten()
+                j_idx = np.argwhere(active_nodes == j).flatten()
+                active_nodes = np.delete(active_nodes, [i_idx, j_idx])
+                active_nodes = np.append(active_nodes, ij)
+
+                # turn nodes i,j off
+                # keep rows where neither column 0 nor column 1 equals i or j
+                mask = ~np.isin(tmp_merge[:, :2], [i, j]).any(axis=1)
+                tmp_merge = tmp_merge[mask]
+
+                # compute log(p_ij)
+                t1 = np.maximum(r1, r2)
+                t2 = np.minimum(r1, r2)
+                log_p_ij = t1 + np.log(1 + np.exp(t2 - t1))
+                log_p = np.append(log_p, log_p_ij)
+
+                comparison_time = time.time()
+                # for every pair ij x active
+                # x_mat_ij = self.data[np.argwhere(assignments == ij).flatten()]
+                collected_merge_info = np.empty((len(active_nodes) - 1, 5), dtype=float)
+                for k in range(active_nodes.size - 1):
+                    # compute log(d_k)
+                    n_ch = n[k] + n[ij]
+                    log_d_ch = log_d[k] + log_d[ij]
+                    log_dij = BayesianHierarchicalClustering.__calc_log_d(
+                        self.alpha, n_ch, log_d_ch
+                    )
+                    # compute log(pi_k)
+                    log_pik = np.log(self.alpha) + gammaln(n_ch) - log_dij
+                    # compute log(p_k)
+                    # data_k_filter = np.argwhere(assignments == active_nodes[k]).flatten()
+                    # data_k = data_per_cluster[k]
+                    assert (
+                        data_per_cluster[active_nodes[k]] is not None
+                    ), f"data_per_cluster[{active_nodes[k]}] is None! {active_nodes}"
+                    data_merged = np.vstack(
+                        (data_per_cluster[ij], data_per_cluster[active_nodes[k]])
+                    )
+                    log_p_ij = self.model.calc_log_mlh(data_merged)
+                    # compute log(r_k)
+                    log_p_ch = log_p[ij] + log_p[active_nodes[k]]
+                    r1 = log_pik + log_p_ij
+                    r2 = log_d_ch - log_dij + log_p_ch
+                    log_r = r1 - r2
+                    # store results
+                    collected_merge_info[k] = [ij, active_nodes[k], log_r, r1, r2]
+
+                pbar.update(1)
+                tmp_merge = np.vstack((tmp_merge, collected_merge_info))
+                new_comparison_time += time.time() - comparison_time
+        self._print(f"Time taken for merging: {time.time() - starttime:.2f} seconds")
+        self._print(
+            f"Time taken for new comparisons: {new_comparison_time:.2f} seconds"
+        )
         return api.Result(
             arc_list,
             np.arange(0, ij + 1),
