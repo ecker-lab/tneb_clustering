@@ -20,9 +20,16 @@ def get_dataset(dataset, size, cache_path="cache"):
     # dataset loading
     X, y, tsne = corc.utils.load_dataset(dataset, cache_path=cache_path)
     np.random.seed(42)
-    indices = np.random.choice(X.shape[0], size=size, replace=False)
-    subsampled_data = X[indices]
-    subsampled_ys = y[indices]
+    if X.shape[0] > size and size > 0:
+        _, subsampled_data, _, subsampled_ys = sklearn.model_selection.train_test_split(
+            X, y, test_size=size, stratify=y, random_state=42
+        )
+    else:
+        subsampled_data = X
+        subsampled_ys = y
+    # indices = np.random.choice(X.shape[0], size=size, replace=False)
+    # subsampled_data = X[indices]
+    # subsampled_ys = y[indices]
     return subsampled_data, subsampled_ys
 
 
@@ -30,7 +37,7 @@ def get_bhc(subsampled_data, g=20, scale_factor=0.001, alpha=1):
     model = prior.NormalInverseWishart.create(subsampled_data, g, scale_factor)
     start_time = time.time()
     bhc_result = corc.bhc.bhc.BayesianHierarchicalClustering(
-        subsampled_data, model, alpha, cut_allowed=False
+        subsampled_data, model, alpha, cut_allowed=False, verbose=True
     ).build()
     end_time = time.time()
     print(f"Time taken for BHC: {end_time - start_time:.2f} seconds")
@@ -121,7 +128,7 @@ def main():
     cache_path = args.cache_path
     # os.makedirs(f"{cache_path}/bhc", exist_ok=True)
 
-    print(f"Processing dataset: {args.dataset}")
+    print(f"Processing dataset: {args.dataset} (size: {args.size})")
     filepath = f"{cache_path}/bhc/{args.dataset}_{args.size}.pkl"
     if os.path.exists(filepath):
         print(f"Result for {args.dataset} already exists. Skipping...")
