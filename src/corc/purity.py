@@ -14,6 +14,8 @@
 
 import numpy as np
 from tqdm import trange
+import tqdm
+import itertools
 
 
 def dendrogram_purity(dendrogram: np.ndarray, y: np.array, y_pred_raw=None):
@@ -37,27 +39,56 @@ def dendrogram_purity(dendrogram: np.ndarray, y: np.array, y_pred_raw=None):
         parent_matrix=parent_matrix, y=y, y_pred_raw=y_pred_raw
     )
     y_label = np.unique(y)
-    purity = 0
+    purity = 0.0
     pairs_counter = 0
-    for true_cluster_index in range(len(y_label)):
-        current_instances = np.argwhere(y == y_label[true_cluster_index]).flatten()
-        purity_cache = dict()
-        # purity scores for all pairs
-        for i in trange(len(current_instances)):
-            for j in range(len(current_instances))[i + 1 :]:
-                cluster_a = int(y_pred_raw[current_instances[i]])
-                cluster_b = int(y_pred_raw[current_instances[j]])
-                if not (cluster_a, cluster_b) in purity_cache.keys():
-                    purity_cache[(cluster_a, cluster_b)] = _purity_score(
-                        y_pred_raw[current_instances[i]],
-                        y_pred_raw[current_instances[j]],
-                        true_cluster_index,
-                        parent_matrix,
-                        node_purity,
-                        n_instance,
-                    )
-                purity += purity_cache[(cluster_a, cluster_b)]
+
+    if len(base_clusters) * 10 < len(y):
+        # y_pred_raw was not None and going over the data by "overclustering" clusters is fast
+        for true_cluster_index in range(len(y_label)):
+            current_instances = np.argwhere(y == y_label[true_cluster_index]).flatten()
+            for i, j in itertools.combinations(range(len(base_clusters)), 2):
+                # compute weight of this combination
+                raw_cluster_instances_i = np.argwhere(
+                    y_pred_raw == base_clusters[i]
+                ).flatten()
+                count_i = len(
+                    np.intersect1d(current_instances, raw_cluster_instances_i)
+                )
+                raw_cluster_instances_j = np.argwhere(
+                    y_pred_raw == base_clusters[j]
+                ).flatten()
+                count_j = len(
+                    np.intersect1d(current_instances, raw_cluster_instances_j)
+                )
+                if count_i == 0 or count_j == 0:
+                    continue
+                purity_score = _purity_score(
+                    base_clusters[i],
+                    base_clusters[j],
+                    true_cluster_index,
+                    parent_matrix,
+                    node_purity,
+                    n_instance,
+                )
+                purity += count_i * count_j * purity_score
+                pairs_counter += count_i * count_j
+    else:
+        # there are so many y_pred_raw clusters (or y_pred_raw was None) that
+        # we use the fallback to go through it pairwise
+        for true_cluster_index in range(len(y_label)):
+            current_instances = np.argwhere(y == y_label[true_cluster_index]).flatten()
+            # purity scores for all pairs
+            for i, j in itertools.combinations(range(len(current_instances)), 2):
+                purity += _purity_score(
+                    y_pred_raw[current_instances[i]],
+                    y_pred_raw[current_instances[j]],
+                    true_cluster_index,
+                    parent_matrix,
+                    node_purity,
+                    n_instance,
+                )
                 pairs_counter += 1
+
     purity = purity / pairs_counter
 
     return purity

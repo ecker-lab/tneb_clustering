@@ -491,8 +491,8 @@ class NEB(Graph):
             self.ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
         return self.ari
 
-    def get_purity(self, X, y):
-        if not hasattr(self, "purity"):
+    def get_purity(self, X, y, recompute=True):
+        if not hasattr(self, "purity") or recompute:
             normed_adj = self.adjacency_.copy()
             normed_adj += np.min(normed_adj)
             condensed_linearized = scipy.spatial.distance.squareform(
