@@ -4,6 +4,8 @@
 
 import numpy as np
 from scipy.special import gammaln
+import sklearn.metrics
+
 import time
 import tqdm
 
@@ -26,6 +28,10 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
     def _print(self, string):
         if self.verbose:
             print(string)
+
+    def fit(data):
+        self.data = data
+        self.build()
 
     def build(self):
         n_objects = self.data.shape[0]
@@ -54,15 +60,6 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
 
         ij = n_objects - 1
 
-        # starttime = time.time()
-        # log_p_k_table = np.array(
-        #     self.model.pairwise_niw_log_mlh_numpy(self.data), dtype=np.float32
-        # )
-        # self._print(log_p_k_table.shape)
-        # self._print(
-        #     f"Time taken pairwise log_p numpy calculations: {time.time() - starttime:.2f} seconds"
-        # )
-
         starttime = time.time()
         pair_count = n_objects * (n_objects - 1) // 2
         tmp_merge = np.empty((pair_count, 5), dtype=float)
@@ -81,13 +78,6 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                 log_pik = np.log(self.alpha) + gammaln(n_ch) - log_dk
                 # compute log(p_k)
                 log_p_k = log_p_k_row[j - i - 1]  # since j starts at i + 1
-                # log_p_k = self.model.calc_log_mlh_two(self.data[i], self.data[j])
-                # assert np.allclose(
-                # log_p_k_table[i, j], log_p_k
-                # ), f"Mismatch in log_p_k_table: {log_p_k_table[i, j]} != {log_p_k}"
-                # compute log(r_k)
-                # data_merged = np.vstack((self.data[i], self.data[j]))
-                # log_p_k = self.model.calc_log_mlh(data_merged)
                 # compute log(r_k)
                 log_p_ch = log_p[i] + log_p[j]
                 r1 = log_pik + log_p_k
@@ -99,7 +89,6 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
         self._print(
             f"Time taken for initial pairwise calculations: {time.time() - starttime:.2f} seconds"
         )
-        log_p_k_table = None  # free memory
 
         starttime = time.time()
         new_comparison_time = 0
@@ -128,11 +117,6 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                 # if self.cut_allowed and log_r < 0:
                 #     hierarchy_cut = True
                 #     break
-
-                # tmp_merge[np.argwhere(tmp_merge[:, 0] == i).flatten(), 2] = -np.inf
-                # tmp_merge[np.argwhere(tmp_merge[:, 1] == i).flatten(), 2] = -np.inf
-                # tmp_merge[np.argwhere(tmp_merge[:, 0] == j).flatten(), 2] = -np.inf
-                # tmp_merge[np.argwhere(tmp_merge[:, 1] == j).flatten(), 2] = -np.inf
 
                 # new node ij
                 ij = n.size
@@ -177,7 +161,6 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
 
                 comparison_time = time.time()
                 # for every pair ij x active
-                # x_mat_ij = self.data[np.argwhere(assignments == ij).flatten()]
                 collected_merge_info = np.empty((len(active_nodes) - 1, 5), dtype=float)
                 for k in range(active_nodes.size - 1):
                     # compute log(d_k)
@@ -189,8 +172,6 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                     # compute log(pi_k)
                     log_pik = np.log(self.alpha) + gammaln(n_ch) - log_dij
                     # compute log(p_k)
-                    # data_k_filter = np.argwhere(assignments == active_nodes[k]).flatten()
-                    # data_k = data_per_cluster[k]
                     assert (
                         data_per_cluster[active_nodes[k]] is not None
                     ), f"data_per_cluster[{active_nodes[k]}] is None! {active_nodes}"
@@ -213,7 +194,7 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
         self._print(
             f"Time taken for new comparisons: {new_comparison_time:.2f} seconds"
         )
-        return api.Result(
+        self.result = api.Result(
             arc_list,
             np.arange(0, ij + 1),
             log_p[-1],
@@ -221,6 +202,31 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
             hierarchy_cut,
             len(np.unique(assignments)),
         )
+        return self.result
+
+    def predict_with_target(self, X, target_number_clusters):
+        """
+        Predicts the cluster assignments for the data X with a target number of clusters.
+        """
+        if self.result is None:
+            raise ValueError("The model has not been fitted yet.")
+
+        # Here we would implement the logic to predict cluster assignments
+        # based on the fitted model and the target number of clusters.
+        # This is a placeholder implementation.
+        return np.random.randint(0, target_number_clusters, size=X.shape[0])
+
+    def get_purity(self, y):
+        if not hasattr(self, "purity"):
+            self.purity = self.result.get_purity(y)
+        return self.purity
+
+    def get_ari(self, y):
+        if not hasattr(self, "ari"):
+            self.ari = sklearn.metrics.adjusted_rand_score(
+                y, self.predict_with_target(self.data, len(np.unique(y)))
+            )
+        return self.ari
 
     @staticmethod
     def __calc_log_d(alpha, nk, log_d_ch):

@@ -236,14 +236,72 @@ def load_tmms(dataset_name, cache_path="../cache"):
 
 
 def load_algorithms(dataset_name, algorithm="TMM-NEB", cache_path="../cache"):
-    dataset_filename = os.path.join(cache_path, f"{dataset_name}_{algorithm}.pickle")
+    alg_name = algorithm.replace("\\n", "\n").replace("\n", "")
+    algorithm_filename = os.path.join(cache_path, f"{dataset_name}_{algorithm}.pickle")
     # Check if the dataset file exists
-    if os.path.exists(dataset_filename):
-        with open(dataset_filename, "rb") as f:
-            tmms = pickle.load(f)
-        return tmms
+    if os.path.exists(algorithm_filename):
+        with open(algorithm_filename, "rb") as f:
+            algorithms = pickle.load(f)
+        return algorithms
     else:
+        print(f"File {algorithm_filename} not found.")
         return None
+
+
+def get_ari(algorithms, X, y):
+    num_classes = len(np.unique(y))
+    aris = list()
+    for algorithm in algorithms:
+        if hasattr(algorithm, "ari"):
+            ari = algorithm.ari
+        else:
+            y_pred = get_prediction(algorithm, X, num_classes)
+            ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+            aris.append(ari)
+    return aris
+
+
+def get_purity_score(algorithms, X, y):
+    num_classes = len(np.unique(y))
+    purity_scores = list()
+    for algorithm in algorithms:
+        linkage_matrix = None
+        y_pred = get_prediction(algorithm, X, num_classes)
+        if hasattr(algorithm, "purity"):
+            purity = algorithm.purity
+        elif isinstance(algorithm, sklearn.cluster.AgglomerativeClustering):
+            linkage_matrix = np.column_stack(
+                [
+                    algorithm.children_,
+                    algorithm.distances_,
+                    np.ones(algorithm.children_.shape[0]),
+                ]
+            ).astype(float)
+        elif isinstance(algorithm, corc.bhc.bhc.BayesianHierarchicalClustering):
+            linkage_matrix = algorithm.result.get_dendrogram()
+        elif hasattr(algorithm, "get_purity"):
+            linkage_matrix = algorithm.get_linkage_matrix()
+            corc.purity.dendr
+        purity_scores.append(purity)
+    return purity_scores
+
+
+def get_predictions(algorithms, X, num_classes):
+    if isinstance(algorithms, list):
+        # then the algorithm is not deterministic and we have multiple runs
+        y_pred = []
+        ari = []
+        for model in algorithms:  # algorithm is a list of models in this case
+            prediction = get_prediction(model, X, num_classes)
+            y_pred.append(prediction)
+            ari.append(sklearn.metrics.adjusted_rand_score(y, prediction))
+            model.data = X  # for tmm plot_graph function later
+    else:
+        y_pred = get_prediction(algorithms, X, num_classes)
+        ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+        algorithms.data = X  # for tmm plot_graph function later
+
+    return algorithms, y_pred, ari
 
 
 def create_dataset_pickle(dataset_name, dataset_filename=None, cache_path="../cache"):

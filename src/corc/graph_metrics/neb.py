@@ -295,17 +295,6 @@ class NEB(Graph):
         return pairs
 
     def create_graph(self, save=True, plot=True, return_graph=False):
-        """'
-        1. Overcluster data using a GMM/TMM
-        2. Construct a weighted undirected graph with the clusters as centers.
-        Low weights mean, that the clusters are more disconnected.
-        We span elastic bands between all pairs of clusters and then optimize them to stay "high" in probability space
-        3. Plots show tsne on samples and gmm/tmm cluster means.
-        """
-
-        # apply TSNE to get down to 2D
-        # embeddings, cluster_means = self._dim_reduction(self.centers_)
-
         # edges are expected in the form of a dictionary, so we have to convert our np array
         edges = {
             (i, j): self.adjacency_[i, j]
@@ -326,10 +315,8 @@ class NEB(Graph):
 
         if plot:
             self.plot_graph()
-
         if save:
             raise NotImplementedError
-
         if return_graph:
             return self.graph_data
 
@@ -497,6 +484,24 @@ class NEB(Graph):
                     ax.plot(*zip(start, end), color="black", alpha=0.5, lw=1)
 
     def get_ari(self, X, y):
-        y_pred = self.predict_with_target(X, target_number_classes=len(np.unique(y)))
-        ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
-        return ari
+        if not hasattr(self, "ari"):
+            y_pred = self.predict_with_target(
+                X, target_number_classes=len(np.unique(y))
+            )
+            self.ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+        return self.ari
+
+    def get_purity(self, X, y):
+        if not hasattr(self, "purity"):
+            normed_adj = self.adjacency_.copy()
+            normed_adj += np.min(normed_adj)
+            condensed_linearized = scipy.spatial.distance.squareform(
+                -normed_adj, checks=False
+            )
+            dendrogram = scipy.cluster.hierarchy.linkage(
+                condensed_linearized, method="single"
+            )
+            y_pred = self.mixture_model.predict(X)
+            self.purity = corc.purity.dendrogram_purity(dendrogram, y, y_pred)
+
+        return self.purity

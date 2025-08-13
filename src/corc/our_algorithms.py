@@ -1,6 +1,7 @@
 from sklearn import cluster, mixture
 import studenttmixture
 from corc.graph_metrics import paga, gwgmara, neb, uniforce, smmp
+import corc.bhc
 from scipy.sparse import csr_matrix
 import scanpy
 import anndata
@@ -200,6 +201,13 @@ def get_clustering_objects(
     smmp_algo = smmp.SMMP(
         n_clusters=params["n_clusters"],
     )
+    bhc = corc.bhc.bhc.BayesianHierarchicalClustering(
+        data=X,
+        model=corc.bhc.prior.NormalInverseWishart.create(X, g=20, scale_factor=0.001),
+        alpha=1,  # not used since cut_allowed=False
+        cut_allowed=False,
+        verbose=True,
+    )
 
     clustering_algorithms = [
         ("MiniBatch\nKMeans", two_means),
@@ -207,6 +215,7 @@ def get_clustering_objects(
         ("Single\nLinkage", agglomerative_min),
         ("Average\nLinkage", agglomerative_mean),
         ("Complete\nLinkage", agglomerative_max),
+        ("BHC", bhc),
         # ("BIRCH", birch), # very old method that people don't really use
         ("HDBSCAN", hdbscan),
         # ("DBSCAN", dbscan), # HDBSCAN is always better than DBSCAN
