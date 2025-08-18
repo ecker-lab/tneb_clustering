@@ -20,7 +20,7 @@ import itertools
 
 def dendrogram_purity(dendrogram: np.ndarray, y: np.array, y_pred_raw=None):
     """
-    A :math:`(n-1)` by 4 matrix ``Z`` is returned. At the
+    dendrogram definition: A :math:`(n-1)` by 4 matrix ``Z`` is returned. At the
     :math:`i`-th iteration, clusters with indices ``Z[i, 0]`` and
     ``Z[i, 1]`` are combined to form cluster :math:`n + i`. A
     cluster with an index less than :math:`n` corresponds to one of
@@ -30,159 +30,78 @@ def dendrogram_purity(dendrogram: np.ndarray, y: np.array, y_pred_raw=None):
     observations in the newly formed cluster.
     """
     if y_pred_raw is None:
-        y_pred_raw = list(range(len(y)))
-    base_clusters, base_counts = np.unique(y_pred_raw, return_counts=True)
-    n_instance = len(base_clusters)
+        y_pred_raw = np.array(list(range(len(y))))
 
-    parent_matrix = _get_parent(dendrogram=dendrogram, n_instance=n_instance)
-    node_purity = _get_node_purity_mixed(
-        parent_matrix=parent_matrix, y=y, y_pred_raw=y_pred_raw
+    num_true_classes = len(np.unique(y))
+    # y_pred_raw = np.array(list(range(len(y))))
+    base_clusters = np.unique(y_pred_raw)
+    num_base_clusters = len(base_clusters)
+    parent_matrix = _get_parent_matrix(
+        dendrogram=dendrogram, n_instance=num_base_clusters
     )
-    y_label = np.unique(y)
+
+    # counts_per_class contains for every true class label the number of datapoints
+    # with this label for each base class. For a full hierarchy this is either 0 or 1.
+    # For an overclustering, larger values are possible.
+    counts_per_class = np.zeros((num_true_classes, num_base_clusters), dtype=int)
+    for true_label_index in range(num_true_classes):
+        filter = y == (np.unique(y)[true_label_index])
+        values, counts = np.unique(y_pred_raw[filter], return_counts=True)
+        # store the counts in the big array
+        for i in range(len(values)):
+            base_cluster_index = np.where(base_clusters == values[i])
+            counts_per_class[true_label_index, base_cluster_index] = counts[i]
+
+    # parent_matrix[i,:] contains a 1 at position j if j is a descendant of i.
+    # the matrix multiplication thus sums up how many original nodes per class are at each
+    # node in the tree.
+    node_counts = counts_per_class @ parent_matrix.T
+
     purity = 0.0
-    pairs_counter = 0
+    total_pairs = 0
+    # within-leaf purities (always 0 for complete hierarchies)
+    for true_label_index in range(num_true_classes):
+        for base_cluster_index in range(num_base_clusters):
+            class_count = counts_per_class[true_label_index, base_cluster_index]
+            leaf_purity = class_count / np.sum(counts_per_class[:, base_cluster_index])
+            weight = class_count * (class_count - 1) / 2
+            purity += leaf_purity * weight
+            total_pairs += weight
 
-    if len(base_clusters) * 10 < len(y):
-        # y_pred_raw was not None and going over the data by "overclustering" clusters is fast
-        for true_cluster_index in range(len(y_label)):
-            current_instances = np.argwhere(y == y_label[true_cluster_index]).flatten()
-            for i, j in itertools.combinations(range(len(base_clusters)), 2):
-                # compute weight of this combination
-                raw_cluster_instances_i = np.argwhere(
-                    y_pred_raw == base_clusters[i]
-                ).flatten()
-                count_i = len(
-                    np.intersect1d(current_instances, raw_cluster_instances_i)
-                )
-                raw_cluster_instances_j = np.argwhere(
-                    y_pred_raw == base_clusters[j]
-                ).flatten()
-                count_j = len(
-                    np.intersect1d(current_instances, raw_cluster_instances_j)
-                )
-                if count_i == 0 or count_j == 0:
-                    continue
-                purity_score = _purity_score(
-                    base_clusters[i],
-                    base_clusters[j],
-                    true_cluster_index,
-                    parent_matrix,
-                    node_purity,
-                    n_instance,
-                )
-                purity += count_i * count_j * purity_score
-                pairs_counter += count_i * count_j
-    else:
-        # there are so many y_pred_raw clusters (or y_pred_raw was None) that
-        # we use the fallback to go through it pairwise
-        for true_cluster_index in range(len(y_label)):
-            current_instances = np.argwhere(y == y_label[true_cluster_index]).flatten()
-            # purity scores for all pairs
-            for i, j in itertools.combinations(range(len(current_instances)), 2):
-                purity += _purity_score(
-                    y_pred_raw[current_instances[i]],
-                    y_pred_raw[current_instances[j]],
-                    true_cluster_index,
-                    parent_matrix,
-                    node_purity,
-                    n_instance,
-                )
-                pairs_counter += 1
+    # purity where inner nodes of the dendrogram serve as LCA
+    for true_label_index in range(num_true_classes):
+        for index, (child1, child2, _, _) in enumerate(dendrogram):
+            counts_child1 = node_counts[true_label_index, int(child1)]
+            counts_child2 = node_counts[true_label_index, int(child2)]
+            weight = counts_child1 * counts_child2
 
-    purity = purity / pairs_counter
+            class_count = node_counts[true_label_index, index + num_base_clusters]
+            node_purity = class_count / np.sum(
+                node_counts[:, index + num_base_clusters]
+            )
 
+            purity += node_purity * weight
+            total_pairs += weight
+
+    purity /= total_pairs
     return purity
 
 
-def _purity_score(
-    i: int,
-    j: int,
-    ci: int,
-    parent_matrix: np.ndarray,
-    node_purity: np.ndarray,
-    n_instances: int,
-):
-    if i == j:
-        score = node_purity[ci, i]
-    else:
-        lca = np.argwhere(parent_matrix[i, :] * parent_matrix[j, :] == 1).flatten()[0]
-        score = node_purity[ci, lca + n_instances]
-    return score
+def _get_parent_matrix(dendrogram, n_instance):
+    "The parent matrix stores for each cluster which of the basic elements/clusters form it."
+    # each line of the dendrogram corresponds to a cluster, plus we need the initial clusters
+    parent_matrix = np.zeros(
+        (dendrogram.shape[0] + n_instance, n_instance), dtype=np.int8
+    )
+    # each initial cluster consists just of itself
+    for i in range(n_instance):
+        parent_matrix[i, i] = 1
 
+    for i, (child1, child2, _, _) in enumerate(dendrogram):
+        parent_matrix[i + n_instance] = (
+            parent_matrix[int(child1)] + parent_matrix[int(child2)]
+        )
 
-def _get_parent(dendrogram: np.ndarray, n_instance: int):
-    """
-    A :math:`(n-1)` by 4 matrix ``Z`` is returned. At the
-    :math:`i`-th iteration, clusters with indices ``Z[i, 0]`` and
-    ``Z[i, 1]`` are combined to form cluster :math:`n + i`. A
-    cluster with an index less than :math:`n` corresponds to one of
-    the :math:`n` original observations. The distance between
-    clusters ``Z[i, 0]`` and ``Z[i, 1]`` is given by ``Z[i, 2]``. The
-    fourth value ``Z[i, 3]`` represents the number of original
-    observations in the newly formed cluster.
-    """
-    parent = [[i + n_instance] for i in range(n_instance - 1)]
-    dendrogram = np.append(dendrogram, parent, axis=1)
-    parent_matrix = np.zeros(shape=[n_instance, 2 * n_instance - 1], dtype=np.int8)
-
-    for i in range(n_instance - 1):
-        current_ind = []
-
-        if dendrogram[i, 0] >= n_instance:
-            ind = np.argwhere(parent_matrix[:, int(dendrogram[i, 0])] == 1).flatten()
-            for item in ind:
-                current_ind.append(item)
-        else:
-            current_ind.append(int(dendrogram[i, 0]))
-
-        if dendrogram[i, 1] >= n_instance:
-            ind = np.argwhere(parent_matrix[:, int(dendrogram[i, 1])] == 1).flatten()
-            for item in ind:
-                current_ind.append(item)
-        else:
-            current_ind.append(int(dendrogram[i, 1]))
-
-        parent_matrix[current_ind, int(dendrogram[i, 4])] = 1
-
-    parent_matrix = np.delete(parent_matrix, np.s_[:n_instance], axis=1)
+    assert np.max(parent_matrix) == 1, "input dendrogram does not correspond to a tree"
 
     return parent_matrix
-
-
-def _get_node_purity_mixed(parent_matrix: np.ndarray, y: np.array, y_pred_raw):
-    true_clusters = np.unique(y)
-    raw_clusters, leaf_sizes = np.unique(y_pred_raw, return_counts=True)
-    n_leaves = len(np.unique(y_pred_raw))
-
-    node_purity = np.zeros(shape=(len(true_clusters), 2 * len(y) - 1))
-
-    # leaf purity per true cluster
-    for true_cluster_index, true_cluster in enumerate(true_clusters):
-        true_cluster_instances = np.argwhere(y == true_cluster).flatten()
-        for leaf_index, raw_cluster in enumerate(raw_clusters):
-            raw_cluster_instances = np.argwhere(y_pred_raw == raw_cluster).flatten()
-            intersection = np.intersect1d(true_cluster_instances, raw_cluster_instances)
-            # compute purity
-            node_purity[true_cluster_index, leaf_index] = (
-                len(intersection) / leaf_sizes[leaf_index]
-            )
-
-    # propagate purity values in the tree
-    # Internal nodes in the dendrogram/parent_matrix are indexed from n_leaf … 2*n_leaves‑2
-    for internal_node_idx in range(2 * n_leaves - 1)[n_leaves:]:
-        # children of the current internal node (columns in parent_matrix are offset by n_leaf)
-        child_indices = np.argwhere(
-            parent_matrix[:, internal_node_idx - n_leaves] == 1
-        ).flatten()
-
-        for true_class_idx, true_cluster in enumerate(true_clusters):
-            child_purities = node_purity[true_class_idx, child_indices]
-            child_weights = leaf_sizes[child_indices]
-
-            weighted_sum = (child_purities * child_weights).sum()
-            total_weight = child_weights.sum()
-
-            # Store the purity of the internal node for this true class
-            node_purity[true_class_idx, internal_node_idx] = weighted_sum / total_weight
-
-    return node_purity
