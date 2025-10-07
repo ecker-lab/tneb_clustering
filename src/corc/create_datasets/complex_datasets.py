@@ -5,6 +5,7 @@ from scipy.spatial import distance
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from corc.utils import set_seed
+import pickle
 
 
 def make_gaussians(
@@ -68,13 +69,19 @@ def make_gaussians(
 
 
 def load_densired(dim, path="../datasets/densired.npz"):
+    Xs = list()
+    ys = list()
     with open(path, "rb") as f:
-        data = np.load(f)
-        # "files" within a npz-file cannot be named with numbers only, thus the f-string
-        X = data[f"d{dim}"][:, :-1]
-        y = data[f"d{dim}"][:, -1]
-    X = StandardScaler().fit_transform(X)
-    return X, y
+        data = pickle.load(f)
+        # data = np.load(f)
+        for index in range(10):
+            # "files" within a npz-file cannot be named with numbers only, thus the f-string
+            X = data[index][dim][:, :-1]
+            y = data[index][dim][:, -1]
+            X = StandardScaler().fit_transform(X)
+            Xs.append(X)
+            ys.append(y)
+    return Xs, ys
 
 
 def make_mnist_nd(dim, path="../datasets/mvae_mnist_nd_saved.pkl"):

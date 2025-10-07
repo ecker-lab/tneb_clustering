@@ -498,10 +498,15 @@ class NEB(Graph):
             condensed_linearized = scipy.spatial.distance.squareform(
                 -normed_adj, checks=False
             )
+            condensed_linearized = np.nan_to_num(
+                condensed_linearized, nan=1e8, posinf=1e6, neginf=1e6
+            ) # make sure -inf values are not chosen
             dendrogram = scipy.cluster.hierarchy.linkage(
                 condensed_linearized, method="single"
             )
             y_pred = self.mixture_model.predict(X)
-            self.purity = corc.purity.dendrogram_purity(dendrogram, y, y_pred)
+            self.purity = corc.purity.dendrogram_purity(
+                dendrogram, y, y_pred_raw=y_pred
+            )
 
         return self.purity

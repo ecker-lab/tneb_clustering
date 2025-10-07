@@ -1,7 +1,8 @@
 from sklearn import cluster, mixture
 import studenttmixture
 from corc.graph_metrics import paga, gwgmara, neb, uniforce, smmp
-import corc.bhc
+import corc.bhc.bhc
+import corc.bhc.prior
 from scipy.sparse import csr_matrix
 import scanpy
 import anndata
@@ -15,6 +16,7 @@ ALGORITHM_SELECTOR = [
     "Single\nLinkage",
     "Average\nLinkage",
     "Complete\nLinkage",
+    "BHC",
     "HDBSCAN",
     "Gaussian\nMixture",
     "t-Student\nMixture",
@@ -23,9 +25,9 @@ ALGORITHM_SELECTOR = [
     # "OPTICS",
     "Spectral\nClustering",
     "Affinity\nPropagation",
-    "MeanShift",
+    # "MeanShift",
     "Leiden",
-    "PAGA",
+    # "PAGA",
     "UniForCE",
     "SMMP",
     "GWG-dip",
@@ -42,6 +44,7 @@ CORE_SELECTOR = [
     "GWG-dip",
     "UniForCE",
     "SMMP",
+    "BHC",
     "GMM-NEB",
     "TMM-NEB",
 ]
@@ -54,12 +57,23 @@ ALG_DISPLAYNAMES = {
 
 DETERMINISTIC_ALGORITHMS = [
     "Agglomerative\nClustering",
+    "BHC",
     "HDBSCAN",
     "Spectral\nClustering",
     "Leiden",
     "Single\nLinkage",
     "Average\nLinkage",
     "Complete\nLinkage",
+]
+
+HIERARCHICAL_ALGORITHMS = [
+    "Agglomerative\nClustering",
+    "Single\nLinkage",
+    "Average\nLinkage",
+    "Complete\nLinkage",
+    "BHC",
+    "TMM-NEB",
+    "GMM-NEB",
 ]
 
 
@@ -111,18 +125,27 @@ def get_clustering_objects(
     two_means = cluster.MiniBatchKMeans(
         n_clusters=params["n_clusters"],
         random_state=params["random_state"],
+        n_init="auto",
     )
     ward = cluster.AgglomerativeClustering(
-        n_clusters=params["n_clusters"], linkage="ward", connectivity=connectivity
+        n_clusters=params["n_clusters"],
+        linkage="ward",
+        # connectivity=connectivity,
     )
     agglomerative_min = cluster.AgglomerativeClustering(
-        n_clusters=params["n_clusters"], linkage="single", connectivity=connectivity
+        n_clusters=params["n_clusters"],
+        linkage="single",
+        # connectivity=connectivity,
     )
     agglomerative_mean = cluster.AgglomerativeClustering(
-        n_clusters=params["n_clusters"], linkage="average", connectivity=connectivity
+        n_clusters=params["n_clusters"],
+        linkage="average",
+        # connectivity=connectivity,
     )
     agglomerative_max = cluster.AgglomerativeClustering(
-        n_clusters=params["n_clusters"], linkage="complete", connectivity=connectivity
+        n_clusters=params["n_clusters"],
+        linkage="complete",
+        # connectivity=connectivity,
     )
     spectral = cluster.SpectralClustering(
         n_clusters=params["n_clusters"],
@@ -130,7 +153,7 @@ def get_clustering_objects(
         affinity="nearest_neighbors",
         random_state=params["random_state"],
     )
-    dbscan = cluster.DBSCAN(eps=params["eps"])
+    # dbscan = cluster.DBSCAN(eps=params["eps"])
     hdbscan = cluster.HDBSCAN(
         min_samples=params["hdbscan_min_samples"],
         min_cluster_size=params["hdbscan_min_cluster_size"],
@@ -163,7 +186,10 @@ def get_clustering_objects(
         tol=1e-3,
         max_iter=5000,
     )
-    leiden = Leiden(resolution=params["resolution_leiden"], seed=params["random_state"])
+    leiden = Leiden(
+        resolution=params["resolution_leiden"],
+        seed=params["random_state"],
+    )
     mgwgmara = gwgmara.GWGMara(
         latent_dim=params["dim"],
         n_components=params["gwg_n_components"],
@@ -196,15 +222,17 @@ def get_clustering_objects(
         optimization_iterations=200,
     )
     uniforce_algo = uniforce.Uniforce_Wrapper(
-        alpha=0.0, num_clusters=params["n_clusters"]
+        alpha=0.0,
+        num_clusters=params["n_clusters"],
+        seed=params["random_state"]
     )
     smmp_algo = smmp.SMMP(
         n_clusters=params["n_clusters"],
     )
     bhc = corc.bhc.bhc.BayesianHierarchicalClustering(
         data=X,
-        model=corc.bhc.prior.NormalInverseWishart.create(X, g=20, scale_factor=0.001),
-        alpha=1,  # not used since cut_allowed=False
+        model=corc.bhc.prior.NormalInverseWishart.create(X, g=50, scale_factor=0.001),
+        alpha=10*len(X),
         cut_allowed=False,
         verbose=True,
     )

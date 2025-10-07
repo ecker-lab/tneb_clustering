@@ -24,6 +24,7 @@ cd external/UniForCE
 and install repo with
 ```
 find . -type f -name "*.py" -print0 | while IFS= read -r -d '' file; do   sed -i 's/from code\./from /g; s/import code\./import /g' "$file";  done
+sed -i 's/~.*//' external/UniForCE/code/test_requirements.txt
 pip install -e code
 ```
 If the folder external/UniForCE does not exist (for example when clonding without the `--recurse-submodules` option), try calling `git submodule init` and `git submodule update --checkout`.
@@ -32,3 +33,20 @@ If the folder external/UniForCE does not exist (for example when clonding withou
 ## Recreating the densired datasets
 
 Since densired relies on modern packages while some baselines necessitate `numpy<2`, an additional environment is needed for running the code in the `densired.ipynb` notebook. It can be installed using `conda env create -f environment_densired.yml` which creates the environment `densired`. This step is _not_ necessary to reproduce our results as we provide an precompiled `.npz` version of the densired datasets.
+
+## Folder structure
+| Folder | Description|
+| - | -| 
+|cache | where all non-figure output is stored|
+| cache/cluster_objects | all pickled algorithm objects | 
+| cache/datasets | pickled datasets (including tsne)
+| datasets| raw datasets, partially pickles, partially npz files| 
+| external | Code for UniForCE baseline method| 
+|figures| output folder for figures created by the scripts
+| notebooks| some notebooks used for the project
+| paper_figures_and_tables/notebooks | most of the other notebooks that are used for evaluation| 
+| paper_figures_and_tables/scripts | core scripts used in the project
+| src/corc/ | general sources of our method | 
+| src/corc/bhc | Code for BHC baseline method | 
+| src/corc/create_datasets | code to create datasets. Used by our_datasets.py | 
+| src/corc/graph_metrics | main code for our method (in neb.py and tmm_gmm_neb.py) | 

@@ -12,6 +12,7 @@ import corc.utils
 import corc.our_datasets
 import corc.bhc.bhc
 import corc.bhc.prior as prior
+import corc.purity
 
 # cache_path = "../../../cache"
 
@@ -122,16 +123,22 @@ def main():
         default="cache",
         help="Path to the cache directory.",
     )
+    parser.add_argument(
+        "index",
+        type=int,
+        default=-1,
+        help="For densired datasets: which subdataset to run on",
+    )
 
     args = parser.parse_args()
 
     cache_path = args.cache_path
     # os.makedirs(f"{cache_path}/bhc", exist_ok=True)
 
-    print(f"Processing dataset: {args.dataset} (size: {args.size})")
-    filepath = f"{cache_path}/bhc/{args.dataset}_{args.size}.pkl"
+    print(f"Processing dataset: {args.dataset}_{args.index} (size: {args.size})")
+    filepath = f"{cache_path}/bhc/{args.dataset}_{args.index}_{args.size}.pkl"
     if os.path.exists(filepath):
-        print(f"Result for {args.dataset} already exists. Skipping...")
+        print(f"File {filepath} already exists. Skipping...")
         return
 
     subsampled_data, subsampled_ys = get_dataset(
@@ -140,8 +147,11 @@ def main():
     bhc_result = get_bhc(subsampled_data)
 
     ari = analyze_result(bhc_result, subsampled_data, subsampled_ys)
+    dendrogram = bhc_result.get_dendrogram()
+    purity = corc.purity.dendrogram_purity(dendrogram, subsampled_ys)
 
-    print(f"ARI of BHC for {args.dataset}: {ari:.2f}")
+    print(f"ARI of BHC for {args.dataset}_{args.index}: {ari:.2f}")
+    print(f"Purity of BHC for {args.dataset}_{args.index}: {purity:.2f}")
 
     # store result object
     with open(f"{cache_path}/bhc/{args.dataset}_{args.size}.pkl", "wb") as f:

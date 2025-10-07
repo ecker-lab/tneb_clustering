@@ -10,7 +10,7 @@ if dry_run:
     print("dry run!")
 datasets = corc.our_datasets.CORE_HD_DATASETS
 
-size = 100
+size = 200
 
 for dataset in datasets:
     # algo = algo.replace("\n", "")

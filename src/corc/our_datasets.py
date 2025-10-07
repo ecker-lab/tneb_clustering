@@ -4,8 +4,8 @@ from sklearn.neighbors import kneighbors_graph
 from corc.create_datasets import complex_datasets, datasets2d
 import os
 
-DENSIRED_FILENAME = "densired.npz"
-DENSIRED_SOFT_FILENAME = "densired_soft.npz"
+DENSIRED_CIRCLES_FILENAME = "densired_circles10.pickle"
+DENSIRED_STUDT_FILENAME = "densired_studt10.pickle"
 MNIST_FILENAME = "mvae_mnist_nd_saved.pkl"
 
 
@@ -30,14 +30,14 @@ dataset_displaynames = {
     "blobs2_16": "Inbalanced\nGaussians 16D",
     "blobs2_32": "Inbalanced\nGaussians 32D",
     "blobs2_64": "Inbalanced\nGaussians 64D",
-    "densired8": "Densired\n'circles' 8D",
-    "densired16": "Densired\n'circles' 16D",
-    "densired32": "Densired\n'circles' 32D",
-    "densired64": "Densired\n'circles' 64D",
-    "densired_soft_8": "Densired\n'Stud-t' 8D",
-    "densired_soft_16": "Densired\n'Stud-t' 16D",
-    "densired_soft_32": "Densired\n'Stud-t' 32D",
-    "densired_soft_64": "Densired\n'Stud-t' 64D",
+    "densired_circles_8": "Densired\n'circles' 8D",
+    "densired_circles_16": "Densired\n'circles' 16D",
+    "densired_circles_32": "Densired\n'circles' 32D",
+    "densired_circles_64": "Densired\n'circles' 64D",
+    "densired_studt_8": "Densired\n'Stud-t' 8D",
+    "densired_studt_16": "Densired\n'Stud-t' 16D",
+    "densired_studt_32": "Densired\n'Stud-t' 32D",
+    "densired_studt_64": "Densired\n'Stud-t' 64D",
     "mnist8": "MNIST-Nd\n8D",
     "mnist16": "MNIST-Nd\n16D",
     "mnist32": "MNIST-Nd\n32D",
@@ -67,22 +67,22 @@ DATASET_SELECTOR = [
     ###########################
     ##### fig 2 datasets ######
     ###########################
-    "blobs1_8",
-    "blobs1_16",
-    "blobs1_32",
-    "blobs1_64",
-    "blobs2_8",
-    "blobs2_16",
-    "blobs2_32",
-    "blobs2_64",
-    "densired8",
-    "densired16",
-    "densired32",
-    "densired64",
-    "densired_soft_8",
-    "densired_soft_16",
-    "densired_soft_32",
-    "densired_soft_64",
+    # "blobs1_8",
+    # "blobs1_16",
+    # "blobs1_32",
+    # "blobs1_64",
+    # "blobs2_8",
+    # "blobs2_16",
+    # "blobs2_32",
+    # "blobs2_64",
+    "densired_circles_8",
+    "densired_circles_16",
+    "densired_circles_32",
+    "densired_circles_64",
+    "densired_studt_8",
+    "densired_studt_16",
+    "densired_studt_32",
+    "densired_studt_64",
     "mnist8",
     "mnist16",
     "mnist32",
@@ -131,14 +131,14 @@ OLD_COMPLEX_DATASETS = [
 ]
 
 CORE_HD_DATASETS = [
-    "densired8",
-    "densired16",
-    "densired32",
-    "densired64",
-    "densired_soft_8",
-    "densired_soft_16",
-    "densired_soft_32",
-    "densired_soft_64",
+    "densired_circles_8",
+    "densired_circles_16",
+    "densired_circles_32",
+    "densired_circles_64",
+    "densired_studt_8",
+    "densired_studt_16",
+    "densired_studt_32",
+    "densired_studt_64",
     "mnist8",
     "mnist16",
     "mnist32",
@@ -267,13 +267,13 @@ class our_datasets:
         )
 
         # funky shapes with 6 clusters in 8D, 16D, 32D, 64D
-        densired_path = os.path.join(self.dataset_folder, DENSIRED_FILENAME)
+        densired_path = os.path.join(self.dataset_folder, DENSIRED_CIRCLES_FILENAME)
         densired0 = complex_datasets.load_densired(dim=dims[0], path=densired_path)
         densired1 = complex_datasets.load_densired(dim=dims[1], path=densired_path)
         densired2 = complex_datasets.load_densired(dim=dims[2], path=densired_path)
         densired3 = complex_datasets.load_densired(dim=dims[3], path=densired_path)
 
-        densired_soft_path = os.path.join(self.dataset_folder, DENSIRED_SOFT_FILENAME)
+        densired_soft_path = os.path.join(self.dataset_folder, DENSIRED_STUDT_FILENAME)
         densired_soft_0 = complex_datasets.load_densired(
             dim=dims[0], path=densired_soft_path
         )
@@ -588,7 +588,7 @@ class our_datasets:
             (
                 densired0,
                 {
-                    "name": "densired8",
+                    "name": "densired_circles_8",
                     "dim": dims[0],
                     "n_clusters": 6,
                     "gwg_n_components": 50,
@@ -603,7 +603,7 @@ class our_datasets:
             (
                 densired1,
                 {
-                    "name": "densired16",
+                    "name": "densired_circles_16",
                     "dim": dims[1],
                     "n_clusters": 6,
                     "gwg_n_components": 50,
@@ -618,7 +618,7 @@ class our_datasets:
             (
                 densired2,
                 {
-                    "name": "densired32",
+                    "name": "densired_circles_32",
                     "dim": dims[2],
                     "n_clusters": 6,
                     "gwg_n_components": 50,
@@ -633,7 +633,7 @@ class our_datasets:
             (
                 densired3,
                 {
-                    "name": "densired64",
+                    "name": "densired_circles_64",
                     "dim": dims[3],
                     "n_clusters": 6,
                     "gwg_n_components": 25,
@@ -648,7 +648,7 @@ class our_datasets:
             (
                 densired_soft_0,
                 {
-                    "name": "densired_soft_8",
+                    "name": "densired_studt_8",
                     "dim": dims[0],
                     "n_clusters": 6,
                     "gwg_n_components": 50,
@@ -663,7 +663,7 @@ class our_datasets:
             (
                 densired_soft_1,
                 {
-                    "name": "densired_soft_16",
+                    "name": "densired_studt_16",
                     "dim": dims[1],
                     "n_clusters": 6,
                     "gwg_n_components": 50,
@@ -678,7 +678,7 @@ class our_datasets:
             (
                 densired_soft_2,
                 {
-                    "name": "densired_soft_32",
+                    "name": "densired_studt_32",
                     "dim": dims[2],
                     "n_clusters": 6,
                     "gwg_n_components": 50,
@@ -693,7 +693,7 @@ class our_datasets:
             (
                 densired_soft_3,
                 {
-                    "name": "densired_soft_64",
+                    "name": "densired_studt_64",
                     "dim": dims[3],
                     "n_clusters": 6,
                     "gwg_n_components": 25,

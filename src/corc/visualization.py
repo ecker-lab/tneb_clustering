@@ -113,6 +113,10 @@ def get_TSNE_embedding(data_X, perplexity=30, seed=42):
     Both implementations give very similar results.
     """
     # if check_cuda():
+    if data_X.shape[-1] == 2:
+        # nothing to do, its a 2D dataset
+        return data_X
+
     if False:
         import tsnecuda
 

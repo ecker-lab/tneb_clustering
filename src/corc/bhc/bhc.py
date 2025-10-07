@@ -5,11 +5,13 @@
 import numpy as np
 from scipy.special import gammaln
 import sklearn.metrics
+import networkx as nx
 
 import time
 import tqdm
 
 import corc.bhc.api as api
+import corc.purity
 
 
 class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalClustering):
@@ -29,7 +31,7 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
         if self.verbose:
             print(string)
 
-    def fit(data):
+    def fit(self, data):
         self.data = data
         self.build()
 
@@ -188,6 +190,8 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                     collected_merge_info[k] = [ij, active_nodes[k], log_r, r1, r2]
 
                 pbar.update(1)
+                pbar.set_postfix_str(f"clusters: {active_nodes.size}, log_r: {log_r:.2f}")
+                # append
                 tmp_merge = np.vstack((tmp_merge, collected_merge_info))
                 new_comparison_time += time.time() - comparison_time
         self._print(f"Time taken for merging: {time.time() - starttime:.2f} seconds")
@@ -206,19 +210,36 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
 
     def predict_with_target(self, X, target_number_clusters):
         """
-        Predicts the cluster assignments for the data X with a target number of clusters.
+        Returns the cluster assignment based on target_number_clusters (i.e. cuts the
+        tree accordingly). X is ignored.
         """
         if self.result is None:
             raise ValueError("The model has not been fitted yet.")
+        assert X is None or len(X) == len(
+            self.data
+        ), "Only works on training data! X is ignored."
 
-        # Here we would implement the logic to predict cluster assignments
-        # based on the fitted model and the target number of clusters.
-        # This is a placeholder implementation.
-        return np.random.randint(0, target_number_clusters, size=X.shape[0])
+        G = nx.DiGraph()
+        for arc in self.result.arc_list:
+            G.add_edge(arc.source, arc.target)
 
-    def get_purity(self, y):
+        remaining_nodes = self.result.node_ids[: (-(target_number_clusters - 1))]
+        subgraph = G.subgraph(remaining_nodes)
+        subgraph = subgraph.to_undirected()
+        components = list(nx.connected_components(subgraph))
+
+        y_pred = np.zeros(len(self.data), dtype=int)
+        for i, component in enumerate(components):
+            for node in component:
+                if node < len(self.data):  # only original nodes, no intermediate ones
+                    y_pred[node] = i
+
+        return y_pred
+
+    def get_purity(self, y, X=None):
         if not hasattr(self, "purity"):
-            self.purity = self.result.get_purity(y)
+            dendrogram = self.result.get_dendrogram()
+            self.purity = corc.purity.dendrogram_purity(dendrogram, y)
         return self.purity
 
     def get_ari(self, y):

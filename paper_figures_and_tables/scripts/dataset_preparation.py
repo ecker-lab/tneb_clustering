@@ -4,10 +4,12 @@
 
 import corc.our_datasets
 import corc.visualization
+import corc.utils
 import os
 import pickle
 import time
 import numpy as np
+import tqdm
 
 
 def main(args):
@@ -21,25 +23,39 @@ def main(args):
 
     for i, dataset in enumerate(all_datasets):
         dataset_name = dataset[1]["name"]
-        dataset_filename = os.path.join(dataset_path, f"{dataset_name}.pickle")
+        dataset_filename = corc.utils.get_dataset_filename(
+            dataset_name, args.cache_path
+        )
         if os.path.exists(dataset_filename):
             print(f"Dataset {dataset_name} already exists. Skipping...")
             continue
 
         starttime = time.time()
-        print(f"Computing TSNE for {dataset_name} ({i+1}/{len(all_datasets)})", end="")
-        X, y = dataset[0]
-        y = np.array(y, dtype=int)
-        tsne = corc.visualization.get_TSNE_embedding(X)
-        dataset = {
-            "dataset": (X, y),
-            "X2D": tsne,
-            "dataset_name": dataset[1]["name"],
-            "dataset_info": dataset[1],
-        }
+        print(f"Computing TSNE for {dataset_name} ({i+1}/{len(all_datasets)})")
+        Xs, ys = dataset[0]
+        if dataset_name.lower().startswith("densired"):
+            # densired → list of 10 sub‑datasets
+            results = list()
+            for X, y in tqdm.tqdm(zip(Xs, ys)):
+                results.append(make_entry(X, y, dataset_name, dataset[1]))
+        else:
+            # regular single‑dataset case (2D and MNIST)
+            results = make_entry(Xs, ys, dataset_name, dataset[1])
+
         with open(dataset_filename, "wb") as f:
-            pickle.dump(dataset, f)
+            pickle.dump(results, f)
         print(f" done. {time.time()-starttime:.2f}s")
+
+
+def make_entry(X, y, name, info):
+    y = np.array(y, dtype=int)
+    tsne = corc.visualization.get_TSNE_embedding(X)
+    return {
+        "dataset": (X, y),
+        "X2D": tsne,
+        "dataset_name": name,
+        "dataset_info": info,
+    }
 
 
 if __name__ == "__main__":

@@ -25,27 +25,6 @@ import corc.utils
 
 cache_path = "cache"
 
-# def train_multiple_tmm_models_seeds(
-#     data_X, data_y, num_seeds=10, neb_iterations=500, gmm=False, n_components=15
-# ):
-#     tmm_models = list()
-#     for i in range(num_seeds):
-#         tmm_model = corc.graph_metrics.neb.NEB(
-#             data=data_X,
-#             labels=data_y,
-#             optimization_iterations=neb_iterations,
-#             seed=42 + i,
-#             n_init=(
-#                 5 if data_X.shape[1] < 10 else 1
-#             ),  # fitting becomes slow in high dimensions
-#             n_components=n_components,
-#             mixture_model_type="gmm" if gmm else "tmm",
-#         )
-#         tmm_model.fit(data=data_X)
-#         tmm_models.append(tmm_model)
-
-#     return tmm_models
-
 
 def train_multiple_tmm_models_overclustering(
     data_X, data_y, num_models=10, neb_iterations=500, gmm=False
@@ -87,10 +66,6 @@ def compute_average_pairwise_ari(tmm_models, data_X, data_y):
         pairwise_ari.append(
             sklearn.metrics.adjusted_rand_score(predictions[i], predictions[j])
         )
-        # ari is not symmetric, so we need to add the other direction as well
-        pairwise_ari.append(
-            sklearn.metrics.adjusted_rand_score(predictions[j], predictions[i])
-        )
 
     # ari scores against GT data
     ari_scores = list()
@@ -113,56 +88,56 @@ def main(args):
     avg_pairwise_aris = dict()
     avg_aris = dict()
     for i, dataset_name in enumerate(args.dataset_names):
-        dataset_displayname = corc.our_datasets.dataset_displaynames[
-            dataset_name
-        ].replace("\n", " ")
-        print(f"Working on {dataset_displayname} ({i+1}/{len(args.dataset_names)})")
-        data_X, data_y, tsne = corc.utils.load_dataset(
-            dataset_name=dataset_name, cache_path=cache_path
-        )
-
-        dataset_filename = dataset_name.replace(" ", "_")
-        gmm_string = "_gmm" if args.gmm else ""
-        n_components_string = (
-            f"_{args.n_components}" if args.plot_type == "seeds" else ""
-        )
-        cache_filename = f"cache/stability/{args.plot_type}_{dataset_filename}{gmm_string}{n_components_string}.pkl"
-
-        if args.plot_type == "seeds":
-            # we only use the precomputed models here.
-            algorithm = "GMM-NEB" if args.gmm else "TMM-NEB"
-            tmm_models = corc.utils.load_algorithms(
-                dataset_name, algorithm=algorithm, cache_path="cache"
+        num_dataset_variants = 10 if dataset_name.lower().startswith("densired") else 1
+        for index in range(num_dataset_variants):
+            dataset_displayname = corc.our_datasets.dataset_displaynames[
+                dataset_name
+            ].replace("\n", " ")
+            print(f"Working on {dataset_displayname} ({i+1}/{len(args.dataset_names)})")
+            data_X, data_y, tsne = corc.utils.load_dataset(
+                dataset_name=dataset_name, cache_path=cache_path, index=index
             )
-            assert tmm_models is not None, "No TMM models found."
-        else:  # overclustering
-            # those we have to create ourselves
 
-            # check if the data is already computed
-            tmm_models = None
-            if os.path.exists(cache_filename):
-                with open(cache_filename, "rb") as f:
-                    tmm_models = pickle.load(f)
-                    # recompute when not enough seeds have been computed
-                    if len(tmm_models) < args.num_models:
-                        tmm_models = None
-                    else:
-                        print(
-                            f"successfully loaded precomputed TMM models for {dataset_displayname} (for {args.plot_type}) from disk"
-                        )
+            dataset_filename = dataset_name.replace(" ", "_")
+            gmm_string = "_gmm" if args.gmm else ""
+            n_components_string = (
+                f"_{args.n_components}" if args.plot_type == "seeds" else ""
+            )
+            cache_filename = f"cache/stability/{args.plot_type}_{dataset_filename}-{index}{gmm_string}{n_components_string}.pkl"
 
-            # compute tmm models
-            if tmm_models is None:
-                print("computing NEB models...")
-                tmm_model_starttime = time.time()
-                tmm_models = train_multiple_tmm_models_overclustering(
-                    data_X, data_y, num_models=args.num_models, gmm=args.gmm
+            if args.plot_type == "seeds":
+                # we only use the precomputed models here.
+                algorithm = "GMM-NEB" if args.gmm else "TMM-NEB"
+                tmm_models = corc.utils.load_algorithms(
+                    dataset_name, algorithm=algorithm, cache_path="cache", index=index
                 )
-                with open(cache_filename, "wb") as f:
-                    pickle.dump(tmm_models, f)
-                print(
-                    f"done with model computation for {dataset_displayname}. ({time.time() - tmm_model_starttime:.2f}s)"
-                )
+                assert tmm_models is not None, "No TMM models found."
+            else:  # overclustering
+                # check if the data is already computed
+                tmm_models = None
+                if os.path.exists(cache_filename):
+                    with open(cache_filename, "rb") as f:
+                        tmm_models = pickle.load(f)
+                        # recompute when not enough models have been computed
+                        if len(tmm_models) < args.num_models:
+                            tmm_models = None
+                        else:
+                            print(
+                                f"successfully loaded precomputed TMM models for {dataset_displayname} (for {args.plot_type}) from disk"
+                            )
+
+                # compute tmm models
+                if tmm_models is None:
+                    print("computing NEB models...")
+                    tmm_model_starttime = time.time()
+                    tmm_models = train_multiple_tmm_models_overclustering(
+                        data_X, data_y, num_models=args.num_models, gmm=args.gmm
+                    )
+                    with open(cache_filename, "wb") as f:
+                        pickle.dump(tmm_models, f)
+                    print(
+                        f"done with model computation for {dataset_displayname}. ({time.time() - tmm_model_starttime:.2f}s)"
+                    )
 
         # get ari scores
         avg_pairwise_aris[dataset_name], avg_aris[dataset_name] = (
