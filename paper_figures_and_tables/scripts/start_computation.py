@@ -5,12 +5,12 @@ import corc.utils
 import os.path
 import argparse
 
-NUM_PARALLEL_JOBS = "6"
+NUM_PARALLEL_JOBS = "60"
 # TIMEOUT = "20m"
 TIMEOUT = "48h"
 # ALGORITHMS_TO_RUN = corc.our_algorithms.CORE_SELECTOR # just some
 ALGORITHMS_TO_RUN = corc.our_algorithms.ALGORITHM_SELECTOR # all
-ALGORITHMS_TO_RUN = ["BHC"] 
+# ALGORITHMS_TO_RUN = ["BHC"] 
 # ALGORITHMS_TO_RUN = ["UniForCE"] 
 # DATASETS = corc.our_datasets.DATASETS2D
 DATASETS = corc.our_datasets.DATASET_SELECTOR

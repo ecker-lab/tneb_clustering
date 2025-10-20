@@ -36,6 +36,7 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
         self.build()
 
     def build(self):
+        print("starting computation")
         n_objects = self.data.shape[0]
 
         weights = []

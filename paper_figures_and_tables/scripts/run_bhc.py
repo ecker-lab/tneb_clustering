@@ -103,35 +103,7 @@ def analyze_result(result, subsampled_data, subsampled_ys):
 # print("All datasets processed.")
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Process datasets and calculate ARI.")
-    parser.add_argument(
-        "dataset",
-        type=str,
-        choices=corc.our_datasets.CORE_HD_DATASETS,
-        help="The dataset to process.",
-    )
-    parser.add_argument(
-        "size",
-        type=int,
-        default=150,
-        help="The size of the subsampled dataset.",
-    )
-    parser.add_argument(
-        "--cache_path",
-        type=str,
-        default="cache",
-        help="Path to the cache directory.",
-    )
-    parser.add_argument(
-        "index",
-        type=int,
-        default=-1,
-        help="For densired datasets: which subdataset to run on",
-    )
-
-    args = parser.parse_args()
-
+def main(args):
     cache_path = args.cache_path
     # os.makedirs(f"{cache_path}/bhc", exist_ok=True)
 
@@ -161,4 +133,31 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Process datasets and calculate ARI.")
+    parser.add_argument(
+        "dataset",
+        type=str,
+        choices=corc.our_datasets.CORE_HD_DATASETS,
+        help="The dataset to process.",
+    )
+    # parser.add_argument(
+    #     "size",
+    #     type=int,
+    #     default=150,
+    #     help="The size of the subsampled dataset.",
+    # )
+    parser.add_argument(
+        "--cache_path",
+        type=str,
+        default="cache",
+        help="Path to the cache directory.",
+    )
+    parser.add_argument(
+        "index",
+        type=int,
+        default=-1,
+        help="For densired datasets: which subdataset to run on",
+    )
+
+    args = parser.parse_args()
+    main(args)
