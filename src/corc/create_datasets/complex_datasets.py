@@ -86,7 +86,16 @@ def load_densired(dim, path="../datasets/densired.npz"):
 
 def make_mnist_nd(dim, path="../datasets/mvae_mnist_nd_saved.pkl"):
     df = pd.read_pickle(path)
-    X = df["data"][dim]
-    y = df["labels"][dim]
+
+    # Choose the correct column names depending on what the file contains
+    if {"data", "labels"}.issubset(df.keys()):
+        X = df["data"][dim]
+        y = df["labels"][dim]
+    elif {"Xs", "ys"}.issubset(df.keys()):
+        X = df["Xs"][dim]
+        y = df["ys"][dim]
+    else:
+        raise KeyError("Expected columns 'data'/'labels' or 'Xs'/'ys' not found.")
+
     X = StandardScaler().fit_transform(X)
     return X, y
