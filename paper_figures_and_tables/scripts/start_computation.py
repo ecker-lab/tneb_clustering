@@ -5,8 +5,8 @@ import corc.utils
 import os.path
 import argparse
 
-NUM_PARALLEL_JOBS = "60"
-# TIMEOUT = "20m"
+NUM_PARALLEL_JOBS = "15"
+# TIMEOUT = "60m"
 TIMEOUT = "48h"
 # ALGORITHMS_TO_RUN = corc.our_algorithms.CORE_SELECTOR # just some
 ALGORITHMS_TO_RUN = corc.our_algorithms.ALGORITHM_SELECTOR # all
@@ -28,7 +28,7 @@ args = parser.parse_args()
 
 jobs = list()
 for dataset in DATASETS:
-    num_datasets = 10 if dataset.lower().startswith("densired") else 1
+    num_datasets = 10 if dataset in corc.our_datasets.CORE_HD_DATASETS else 1
     for index in range(num_datasets):
         for algorithm in ALGORITHMS_TO_RUN:
             algorithm = algorithm.replace("\n", "")

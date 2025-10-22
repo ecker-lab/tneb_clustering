@@ -6,7 +6,9 @@ import os
 
 DENSIRED_CIRCLES_FILENAME = "densired_circles10.pickle"
 DENSIRED_STUDT_FILENAME = "densired_studt10.pickle"
-MNIST_FILENAME = "mvae_mnist_nd_saved.pkl"
+# MNIST_FILENAME = "mvae_mnist_nd_saved.pkl"
+MNIST_FILENAME = "mnist_nd.pkl"
+
 
 
 dataset_displaynames = {
@@ -289,10 +291,10 @@ class our_datasets:
 
         # MNIST-Nd
         mnist_path = os.path.join(self.dataset_folder, MNIST_FILENAME)
-        mnist0 = complex_datasets.make_mnist_nd(dim=dims[0], path=mnist_path)
-        mnist1 = complex_datasets.make_mnist_nd(dim=dims[1], path=mnist_path)
-        mnist2 = complex_datasets.make_mnist_nd(dim=dims[2], path=mnist_path)
-        mnist3 = complex_datasets.make_mnist_nd(dim=dims[3], path=mnist_path)
+        mnist0 = complex_datasets.load_mnist(dim=dims[0], path=mnist_path)
+        mnist1 = complex_datasets.load_mnist(dim=dims[1], path=mnist_path)
+        mnist2 = complex_datasets.load_mnist(dim=dims[2], path=mnist_path)
+        mnist3 = complex_datasets.load_mnist(dim=dims[3], path=mnist_path)
 
         ############
         # store dataset together with default parameters

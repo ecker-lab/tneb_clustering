@@ -202,7 +202,7 @@ def predict_by_joining_closest_clusters(
 def get_filename(dataset_name, algorithm_name, cache_path, index=None):
     dataset_name = dataset_name.replace(" ", "_")
     alg_name = algorithm_name.replace("\\n", "\n").replace("\n", "").replace(" ", "")
-    if dataset_name.lower().startswith("densired"):
+    if dataset_name.lower().startswith("densired") or dataset_name.lower().startswith("mnist"):
         if index is not None:
             return os.path.join(
                 cache_path,
@@ -210,7 +210,7 @@ def get_filename(dataset_name, algorithm_name, cache_path, index=None):
                 f"{dataset_name}_{index}_{alg_name}.pickle",
             )
         else:
-            print("For all densired dataset, the index must be specified")
+            print("For densired/mnist datasets, the index must be specified")
             return None
     else:
         return os.path.join(
@@ -238,7 +238,8 @@ def load_dataset(dataset_name, index=None, cache_path="../cache", return_params=
         return None
 
     # for densired datasets we have to select which one we need
-    if index is not None and dataset_name.lower().startswith("densired"):
+    index_needed = dataset_name.lower().startswith("densired") or dataset_name.lower().startswith("mnist")
+    if index is not None and index_needed:
         dataset = dataset[index]
     elif isinstance(dataset, list):
         print(f"Select an index for the dataset (len: {len(dataset)})")

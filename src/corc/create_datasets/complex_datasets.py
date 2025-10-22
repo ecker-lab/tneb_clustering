@@ -68,20 +68,30 @@ def make_gaussians(
     return X, labels
 
 
-def load_densired(dim, path="../datasets/densired.npz"):
+def load_densired(dim, path=""):
     Xs = list()
     ys = list()
     with open(path, "rb") as f:
         data = pickle.load(f)
         # data = np.load(f)
         for index in range(10):
-            # "files" within a npz-file cannot be named with numbers only, thus the f-string
             X = data[index][dim][:, :-1]
             y = data[index][dim][:, -1]
             X = StandardScaler().fit_transform(X)
             Xs.append(X)
             ys.append(y)
     return Xs, ys
+
+def load_mnist(dim, path="../datasets/mnist_nd.pkl"):
+    with open(path, "rb") as f:
+        data = pickle.load(f)
+        Xs = data[dim]["Xs"]
+        ys = data[dim]["ys"]
+    
+    scaled_Xs = list()
+    for X in Xs:
+        scaled_Xs.append(StandardScaler().fit_transform(X))
+    return scaled_Xs, ys
 
 
 def make_mnist_nd(dim, path="../datasets/mvae_mnist_nd_saved.pkl"):
