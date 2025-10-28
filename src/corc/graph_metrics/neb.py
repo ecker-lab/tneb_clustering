@@ -40,7 +40,7 @@ class NEB(Graph):
         thresh=0.01,  # for fitting TMM/GMM
         reduced_tolerance_on_retry=1e-3,  # for fitting TMM/GMM
         max_iter_on_retries=10000,  # for TMM fitting, 10x the default
-        max_elongation=None,  # will be set to 500 * dim
+        max_elongation=None,  # filtering will take place with 100*median_elongation, this parameter has no effect.
         min_cluster_size=10,  # mixture model filtering is only applied to TMM
         batch_size=150,  # for NEB computation (150 <8GB on GPU for d=64, more for lower dimensions)
     ):
@@ -85,7 +85,7 @@ class NEB(Graph):
         self.max_iter_on_retries = max_iter_on_retries
         self.min_cluster_size = min_cluster_size
         self.max_elongation = (
-            max_elongation if max_elongation is not None else 500 * latent_dim
+            max_elongation if max_elongation is not None else 250 * latent_dim**2
         )
         self.reduced_tolerance_on_retry = reduced_tolerance_on_retry
         self.num_NEB_points = num_NEB_points
@@ -121,7 +121,14 @@ class NEB(Graph):
         mixture_model.filter_components(
             data_X=data_X,
             min_cluster_size=min_cluster_size,
-            max_elongation=max_elongation,
+            max_elongation=np.inf,
+        )
+        elongations = mixture_model.get_elongations()
+        med_elongation = np.median(elongations) if len(elongations) > 0 else np.inf
+        mixture_model.filter_components(
+            data_X=data_X,
+            min_cluster_size=min_cluster_size, # does not hurt to re-apply
+            max_elongation=100*med_elongation,
         )
 
         return mixture_model, model_type
@@ -483,8 +490,8 @@ class NEB(Graph):
                     end = cluster_means[pair[1]]
                     ax.plot(*zip(start, end), color="black", alpha=0.5, lw=1)
 
-    def get_ari(self, X, y):
-        if not hasattr(self, "ari"):
+    def get_ari(self, X, y, force=False):
+        if not hasattr(self, "ari") or force:
             y_pred = self.predict_with_target(
                 X, target_number_classes=len(np.unique(y))
             )
@@ -500,7 +507,7 @@ class NEB(Graph):
             )
             condensed_linearized = np.nan_to_num(
                 condensed_linearized, nan=1e8, posinf=1e6, neginf=1e6
-            ) # make sure -inf values are not chosen
+            )  # make sure -inf values are not chosen
             dendrogram = scipy.cluster.hierarchy.linkage(
                 condensed_linearized, method="single"
             )

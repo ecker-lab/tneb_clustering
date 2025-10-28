@@ -1,13 +1,9 @@
 from datetime import datetime
-import colorcet as cc
 import diptest
-import matplotlib.pylab as plt
 import numpy as np
-import seaborn as sns
 
 
 from corc.graph_metrics.graph import GWGGraph
-import corc.utils
 
 
 class GWGMara(GWGGraph):
@@ -18,7 +14,7 @@ class GWGMara(GWGGraph):
         labels=None,
         path=None,
         n_clusters=None,
-        n_components=10,
+        n_components=50,
         n_neighbors=3,
         covariance="diag",
         clustering_method="gmm",
@@ -36,17 +32,17 @@ class GWGMara(GWGGraph):
             n_components (int): Number of components for GMM clustering.
         """
         super().__init__(
-            latent_dim,
-            data,
-            labels,
-            path,
-            n_clusters,
-            n_components,
-            n_neighbors,
-            covariance,
-            clustering_method,
-            filter_edges,
-            seed,
+            latent_dim=latent_dim,
+            data=data,
+            labels=labels,
+            path=path,
+            n_clusters=n_clusters,
+            n_components=n_components,
+            n_neighbors=n_neighbors,
+            covariance=covariance,
+            clustering_method=clustering_method,
+            filter_edges=filter_edges,
+            seed=seed,
         )
 
     def create_graph(self, save=True, plot=True, return_graph=False):

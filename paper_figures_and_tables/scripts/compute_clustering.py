@@ -45,10 +45,11 @@ def compute_clusters(X, params, algorithm_name, num_seeds):
 def main(args):
     corc.utils.create_folder(args.cache_path)
     corc.utils.create_folder(os.path.join(args.cache_path, "cluster_objects"))
-
     filename = corc.utils.get_filename(
         args.dataset, args.algorithm, args.cache_path, index=args.index
     )
+    
+    # check whether algorithms have already been computed
     algorithms = corc.utils.load_algorithms(
         args.dataset, args.algorithm, cache_path=args.cache_path, index=args.index
     )
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-i",
         "--index",
-        help="Index to subselect the densired datasets",
+        help="Index to subselect the densired and mnist datasets",
         type=int,
         default=None,
     )

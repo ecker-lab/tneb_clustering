@@ -160,6 +160,8 @@ class our_datasets:
         self.dataset_folder = dataset_folder
         # ============
         # Set up cluster parameters
+        # In order to use them, one has to update the "compiled" datasets!
+        # without modifying the pickles, changes here will have no effect!
         # ============
         self.default_base = {
             "name": "unknown",  # dataset name
@@ -181,7 +183,7 @@ class our_datasets:
             "resolution": 1.0,
             "resolution_leiden": 1.0,
             "use_rep": "X",
-            "gwg_n_components": 15,
+            "gwg_n_components": 20,
             "gwg_n_neighbors": 3,
             "gwg_covariance": "diag",
             "random_state": 42,  # fixed default seed
@@ -715,7 +717,7 @@ class our_datasets:
                     "dim": dims[0],
                     "n_clusters": 10,
                     "n_components": 20,
-                    "gwg_n_components": 10,
+                    "gwg_n_components": 20,
                     "gwg_n_neighbors": 5,
                     "gwg_covariance": "full",
                     "resolution": 0.6,
@@ -731,7 +733,7 @@ class our_datasets:
                     "dim": dims[1],
                     "n_clusters": 10,
                     "n_components": 20,
-                    "gwg_n_components": 10,
+                    "gwg_n_components": 20,
                     "gwg_n_neighbors": 3,
                     "gwg_covariance": "full",
                     "resolution": 0.7,
@@ -764,7 +766,7 @@ class our_datasets:
                     "dim": dims[3],
                     "n_clusters": 10,
                     "n_components": 20,
-                    "gwg_n_components": 15,
+                    "gwg_n_components": 20,
                     "gwg_n_neighbors": 2,
                     "gwg_covariance": "full",
                     "resolution": 0.49,

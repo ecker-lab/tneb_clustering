@@ -33,13 +33,14 @@ def main(args):
         starttime = time.time()
         print(f"Computing TSNE for {dataset_name} ({i+1}/{len(all_datasets)})")
         Xs, ys = dataset[0]
-        if dataset_name.lower().startswith("densired"):
-            # densired → list of 10 sub‑datasets
+        if dataset_name in corc.our_datasets.CORE_HD_DATASETS:
+            # if dataset_name.lower().startswith("densired"):
+            # densired/mnist → list of 10 sub‑datasets
             results = list()
             for X, y in tqdm.tqdm(zip(Xs, ys)):
                 results.append(make_entry(X, y, dataset_name, dataset[1]))
         else:
-            # regular single‑dataset case (2D and MNIST)
+            # regular single‑dataset case (2D)
             results = make_entry(Xs, ys, dataset_name, dataset[1])
 
         with open(dataset_filename, "wb") as f:
