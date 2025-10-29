@@ -207,10 +207,18 @@ class NormalInverseWishart(AbstractPrior):
         rp = r + 2.0
         vp = v + 2.0
         sign, logdet = slogdet(s_mat_p)  # (N-i-1,)
+
+        sign, logdet = slogdet(s_mat_p)
         if not np.all(sign > 0):
-            raise ValueError(
-                "Posterior scale matrix not positive‑definite for some pair"
-            )
+            # add jitter and try again
+            eps = 1e-6
+            s_mat_p += eps * np.eye(s_mat_p.shape[-1])
+            sign, logdet = slogdet(s_mat_p)
+            if not np.all(sign > 0):
+                raise ValueError(
+                    "Posterior scale matrix not PD even after jitter; "
+                    "check data or increase prior strength."
+                )
         log_prior_post = (
             np.log(2) * (vp * d / 2.0)
             + (d / 2.0) * np.log(2.0 * np.pi / rp)

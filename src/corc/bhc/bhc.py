@@ -52,11 +52,11 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
         # for every single data point
         log_p = np.zeros(n_objects)
         log_d = np.zeros(n_objects)
-        n = np.ones(n_objects)
+        counts = np.ones(n_objects, dtype=int)
         for i in range(n_objects):
             # compute log(d_k)
             log_d[i] = BayesianHierarchicalClustering.__calc_log_d(
-                self.alpha, n[i], None
+                self.alpha, counts[i], None
             )
             # compute log(p_i)
             log_p[i] = self.model.calc_log_mlh(self.data[i])
@@ -72,7 +72,7 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
             log_p_k_row = self.model.row_of_log_likelihood_for_pairs(self.data, i)
             for j in range(i + 1, n_objects):
                 # compute log(d_k)
-                n_ch = n[i] + n[j]
+                n_ch = counts[i] + counts[j]
                 log_d_ch = log_d[i] + log_d[j]
                 log_dk = BayesianHierarchicalClustering.__calc_log_d(
                     self.alpha, n_ch, log_d_ch
@@ -122,13 +122,13 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                 #     break
 
                 # new node ij
-                ij = n.size
-                n_ch = n[i] + n[j]
-                n = np.append(n, n_ch)
+                ij = counts.size
+                n_ch = counts[i] + counts[j]
+                counts = np.append(counts, n_ch)
                 # compute log(d_ij)
                 log_d_ch = log_d[i] + log_d[j]
                 log_d_ij = BayesianHierarchicalClustering.__calc_log_d(
-                    self.alpha, n[ij], log_d_ch
+                    self.alpha, counts[ij], log_d_ch
                 )
                 log_d = np.append(log_d, log_d_ij)
                 # update assignments
@@ -167,7 +167,7 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
                 collected_merge_info = np.empty((len(active_nodes) - 1, 5), dtype=float)
                 for k in range(active_nodes.size - 1):
                     # compute log(d_k)
-                    n_ch = n[k] + n[ij]
+                    n_ch = counts[k] + counts[ij]
                     log_d_ch = log_d[k] + log_d[ij]
                     log_dij = BayesianHierarchicalClustering.__calc_log_d(
                         self.alpha, n_ch, log_d_ch
@@ -199,13 +199,15 @@ class BayesianHierarchicalClustering(api.AbstractBayesianBasedHierarchicalCluste
         self._print(
             f"Time taken for new comparisons: {new_comparison_time:.2f} seconds"
         )
+
+
         self.result = api.Result(
-            arc_list,
-            np.arange(0, ij + 1),
-            log_p[-1],
-            np.array(weights),
-            hierarchy_cut,
-            len(np.unique(assignments)),
+            arc_list=arc_list,
+            node_ids=np.arange(0, ij + 1),
+            last_log_p=log_p[-1],
+            weights=np.array(weights),
+            hierarchy_cut=hierarchy_cut,
+            n_clusters=len(np.unique(assignments)),
         )
         return self.result
 
