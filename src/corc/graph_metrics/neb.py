@@ -124,11 +124,12 @@ class NEB(Graph):
             max_elongation=np.inf,
         )
         elongations = mixture_model.get_elongations()
-        med_elongation = np.median(elongations) if len(elongations) > 0 else np.inf
+        perc_25_elongation = np.percentile(elongations, 25) if len(elongations) > 0 else np.inf
+        # med_elongation = np.median(elongations) if len(elongations) > 0 else np.inf
         mixture_model.filter_components(
             data_X=data_X,
             min_cluster_size=min_cluster_size, # does not hurt to re-apply
-            max_elongation=100*med_elongation,
+            max_elongation=100*perc_25_elongation,
         )
 
         return mixture_model, model_type

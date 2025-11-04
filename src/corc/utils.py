@@ -202,7 +202,9 @@ def predict_by_joining_closest_clusters(
 def get_filename(dataset_name, algorithm_name, cache_path, index=None):
     dataset_name = dataset_name.replace(" ", "_")
     alg_name = algorithm_name.replace("\\n", "\n").replace("\n", "").replace(" ", "")
-    if dataset_name.lower().startswith("densired") or dataset_name.lower().startswith("mnist"):
+    if dataset_name.lower().startswith("densired") or dataset_name.lower().startswith(
+        "mnist"
+    ):
         if index is not None:
             return os.path.join(
                 cache_path,
@@ -238,7 +240,9 @@ def load_dataset(dataset_name, index=None, cache_path="../cache", return_params=
         return None
 
     # for densired datasets we have to select which one we need
-    index_needed = dataset_name.lower().startswith("densired") or dataset_name.lower().startswith("mnist")
+    index_needed = dataset_name.lower().startswith(
+        "densired"
+    ) or dataset_name.lower().startswith("mnist")
     if index is not None and index_needed:
         dataset = dataset[index]
     elif isinstance(dataset, list):
@@ -343,6 +347,18 @@ def get_predictions(algorithms, X, num_classes, y=None):
     return algorithms, y_pred, ari
 
 
+def get_prediction(algorithm, X, num_classes):
+    # if isinstance(algorithm, corc.graph_metrics.gwgmara.GWGMara):
+    #     y_pred = algorithm.predict(X, target_number_clusters=num_classes)
+    if hasattr(algorithm, "predict_with_target"):
+        y_pred = algorithm.predict_with_target(X, num_classes).astype(int)
+    elif hasattr(algorithm, "labels_"):
+        y_pred = algorithm.labels_.astype(int)
+    else:
+        y_pred = algorithm.predict(X)
+    return y_pred
+
+
 # def create_dataset_pickle(dataset_name, dataset_filename=None, cache_path="../cache"):
 #     import corc.our_datasets
 #     import corc.visualization
@@ -378,15 +394,3 @@ def create_folder(folder_path):
         else:
             print("Exiting...")
             exit(-1)
-
-
-def get_prediction(algorithm, X, num_classes):
-    # if isinstance(algorithm, corc.graph_metrics.gwgmara.GWGMara):
-    #     y_pred = algorithm.predict(X, target_number_clusters=num_classes)
-    if hasattr(algorithm, "predict_with_target"):
-        y_pred = algorithm.predict_with_target(X, num_classes).astype(int)
-    elif hasattr(algorithm, "labels_"):
-        y_pred = algorithm.labels_.astype(int)
-    else:
-        y_pred = algorithm.predict(X)
-    return y_pred

@@ -238,7 +238,10 @@ class NormalInverseWishart(AbstractPrior):
     def __calc_log_prior(s_mat, r, v):
         d = s_mat.shape[0]
         log_prior = LOG2 * (v * d / 2.0) + (d / 2.0) * np.log(2.0 * np.pi / r)
-        log_prior += multigammaln(v / 2.0, d) - (v / 2.0) * np.log(linalg.det(s_mat))
+        determinant = linalg.det(s_mat)
+        if determinant <= 0:
+            determinant = linalg.det(s_mat + 1e-6 * np.eye(d))
+        log_prior += multigammaln(v / 2.0, d) - (v / 2.0) * np.log(determinant)
         return log_prior
 
     @staticmethod
