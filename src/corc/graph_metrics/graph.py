@@ -323,6 +323,7 @@ class GWGGraph(Graph):
 
             tmm = studenttmixture.EMStudentMixture(
                 n_components=self.n_components,
+                covariance_type=self.covariance,
                 n_init=1,
                 fixed_df=False,  # True,
                 # df=1.0,

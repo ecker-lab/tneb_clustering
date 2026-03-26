@@ -177,6 +177,7 @@ def get_clustering_objects(
     )
     tmm = studenttmixture.EMStudentMixture(
         n_components=params["n_clusters"],
+        covariance_type="full",
         n_init=10,
         fixed_df=False,  # True,
         # df=1.0,

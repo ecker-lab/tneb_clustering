@@ -7,16 +7,44 @@ name = "tneb"
 version = "0.1"
 description = "Python package to t-NEB clustering"
 readme = "README.md"
+requires-python = ">=3.11"
 authors = [
     {name = "Laura Hansel", email = "hansel@cs.uni-goettingen.de"},
     {name = "Polina Turishcheva", email = "turishcheva@cs.uni-goettingen.de"},
     {name = "Martin Ritzert", email = "ritzert@informatik.uni-goettingen.de"}
 ]
-license = {text = "MIT"} 
+license = {text = "MIT"}
 
 dependencies = [
-    # List dependencies if needed
+    "numpy",
+    "scipy<1.13",
+    "scikit-learn",
+    "jax",
+    "jaxtyping",
+    "optax",
+    "studenttmixture",
+    "pandas",
+    "tqdm",
+    "pyyaml",
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "opentsne",
+    "scanpy",
+    "anndata",
+    "colorcet",
+    "configargparse",
+    "diptest",
+    "python-igraph",
+    "networkx",
 ]
+
+[project.optional-dependencies]
+cuda = ["jax[cuda12]"]
+notebook = ["nbconvert", "ipykernel", "jupyter"]
+
+[tool.uv.sources]
+studenttmixture = { git = "https://github.com/pollytur/mix_T" }
 
 [tool.setuptools]
 package-dir = {"" = "src"}

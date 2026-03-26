@@ -43,6 +43,7 @@ class NEB(Graph):
         max_elongation=None,  # filtering will take place with 100*median_elongation, this parameter has no effect.
         min_cluster_size=10,  # mixture model filtering is only applied to TMM
         batch_size=150,  # for NEB computation (150 <8GB on GPU for d=64, more for lower dimensions)
+        covariance_type="full",
     ):
         """
         Initialize the NEB (nudged elastic band) based on TMM/GMM.
@@ -53,9 +54,18 @@ class NEB(Graph):
 
         super().__init__(latent_dim, data, labels, path, seed)
 
+        valid_covariance_types = ("full", "diag", "tied", "spherical")
+        if covariance_type not in valid_covariance_types:
+            raise ValueError(f"Invalid covariance_type '{covariance_type}'. Must be one of {valid_covariance_types}.")
+        if mixture_model_type == "tmm" and covariance_type in ("tied", "spherical"):
+            raise NotImplementedError(f"covariance_type='{covariance_type}' is not implemented for TMM.")
+
+        self.covariance_type = covariance_type
+
         if mixture_model_type == "tmm":
             self.mixture_model = studenttmixture.EMStudentMixture(
                 n_components=n_components,
+                covariance_type=covariance_type,
                 reg_covar=tmm_regularization,  # this makes the TMM favor ball-like shapes (and avoid extreme elongations)
                 n_init=n_init,
                 tol=10e-3,  # matching the default of sklearn for GMM
@@ -72,7 +82,7 @@ class NEB(Graph):
                 n_init=n_init,
                 random_state=seed,
                 init_params="kmeans",
-                covariance_type="full",  # `full` to make it consistent with the TMM covariance
+                covariance_type=self.covariance_type,  # `full` to make it consistent with the TMM covariance
             )
 
         self.n_components = n_components
