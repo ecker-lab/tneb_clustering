@@ -5,6 +5,7 @@ from scipy.spatial import distance
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from corc.utils import set_seed
+import pickle
 
 
 def make_gaussians(
@@ -67,19 +68,44 @@ def make_gaussians(
     return X, labels
 
 
-def load_densired(dim, path="../datasets/densired.npz"):
+def load_densired(dim, path=""):
+    Xs = list()
+    ys = list()
     with open(path, "rb") as f:
-        data = np.load(f)
-        # "files" within a npz-file cannot be named with numbers only, thus the f-string
-        X = data[f"d{dim}"][:, :-1]
-        y = data[f"d{dim}"][:, -1]
-    X = StandardScaler().fit_transform(X)
-    return X, y
+        data = pickle.load(f)
+        # data = np.load(f)
+        for index in range(10):
+            X = data[index][dim][:, :-1]
+            y = data[index][dim][:, -1]
+            X = StandardScaler().fit_transform(X)
+            Xs.append(X)
+            ys.append(y)
+    return Xs, ys
+
+def load_mnist(dim, path="../datasets/mnist_nd.pkl"):
+    with open(path, "rb") as f:
+        data = pickle.load(f)
+        Xs = data[dim]["Xs"]
+        ys = data[dim]["ys"]
+    
+    scaled_Xs = list()
+    for X in Xs:
+        scaled_Xs.append(StandardScaler().fit_transform(X))
+    return scaled_Xs, ys
 
 
 def make_mnist_nd(dim, path="../datasets/mvae_mnist_nd_saved.pkl"):
     df = pd.read_pickle(path)
-    X = df["data"][dim]
-    y = df["labels"][dim]
+
+    # Choose the correct column names depending on what the file contains
+    if {"data", "labels"}.issubset(df.keys()):
+        X = df["data"][dim]
+        y = df["labels"][dim]
+    elif {"Xs", "ys"}.issubset(df.keys()):
+        X = df["Xs"][dim]
+        y = df["ys"][dim]
+    else:
+        raise KeyError("Expected columns 'data'/'labels' or 'Xs'/'ys' not found.")
+
     X = StandardScaler().fit_transform(X)
     return X, y

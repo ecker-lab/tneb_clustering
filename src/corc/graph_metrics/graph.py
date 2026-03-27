@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.neighbors import kneighbors_graph
 from abc import ABC, abstractmethod
 from corc.utils import compute_projection, set_seed
+import corc.visualization
 
 
 class Graph(ABC):
@@ -190,7 +191,9 @@ class Graph(ABC):
 
     def _plt_graph_compare(self, embeddings, pred_labels, save=None, to_norm=False):
         """
-        this function makes a plot with right panel being ground truth and left panel being the original overclustered components (before merge) and the weights of the edges across these components.
+        this function makes a plot with right panel being ground truth and left panel 
+        being the original overclustered components (before merge) and the weights of 
+        the edges across these components.
         """
         fig, axs = plt.subplots(1, 2, figsize=(15, 5))
         palette = (
@@ -273,7 +276,7 @@ class GWGGraph(Graph):
         labels=None,
         path=None,
         n_clusters=None,
-        n_components=10,
+        n_components=50,
         n_neighbors=3,
         covariance="full",
         clustering_method="gmm",
@@ -369,6 +372,9 @@ class GWGGraph(Graph):
             knn_dict[i] = set(neighbors)
         return knn_dict
 
+    def predict_with_target(self, data, target_number_clusters):
+        return self.predict(data, target_number_clusters=target_number_clusters)
+
     def predict(self, data, target_number_clusters=None):
 
         # the following line takes the raw labels instead of the filtered ones
@@ -410,7 +416,9 @@ class GWGGraph(Graph):
         ).toarray()
         knn_all_to_all_sorted = np.sort(knn_all_to_all)
         """
-        Why 3: I looked at the average distances between 1st, 2nd, etc neighbors and there was a jump in the change of distances between 2nd and 3rd neighbor (second point in the plot), so I set max distance threshold to be the average distance of the 3rd neighbor.
+        Why 3: I looked at the average distances between 1st, 2nd, etc neighbors and there was a jump
+        in the change of distances between 2nd and 3rd neighbor (second point in the plot), so I set 
+        max distance threshold to be the average distance of the 3rd neighbor. (Mara)
         """
         return knn_all_to_all_sorted.mean(axis=0)[3]
 

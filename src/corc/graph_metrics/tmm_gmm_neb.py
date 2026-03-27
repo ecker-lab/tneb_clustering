@@ -134,9 +134,9 @@ def predict_gmm_jax(X, means, covs, weights):
 # the loss of the interpolation
 def loss(paths, means, covs, weights, gmm=False, df=1.0):
     # maximize the negative log likelihood
-    if gmm: 
+    if gmm:
         nll = -jnp.sum(gmm_jax_batched(paths, means, covs, weights))
-    else: # tmm (the default case)
+    else:  # tmm (the default case)
         nll = -jnp.sum(tmm_jax_batched(paths, means, covs, weights, df=df))
 
     # the loss is just the tmm/gmm value
@@ -188,7 +188,9 @@ def equidistant_interpolate(path, target_num_points=None):
 
 
 interpolate_paths_batched = jax.vmap(
-    functools.partial(equidistant_interpolate, target_num_points=1024)
+    equidistant_interpolate,
+    in_axes=(0, None),
+    out_axes=0,
 )
 
 
@@ -199,7 +201,8 @@ def compute_interpolation_batch(
     weights: jnp.ndarray,
     df: float = 1.0,
     iterations: int = 500,
-    num_points: int = 1024,
+    num_points: int = 100,
+    num_eval_points: int = 1024,
     gmm: bool = False,
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
@@ -219,8 +222,14 @@ def compute_interpolation_batch(
         probabilities: Batched array of log probabilities along paths.
     """
     i_indices, j_indices = pairs  # Each of shape: (batch_size,)
+    assert (
+        i_indices.shape == j_indices.shape
+    ), f"i and j indices must have the same shape"
 
     batch_size, dim = means.shape
+
+    if not gmm:
+        assert df is not None, "df must be provided for TMM"
 
     # Reshape for broadcasting
     temperatures = jnp.linspace(0, 1, num_points).reshape(1, num_points, 1)
@@ -235,7 +244,7 @@ def compute_interpolation_batch(
     opt_state = optimizer.init(initial_paths)
 
     def optimization_step(paths, opt_state):
-        grads = jax.grad(loss)(paths, means, covs, weights, df=df, gmm=False)
+        grads = jax.grad(loss)(paths, means, covs, weights, df=df, gmm=gmm)
         updates, opt_state = optimizer.update(grads, opt_state)
         paths = optax.apply_updates(paths, updates)
         paths = batch_interpolate(paths)
@@ -250,11 +259,11 @@ def compute_interpolation_batch(
     )
 
     # Compute log probabilities
-    interpolated_paths = interpolate_paths_batched(paths)
+    interpolated_paths = interpolate_paths_batched(paths, num_eval_points)
     if gmm:
         logprobs = gmm_jax_batched(interpolated_paths, means, covs, weights)
-    else: # tmm (the default case)
-        logprobs = tmm_jax_batched(interpolated_paths, means, covs, weights)
+    else:  # tmm (the default case)
+        logprobs = tmm_jax_batched(interpolated_paths, means, covs, weights, df=df)
     distances = jnp.min(logprobs, axis=1)
 
     # return paths, distances
@@ -270,7 +279,7 @@ def compute_neb_paths_batch(
     num_NEB_points: int = 100,
     knn: int = None,
     gmm: bool = False,
-    batch_size: int = 1000,
+    batch_size: int = 50,
 ):
     n_components = len(means)
 
@@ -279,14 +288,11 @@ def compute_neb_paths_batch(
         distances = jnp.linalg.norm(means[:, None, :] - means[None, :, :], axis=-1)
         indices = jnp.argsort(distances, axis=-1)[:, 1 : (knn + 1)]
         pair_i, pair_j = jnp.meshgrid(
-            jnp.arange(n_components), jnp.arange(knn), indexing="ij"
+            jnp.arange(n_components), jnp.arange(indices.shape[1]), indexing="ij"
         )
         pairs = (pair_i.flatten(), indices.flatten())
     else:
-        pairs = list(itertools.combinations(range(n_components), r=2))
-        pair_i = jnp.array([i for i, _ in pairs])
-        pair_j = jnp.array([j for _, j in pairs])
-        pairs = (pair_i, pair_j)
+        pairs = jnp.triu_indices(n_components, k=1)
 
     total_pairs = len(pairs[0])
     adjacency = jnp.zeros((n_components, n_components))

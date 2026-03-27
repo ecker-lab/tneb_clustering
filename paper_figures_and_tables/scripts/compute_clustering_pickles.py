@@ -6,15 +6,9 @@ os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 
 import time
 import warnings
-import numpy as np
-from sklearn import cluster
-from sklearn.preprocessing import StandardScaler
 import corc.our_datasets as our_datasets
 import corc.our_algorithms as our_algorithms
-from openTSNE import TSNE
-import re
 import pickle
-import sys
 import corc.utils
 import argparse
 
@@ -28,15 +22,19 @@ one can call the script with the list of datasets that should be used.
 
 
 def main(args):
+    corc.utils.create_folder(args.cache_path)
+
     # get the datasets and default parameters for them
     # if no datasets are given, all datasets will be used
-    dataset_selector = (
-        args.datasets if len(args.datasets) > 0 else our_datasets.DATASET_SELECTOR
-    )
+    if args.datasets is None or len(args.datasets) == 0:
+        dataset_selector = our_datasets.DATASET_SELECTOR
+    elif args.datasets[0] == "2d":
+        dataset_selector = our_datasets.DATASETS2D
+    else:
+        dataset_selector = args.datasets
     print(f"Datasets: {dataset_selector}")
 
-    cache_path = "cache"
-    corc.utils.create_folder(cache_path)
+    # populate algorithms
     if args.algorithms == "all":
         clustering_algorithm_selector = our_algorithms.ALGORITHM_SELECTOR
     elif args.algorithms == "core":
@@ -48,24 +46,27 @@ def main(args):
     print(f"Algorithms: {clustering_algorithm_selector}")
 
     for i_dataset, dataset_name in enumerate(dataset_selector):
-        X, y, tsne, params = corc.utils.load_dataset(
-            dataset_name, cache_path=cache_path, return_params=True
-        )
+        print(f"Dataset {i_dataset + 1}/{len(dataset_selector)}: {dataset_name}")
+        for index in range(10):
+            X, y, tsne, params = corc.utils.load_dataset(
+                dataset_name, cache_path=args.cache_path, return_params=True
+            )
 
-        clustering_algorithms = our_algorithms.get_clustering_objects(
-            params, X, selector=clustering_algorithm_selector
-        )
+            clustering_algorithms = our_algorithms.get_clustering_objects(
+                params, X, selector=clustering_algorithm_selector
+            )
 
         for name, algorithm in clustering_algorithms:
             # check whether this was already computed
-            alg_name = re.sub("\n", "", name)
-            filename = os.path.join(cache_path, f"{dataset_name}_{alg_name}.pickle")
+            filename = corc.utils.get_filename(
+                dataset_name, algorithm, args.cache_path, index=index
+            )
             if os.path.exists(filename):
                 print(f"{filename} already exists. Skipping.")
                 continue
 
             t0 = time.time()
-            print(f"algorithm {alg_name}", end="")
+            print(f"algorithm {algorithm}", end="")
 
             # catch warnings related to kneighbors_graph
             with warnings.catch_warnings():
@@ -86,8 +87,8 @@ def main(args):
                     # train 10 with different seeds
                     algorithms = list()
                     base_seed = params["random_state"]
-                    for i in range(10):
-                        params["random_state"] = base_seed + i
+                    for i in range(args.num_seeds):
+                        params["random_state"] = base_seed + i * 100
                         _, algorithm = corc.our_algorithms.get_clustering_objects(
                             params, X, selector=[name]
                         )[0]
@@ -105,20 +106,38 @@ def main(args):
             print(f"saving to {filename}")
             with open(filename, "wb") as f:
                 pickle.dump(algorithm, f)
+        if not dataset_name.lower().startswith("densired"):
+            break
 
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-d",
         "--datasets",
         nargs="+",
         help="List of datasets to be used. If not provided, all datasets in our_datasets.DATASET_SELECTOR will be used.",
     )
     parser.add_argument(
+        "-a",
         "--algorithms",
         choices=["all", "core", "tneb", "ours"],
-        help="algorithms to be used.",
+        help="algorithms to be used. (Default: all)",
+        default="all",
+    )
+    parser.add_argument(
+        "-c",
+        "--cache_path",
+        help="Path to the cache directory. (Default: cache)",
+        default="cache",
+    )
+    parser.add_argument(
+        "-n",
+        "--num_seeds",
+        type=int,
+        help="Number of seeds to be used for non-deterministic algorithms. (Default: 10)",
+        default=10,
     )
     args = parser.parse_args()
 

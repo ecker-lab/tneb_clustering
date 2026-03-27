@@ -6,7 +6,7 @@ dependencies:
   - python
   - scipy
   - opentsne
-  - tsnecuda
+  # - tsnecuda
   - ipykernel
   - scikit-learn
   - pytorch

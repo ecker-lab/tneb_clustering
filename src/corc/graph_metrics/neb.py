@@ -1,6 +1,7 @@
 from datetime import datetime
 import itertools
 
+import sklearn.metrics
 import tqdm
 import corc.mixture
 import scipy
@@ -22,26 +23,26 @@ import corc.visualization
 class NEB(Graph):
     def __init__(
         self,
+        data=None,
+        labels=None,
         n_components=25,
         mixture_model_type="tmm",
         n_neighbors=10,  # number of neighbors for the NEB path computation
         dataset_name=None,
         n_clusters=None,  # target number of clusters (filled with GT if labels is given)
-        optimization_iterations=500,  # for NEB (huge impact on time consumption)
+        optimization_iterations=200,  # for NEB (huge impact on time consumption)
+        num_NEB_points=100,  # number of points in the NEB path
         seed=42,
-        data=None,
         latent_dim=2,  # automatically derived from data if provided. One of both is needed.
-        labels=None,
         path=None,
-        num_NEB_points=10,
         tmm_regularization=1e-4,
-        n_init=5,  # for fitting TMM/GMM
+        n_init=20,  # for fitting TMM/GMM
         thresh=0.01,  # for fitting TMM/GMM
         reduced_tolerance_on_retry=1e-3,  # for fitting TMM/GMM
         max_iter_on_retries=10000,  # for TMM fitting, 10x the default
-        max_elongation=None,  # will be set to 500 * dim
+        max_elongation=None,  # filtering will take place with 100*median_elongation, this parameter has no effect.
         min_cluster_size=10,  # mixture model filtering is only applied to TMM
-        batch_size=1024,  # for NEB computation (how many paths in parallel)
+        batch_size=150,  # for NEB computation (150 <8GB on GPU for d=64, more for lower dimensions)
     ):
         """
         Initialize the NEB (nudged elastic band) based on TMM/GMM.
@@ -56,11 +57,12 @@ class NEB(Graph):
             self.mixture_model = studenttmixture.EMStudentMixture(
                 n_components=n_components,
                 reg_covar=tmm_regularization,  # this makes the TMM favor ball-like shapes (and avoid extreme elongations)
-                n_init=(
-                    1 if latent_dim > 10 else n_init
-                ),  # convergence is slow in high dimension so we give the model more tries in the fit function if it does not converge immediately.
+                n_init=n_init,
+                tol=10e-3,  # matching the default of sklearn for GMM
+                max_iter=100,  # matching the default of sklearn for GMM
                 fixed_df=True,
                 df=1.0,  # the minimum value, for df=infty we get gmm
+                # fixed_df=False,
                 init_type="kmeans",
                 random_state=seed,
             )
@@ -83,7 +85,7 @@ class NEB(Graph):
         self.max_iter_on_retries = max_iter_on_retries
         self.min_cluster_size = min_cluster_size
         self.max_elongation = (
-            max_elongation if max_elongation is not None else 500 * latent_dim
+            max_elongation if max_elongation is not None else 250 * latent_dim**2
         )
         self.reduced_tolerance_on_retry = reduced_tolerance_on_retry
         self.num_NEB_points = num_NEB_points
@@ -119,21 +121,55 @@ class NEB(Graph):
         mixture_model.filter_components(
             data_X=data_X,
             min_cluster_size=min_cluster_size,
-            max_elongation=max_elongation,
+            max_elongation=np.inf,
+        )
+        elongations = mixture_model.get_elongations()
+        perc_25_elongation = np.percentile(elongations, 25) if len(elongations) > 0 else np.inf
+        # med_elongation = np.median(elongations) if len(elongations) > 0 else np.inf
+        mixture_model.filter_components(
+            data_X=data_X,
+            min_cluster_size=min_cluster_size, # does not hurt to re-apply
+            max_elongation=100*perc_25_elongation,
         )
 
         return mixture_model, model_type
+
+    def _fit_NEB_paths(self, model_type, knn):
+
+        if knn is None:
+            knn = self.n_neighbors
+
+        start_NEB = time.time()
+        # compute NEB paths.
+        (
+            self.adjacency_,
+            self.raw_adjacency_,
+            self.paths_,
+        ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths_batch(
+            means=self.mixture_model.centers,
+            covs=self.mixture_model.covs,
+            weights=self.mixture_model.weights,
+            df=self.mixture_model.df if (model_type == "tmm") else None,
+            gmm=(model_type == "gmm"),
+            iterations=self.iterations,
+            knn=knn,
+            num_NEB_points=self.num_NEB_points,
+            batch_size=self.batch_size,
+        )
+        self.time_NEB = time.time() - start_NEB
 
     def fit(self, data, knn=None):
         """
         fit the mixture model (overcluster), compute distances between clusters (based on NEB paths).
         """
         # fit the mixture model (re-use old model if available)
-        if hasattr(self, "old_mixture_model"):
-            if self.old_mixture_model is not None:
-                self.mixture_model = self.old_mixture_model
+        if hasattr(self, "old_mixture_model") and self.old_mixture_model is not None:
+            self.mixture_model = self.old_mixture_model
         else:
+            start_mixture = time.time()
             self.mixture_model.fit(data)
+            self.time_mixture = time.time() - start_mixture
+            print(f"Mixture model fit took {self.time_mixture:.2f} seconds.")
 
         # make sure that TMM converged (this is sometimes problematic)
         if isinstance(self.mixture_model, studenttmixture.EMStudentMixture):
@@ -181,25 +217,8 @@ class NEB(Graph):
         )
         if original_num_components != len(self.mixture_model.weights):
             self.mixture_model.print_elongations_and_counts(data)
-        if knn is None:
-            knn = self.n_neighbors
 
-        # compute NEB paths.
-        (
-            self.adjacency_,
-            self.raw_adjacency_,
-            self.paths_,
-        ) = corc.graph_metrics.tmm_gmm_neb.compute_neb_paths_batch(
-            means=self.mixture_model.centers,
-            covs=self.mixture_model.covs,
-            weights=self.mixture_model.weights,
-            df=self.mixture_model.df,
-            gmm=(model_type == "gmm"),
-            iterations=self.iterations,
-            knn=knn,
-            num_NEB_points=self.num_NEB_points,
-            batch_size=self.batch_size,
-        )
+        self._fit_NEB_paths(model_type, knn)
 
     def compute_mst_edges(self):
         """
@@ -284,17 +303,6 @@ class NEB(Graph):
         return pairs
 
     def create_graph(self, save=True, plot=True, return_graph=False):
-        """'
-        1. Overcluster data using a GMM/TMM
-        2. Construct a weighted undirected graph with the clusters as centers.
-        Low weights mean, that the clusters are more disconnected.
-        We span elastic bands between all pairs of clusters and then optimize them to stay "high" in probability space
-        3. Plots show tsne on samples and gmm/tmm cluster means.
-        """
-
-        # apply TSNE to get down to 2D
-        # embeddings, cluster_means = self._dim_reduction(self.centers_)
-
         # edges are expected in the form of a dictionary, so we have to convert our np array
         edges = {
             (i, j): self.adjacency_[i, j]
@@ -315,10 +323,8 @@ class NEB(Graph):
 
         if plot:
             self.plot_graph()
-
         if save:
             raise NotImplementedError
-
         if return_graph:
             return self.graph_data
 
@@ -453,10 +459,11 @@ class NEB(Graph):
                 plot_points=False,
                 plot_ids=False,
                 landscape_kwargs=kwargs,
+                bend_paths=True,
             )
 
         else:  # more than 2 dims
-
+            assert self.data is not None, "self.data is needed for tsne matching"
             # get (pseudo) TSNE embedding
             if X2D is None:
                 raise Exception(
@@ -483,3 +490,31 @@ class NEB(Graph):
                     start = cluster_means[pair[0]]
                     end = cluster_means[pair[1]]
                     ax.plot(*zip(start, end), color="black", alpha=0.5, lw=1)
+
+    def get_ari(self, X, y, force=False):
+        if not hasattr(self, "ari") or force:
+            y_pred = self.predict_with_target(
+                X, target_number_classes=len(np.unique(y))
+            )
+            self.ari = sklearn.metrics.adjusted_rand_score(y, y_pred)
+        return self.ari
+
+    def get_purity(self, X, y, recompute=True):
+        if not hasattr(self, "purity") or recompute:
+            normed_adj = self.adjacency_.copy()
+            normed_adj += np.min(normed_adj)
+            condensed_linearized = scipy.spatial.distance.squareform(
+                -normed_adj, checks=False
+            )
+            condensed_linearized = np.nan_to_num(
+                condensed_linearized, nan=1e8, posinf=1e6, neginf=1e6
+            )  # make sure -inf values are not chosen
+            dendrogram = scipy.cluster.hierarchy.linkage(
+                condensed_linearized, method="single"
+            )
+            y_pred = self.mixture_model.predict(X)
+            self.purity = corc.purity.dendrogram_purity(
+                dendrogram, y, y_pred_raw=y_pred
+            )
+
+        return self.purity

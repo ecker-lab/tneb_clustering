@@ -31,6 +31,8 @@ class MixtureModel(ABC):
         self.centers = self.centers[component_filter]
         self.covs = self.covs[component_filter]
         self.weights = self.weights[component_filter]
+        if hasattr(self, "df"):
+            self.df = self.df[component_filter]
 
     def get_elongations(self):
         """
